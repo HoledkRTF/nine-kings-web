@@ -1,0 +1,16 @@
+{
+  "name": "ossuary-citadel",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite features/ossuary-citadel-core",
+    "build": "vite build features/ossuary-citadel-core",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vitest": "^1.4.0"
+  }
+}
