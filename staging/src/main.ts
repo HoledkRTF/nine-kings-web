@@ -100,16 +100,16 @@ function gameLoop(now: number) {
     // 2. Quick-Raise Minions
     if (input.isDown('q')) {
       input.keys.delete('q');
-      const raised = swarm.raiseMinion('skeleton_grunt', citadel.x, citadel.y, corpses);
+      const raised = swarm.raiseMinion('skeleton_grunt', citadel.x, citadel.y, corpses, citadel.radius, citadel.angle);
       if (raised) audio.playCrunch();
     }
     if (input.isDown('e')) {
       input.keys.delete('e');
-      const raised = swarm.raiseMinion('bone_phalanx', citadel.x, citadel.y, corpses);
+      const raised = swarm.raiseMinion('bone_phalanx', citadel.x, citadel.y, corpses, citadel.radius, citadel.angle);
       if (raised) audio.playCrunch();
     }
 
-    // Active Spells
+    // 3. Active Spells
     spells.update(dt);
     if (input.isDown('1')) {
       input.keys.delete('1');
@@ -157,8 +157,44 @@ function gameLoop(now: number) {
       enemies.push(crusade.createEnemy(Math.random() > 0.5 ? 'peasant_caravan' : 'fleeing_hamlet', citadel.x + Math.cos(angle) * d, citadel.y + Math.sin(angle) * d));
     }
 
-    // 5. Update Minion Swarm
-    swarm.update(dt, citadel.x, citadel.y, spells.rallyActiveTimer > 0);
+    // 5. Update Autonomous Minion Swarm
+    const worldMouseX = input.mouseX + renderer.cameraX;
+    const worldMouseY = input.mouseY + renderer.cameraY;
+    const isPlayerDirecting = input.mouseClicked;
+
+    const minionEvents = swarm.update(
+      dt,
+      citadel.x,
+      citadel.y,
+      citadel.radius,
+      citadel.angle,
+      spells.rallyActiveTimer > 0,
+      enemies,
+      isPlayerDirecting ? worldMouseX : undefined,
+      isPlayerDirecting ? worldMouseY : undefined
+    );
+
+    // Process Minion Combat Events (Hits & Husk Kamikaze Explosions)
+    for (const ev of minionEvents) {
+      if (ev.type === 'husk_detonate') {
+        audio.playCrunch();
+        renderer.addShake(10, 0.3);
+        renderer.addParticle(ev.x, ev.y, '#84cc16', 22, 180, 4);
+        const aoeRad = ev.aoeRadius || 100;
+        for (const e of enemies) {
+          if (dist(ev, e) <= aoeRad + e.radius) {
+            e.hp -= ev.damage;
+            renderer.addParticle(e.x, e.y, '#22c55e', 5, 80, 2);
+          }
+        }
+      } else if (ev.type === 'hit' && ev.targetId) {
+        const target = enemies.find(e => e.id === ev.targetId);
+        if (target) {
+          target.hp -= ev.damage;
+          renderer.addParticle(target.x, target.y, '#f8fafc', 3, 60, 2);
+        }
+      }
+    }
 
     // 6. Auto-fire modules in 360 degrees
     const buff = swarm.getBuffMultiplier();

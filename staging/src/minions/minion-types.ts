@@ -22,61 +22,61 @@ export const MINION_SPECS: Record<MinionKind, MinionDefinition> = {
     kind: 'skeleton_grunt',
     name: 'Skeleton Grunt',
     corpseCost: 1,
-    hp: 35,
-    speed: 160,
-    damage: 12,
-    radius: 7,
-    role: 'Fodder swarm & corpse collector'
+    hp: 45,
+    speed: 260,
+    damage: 18,
+    radius: 8,
+    role: 'Aggressive swarmer & enemy chaser'
   },
   bone_phalanx: {
     kind: 'bone_phalanx',
     name: 'Bone Phalanx',
     corpseCost: 2,
-    hp: 110,
-    speed: 120,
-    damage: 15,
-    radius: 9,
-    role: 'Shield-bearer absorbing siege fire'
+    hp: 140,
+    speed: 220,
+    damage: 20,
+    radius: 10,
+    role: 'Vanguard shield-wall intercepting charges'
   },
   bloated_husk: {
     kind: 'bloated_husk',
     name: 'Bloated Husk',
     corpseCost: 2,
-    hp: 40,
-    speed: 140,
-    damage: 80,
-    radius: 8,
-    role: 'Kamikaze siege bomber'
+    hp: 50,
+    speed: 240,
+    damage: 120,
+    radius: 9,
+    role: 'Kamikaze suicide bomber seeking siege & elites'
   },
   carrion_specter: {
     kind: 'carrion_specter',
     name: 'Carrion Specter',
     corpseCost: 3,
-    hp: 55,
-    speed: 210,
-    damage: 24,
+    hp: 65,
+    speed: 320,
+    damage: 28,
     radius: 8,
-    role: 'Flying armor-piercing phantom'
+    role: 'Flying armor-piercing flanker'
   },
   stitched_abomination: {
     kind: 'stitched_abomination',
     name: 'Stitched Abomination',
     corpseCost: 5,
-    hp: 350,
-    speed: 110,
-    damage: 55,
-    radius: 16,
-    role: 'Heavy frontline bruiser'
+    hp: 450,
+    speed: 200,
+    damage: 65,
+    radius: 17,
+    role: 'Frontline heavy bruiser crushing champions'
   },
   tomb_acolyte: {
     kind: 'tomb_acolyte',
     name: 'Tomb Acolyte',
     corpseCost: 3,
-    hp: 50,
-    speed: 130,
-    damage: 8,
-    radius: 7,
-    role: 'Support buffer increasing turret fire rate'
+    hp: 60,
+    speed: 200,
+    damage: 15,
+    radius: 8,
+    role: 'Rearguard caster buffing modules and firing bolts'
   }
 };
 
@@ -91,4 +91,14 @@ export interface ActiveMinion {
   damage: number;
   radius: number;
   attackCooldown: number;
+  formationOffset: number; // Offset for patrol / shield slot
+}
+
+export interface MinionCombatEvent {
+  type: 'hit' | 'husk_detonate' | 'acolyte_bolt';
+  x: number;
+  y: number;
+  damage: number;
+  aoeRadius?: number;
+  targetId?: string;
 }
