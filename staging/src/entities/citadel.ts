@@ -27,10 +27,10 @@ export class CitadelEntity {
   socketCount: number = 2;
 
   // Steering constants
-  readonly maxSpeedBase: number = 180;
-  readonly accelerationBase: number = 220;
-  readonly turnSpeedBase: number = 2.4;
-  readonly friction: number = 0.92;
+  readonly maxSpeedBase: number = 380;
+  readonly accelerationBase: number = 720;
+  readonly turnSpeedBase: number = 3.8;
+  readonly friction: number = 0.94;
 
   // Surge state
   surgeCooldown: number = 0;
@@ -107,21 +107,23 @@ export class CitadelEntity {
     let accel = this.accelerationBase / (1 + this.tier * 0.05);
     const turnRate = this.turnSpeedBase / (1 + this.tier * 0.09);
 
-    if (input.surge && this.surgeCooldown <= 0 && this.boneMass >= 5) {
-      this.boneMass -= 5;
-      this.recalculateGrowth();
-      this.surgeActiveTimer = 0.5;
-      this.surgeCooldown = 3.0;
+    if (input.surge && this.surgeCooldown <= 0) {
+      if (this.boneMass >= 2) {
+        this.boneMass -= 2;
+        this.recalculateGrowth();
+      }
+      this.surgeActiveTimer = 0.6;
+      this.surgeCooldown = 1.8;
     }
 
     if (this.surgeActiveTimer > 0) {
-      maxSpeed *= 2.0;
-      accel *= 2.5;
+      maxSpeed *= 2.2;
+      accel *= 3.0;
     }
 
     this.angle += input.turn * turnRate * dt;
     this.speed += input.moveForward * accel * dt;
-    this.speed = clamp(this.speed, -maxSpeed * 0.4, maxSpeed);
+    this.speed = clamp(this.speed, -maxSpeed * 0.6, maxSpeed);
     this.speed *= Math.pow(this.friction, dt * 60);
 
     this.x += Math.cos(this.angle) * this.speed * dt;

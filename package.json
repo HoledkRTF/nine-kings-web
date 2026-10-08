@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite features/ossuary-citadel-core",
-    "build": "vite build features/ossuary-citadel-core",
+    "dev": "vite main",
+    "build": "vite build main",
     "test": "vitest run"
   },
   "devDependencies": {
