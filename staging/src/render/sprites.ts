@@ -3,6 +3,7 @@ import { WeaponModule } from '../weapons/weapon-module';
 import { ActiveMinion } from '../minions/minion-types';
 import { WorldEnemy } from '../world/world-entities';
 import { CorpseEntity } from '../entities/corpse';
+import { getPixelArtMinion } from './pixel-sprites';
 
 // --- CITADEL SPRITE RENDERING ---
 
@@ -267,144 +268,59 @@ export function drawMinionSprite(
   ctx.save();
   ctx.translate(m.x, m.y);
 
-  if (m.kind === 'skeleton_grunt') {
-    // Humanoid Skeleton with sword & skull
-    const bob = Math.sin(animTime * 10 + m.x) * 2;
+  // Pin-sharp pixel rendering
+  ctx.imageSmoothingEnabled = false;
 
-    // Ribcage & spine
-    ctx.strokeStyle = '#f8fafc';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -2 + bob);
-    ctx.lineTo(0, 6 + bob);
-    ctx.moveTo(-4, 0 + bob);
-    ctx.lineTo(4, 0 + bob);
-    ctx.moveTo(-3, 3 + bob);
-    ctx.lineTo(3, 3 + bob);
-    ctx.stroke();
+  // Walk cycle animation (frame 0 or 1)
+  const frameIndex = Math.floor(animTime * 7) % 2;
+  const scale = m.kind === 'stitched_abomination' ? 3 : 2;
+  const sprite = getPixelArtMinion(m.kind, frameIndex, scale);
 
-    // Skull
-    ctx.fillStyle = '#f8fafc';
+  // Dynamic vertical bobbing for marching or hovering
+  const bob = m.kind === 'carrion_specter'
+    ? Math.sin(animTime * 5 + (m.formationOffset * 10)) * 3
+    : Math.sin(animTime * 14 + (m.formationOffset * 10)) * 2;
+
+  // Draw cached pixel art sprite centered
+  ctx.drawImage(
+    sprite.canvas,
+    -sprite.width / 2,
+    -sprite.height / 2 + bob
+  );
+
+  // Glowing ethereal aura for Specters and Husks
+  if (m.kind === 'carrion_specter') {
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
     ctx.beginPath();
-    ctx.arc(0, -6 + bob, 4.5, 0, Math.PI * 2);
+    ctx.arc(0, bob, 14, 0, Math.PI * 2);
     ctx.fill();
-
-    // Glowing cyan eyes
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(-2, -7 + bob, 1.5, 1.5);
-    ctx.fillRect(1, -7 + bob, 1.5, 1.5);
-
-    // Rusty iron blade
-    ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(4, 2 + bob);
-    ctx.lineTo(9, -6 + bob);
-    ctx.stroke();
-  } else if (m.kind === 'bone_phalanx') {
-    // Heavy Tower-Shield with horned goat skull
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(-7, -9, 14, 18);
-    ctx.strokeStyle = '#f1f5f9';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-7, -9, 14, 18);
-
-    // Shield Skull Insignia
-    ctx.fillStyle = '#e2e8f0';
-    ctx.beginPath();
-    ctx.arc(0, -2, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Spear tip protruding from shield
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(5, -1);
-    ctx.lineTo(12, -7);
-    ctx.stroke();
   } else if (m.kind === 'bloated_husk') {
-    // Swollen bile-green exploding zombie
-    const pulse = Math.sin(animTime * 8) * 1.5;
-    ctx.fillStyle = '#4d7c0f';
+    const pulse = Math.sin(animTime * 8) * 2;
+    ctx.fillStyle = 'rgba(190, 242, 100, 0.2)';
     ctx.beginPath();
-    ctx.ellipse(0, 0, 8 + pulse, 10 + pulse, 0, 0, Math.PI * 2);
+    ctx.arc(0, bob, 14 + pulse, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#a3e635';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+  }
 
-    // Pus boils
-    ctx.fillStyle = '#bef264';
-    ctx.beginPath();
-    ctx.arc(-3, -3, 2.5, 0, Math.PI * 2);
-    ctx.arc(3, 2, 2, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (m.kind === 'carrion_specter') {
-    // Flying ethereal wraith with mist tail
-    const wav = Math.sin(animTime * 6 + m.y * 0.1) * 3;
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.75)';
-    ctx.beginPath();
-    ctx.moveTo(0, -9);
-    ctx.lineTo(6, 2);
-    ctx.lineTo(wav, 11);
-    ctx.lineTo(-6, 2);
-    ctx.closePath();
-    ctx.fill();
+  // Health bar if damaged
+  if (m.hp < m.maxHp) {
+    const barW = Math.max(18, sprite.width * 0.7);
+    const barH = 3;
+    const barX = -barW / 2;
+    const barY = -sprite.height / 2 - 6 + bob;
 
-    // Twin piercing soul eyes
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(-2, -6, 1.5, 1.5);
-    ctx.fillRect(1, -6, 1.5, 1.5);
-  } else if (m.kind === 'stitched_abomination') {
-    // Colossal Meat Golem
-    ctx.fillStyle = '#831843';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 15, 13, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#f43f5e';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Stitches
-    ctx.strokeStyle = '#fecdd3';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(-6, -6);
-    ctx.lineTo(6, 6);
-    ctx.moveTo(-8, 3);
-    ctx.lineTo(8, -3);
-    ctx.stroke();
-
-    // Twin giant rusted meat cleavers
-    ctx.fillStyle = '#94a3b8';
-    ctx.fillRect(10, -12, 6, 16);
-    ctx.fillRect(-16, -12, 6, 16);
-  } else {
-    // Tomb Acolyte (Hooded dark mystic with bone lantern staff)
-    ctx.fillStyle = '#4c1d95';
-    ctx.beginPath();
-    ctx.moveTo(0, -8);
-    ctx.lineTo(6, 8);
-    ctx.lineTo(-6, 8);
-    ctx.closePath();
-    ctx.fill();
-
-    // Glowing lantern staff
-    ctx.strokeStyle = '#cbd5e1';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(5, -10);
-    ctx.lineTo(5, 8);
-    ctx.stroke();
-
-    ctx.fillStyle = '#a855f7';
-    ctx.beginPath();
-    ctx.arc(5, -11, 3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(barX, barY, barW * Math.max(0, m.hp / m.maxHp), barH);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(barX, barY, barW, barH);
   }
 
   ctx.restore();
 }
+
 
 // --- PREY & CRUSADE ENEMY SPRITES ---
 

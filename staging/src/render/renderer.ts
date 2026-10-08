@@ -87,6 +87,7 @@ export class GameRenderer {
     }
 
     ctx.save();
+    ctx.imageSmoothingEnabled = false;
     ctx.translate(-this.cameraX + offsetX, -this.cameraY + offsetY);
 
     // 1. Dark Grimdark Battlefield Terrain
