@@ -109,32 +109,44 @@ function gameLoop(now: number) {
       if (raised) audio.playCrunch();
     }
 
-    // 3. Active Spells
+    // Active Spells
     spells.update(dt);
     if (input.isDown('1')) {
       input.keys.delete('1');
       const res = spells.triggerCorpseExplosion(citadel.x, citadel.y, corpses);
-      if (res.explodedCount > 0) audio.playFire('physical');
+      if (res.explodedCount > 0) {
+        audio.playFire('physical');
+        renderer.addShake(12, 0.35);
+        renderer.addParticle(citadel.x, citadel.y, '#84cc16', 24, 220, 4);
+      }
     }
     if (input.isDown('2')) {
       input.keys.delete('2');
       spells.triggerUnholyRally();
+      renderer.addParticle(citadel.x, citadel.y, '#38bdf8', 12, 100, 3);
     }
     if (input.isDown('3')) {
       input.keys.delete('3');
       const healed = spells.triggerCannibalHarvest(citadel, swarm);
-      if (healed > 0) audio.playCrunch();
+      if (healed > 0) {
+        audio.playCrunch();
+        renderer.addParticle(citadel.x, citadel.y, '#10b981', 16, 120, 3);
+      }
     }
     if (input.isDown('4')) {
       input.keys.delete('4');
       const triggered = spells.triggerReapersWake();
-      if (triggered) audio.playFire('soul');
+      if (triggered) {
+        audio.playFire('soul');
+        renderer.addParticle(citadel.x, citadel.y, '#a855f7', 20, 160, 4);
+      }
     }
 
-    // 4. Crusade Wave Director
+    // Crusade Wave Director
     const wave = crusade.update(dt, citadel.x, citadel.y);
     if (wave.spawnedEnemies.length > 0) {
       enemies.push(...wave.spawnedEnemies);
+      renderer.addShake(6, 0.2);
     }
 
     // Replenish prey if population drops
@@ -179,6 +191,7 @@ function gameLoop(now: number) {
         if (dist(p, e) <= p.radius + e.radius) {
           e.hp -= p.damage;
           hit = true;
+          renderer.addParticle(p.x, p.y, p.type === 'blight' ? '#4ade80' : p.type === 'soul' ? '#c084fc' : '#f8fafc', 4, 80, 2);
           break;
         }
       }
@@ -196,6 +209,8 @@ function gameLoop(now: number) {
         const crush = citadel.calculateCrushDamage(e.radius);
         e.hp -= crush;
         audio.playCrunch();
+        renderer.addShake(7, 0.2);
+        renderer.addParticle(e.x, e.y, '#991b1b', 6, 120, 3);
       }
 
       // Minion clashes
@@ -210,6 +225,7 @@ function gameLoop(now: number) {
         corpses.spawnCorpse(e.x, e.y, e.corpseYield);
         citadel.addBoneMass(e.boneMassYield);
         crusade.addWrath(e.isHostile ? 12 : 25);
+        renderer.addParticle(e.x, e.y, '#f8fafc', 8, 90, 2.5);
         continue;
       }
 
@@ -226,6 +242,7 @@ function gameLoop(now: number) {
           if (e.attackCooldown <= 0) {
             citadel.takeDamage(e.damage);
             e.attackCooldown = 1.0;
+            renderer.addShake(4, 0.15);
           }
         }
       } else {
@@ -245,7 +262,7 @@ function gameLoop(now: number) {
 
   // 9. Render Frame
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  renderer.render(ctx, canvas.width, canvas.height, citadel, corpses.getAll(), swarm.getAll(), enemies, projectiles, equippedModules);
+  renderer.render(ctx, canvas.width, canvas.height, citadel, corpses.getAll(), swarm.getAll(), enemies, projectiles, equippedModules, dt);
   hud.render(ctx, canvas.width, canvas.height, citadel, corpses, crusade, spells, swarm, equippedModules, workshopOpen);
 
   requestAnimationFrame(gameLoop);

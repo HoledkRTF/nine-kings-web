@@ -4,11 +4,53 @@ import { ActiveMinion } from '../minions/minion-types';
 import { WorldEnemy } from '../world/world-entities';
 import { Projectile } from '../weapons/projectile';
 import { WeaponModule } from '../weapons/weapon-module';
+import {
+  drawCitadelSprite,
+  drawMinionSprite,
+  drawEnemySprite,
+  drawCorpseSprite
+} from './sprites';
+
+export interface VisualParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+  size: number;
+  life: number;
+  maxLife: number;
+}
 
 export class GameRenderer {
   cameraX: number = 0;
   cameraY: number = 0;
   private cameraInitialized: boolean = false;
+  shakeTime: number = 0;
+  shakeIntensity: number = 0;
+  particles: VisualParticle[] = [];
+
+  addShake(intensity: number, duration: number = 0.2): void {
+    this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
+    this.shakeTime = Math.max(this.shakeTime, duration);
+  }
+
+  addParticle(x: number, y: number, color: string, count: number = 4, speed: number = 60, size: number = 3): void {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = Math.random() * speed;
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        color,
+        size,
+        life: 0.4 + Math.random() * 0.4,
+        maxLife: 0.8
+      });
+    }
+  }
 
   render(
     ctx: CanvasRenderingContext2D,
@@ -19,224 +61,177 @@ export class GameRenderer {
     minions: ActiveMinion[],
     enemies: WorldEnemy[],
     projectiles: Projectile[],
-    equippedModules: (WeaponModule | null)[]
+    equippedModules: (WeaponModule | null)[],
+    dt: number = 0.016
   ): void {
+    const animTime = performance.now() / 1000;
+
+    // Smooth camera tracking
     if (!this.cameraInitialized) {
       this.cameraX = citadel.x - width / 2;
       this.cameraY = citadel.y - height / 2;
       this.cameraInitialized = true;
     } else {
-      this.cameraX += (citadel.x - width / 2 - this.cameraX) * 0.12;
-      this.cameraY += (citadel.y - height / 2 - this.cameraY) * 0.12;
+      this.cameraX += (citadel.x - width / 2 - this.cameraX) * 0.15;
+      this.cameraY += (citadel.y - height / 2 - this.cameraY) * 0.15;
+    }
+
+    // Screen Shake
+    let offsetX = 0;
+    let offsetY = 0;
+    if (this.shakeTime > 0) {
+      this.shakeTime -= dt;
+      offsetX = (Math.random() - 0.5) * this.shakeIntensity;
+      offsetY = (Math.random() - 0.5) * this.shakeIntensity;
+      if (this.shakeTime <= 0) this.shakeIntensity = 0;
     }
 
     ctx.save();
-    ctx.translate(-this.cameraX, -this.cameraY);
+    ctx.translate(-this.cameraX + offsetX, -this.cameraY + offsetY);
 
-    // 1. Terrain Grid
-    this.drawTerrain(ctx, width, height);
+    // 1. Dark Grimdark Battlefield Terrain
+    this.drawGrimdarkTerrain(ctx, width, height, animTime);
 
-    // 2. Ground Corpses
+    // 2. Ground Corpses (Detailed with bone heaps and blood pools)
     for (const c of corpses) {
-      ctx.fillStyle = c.value > 1 ? '#991b1b' : '#581c87';
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = c.value > 1 ? '#f87171' : '#c084fc';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      if (c.value > 1) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`x${c.value}`, c.x, c.y + 3);
-      }
+      drawCorpseSprite(ctx, c, animTime);
     }
 
-    // 3. Minion Swarm
+    // 3. Minion Swarm Sprites
     for (const m of minions) {
-      if (m.kind === 'stitched_abomination') {
-        ctx.fillStyle = '#831843';
-        ctx.beginPath();
-        ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#f43f5e';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      } else if (m.kind === 'carrion_specter') {
-        ctx.fillStyle = '#38bdf8';
-        ctx.beginPath();
-        ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (m.kind === 'bone_phalanx') {
-        ctx.fillStyle = '#64748b';
-        ctx.beginPath();
-        ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      } else if (m.kind === 'bloated_husk') {
-        ctx.fillStyle = '#65a30d';
-        ctx.beginPath();
-        ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        // Skeleton Grunt
-        ctx.fillStyle = '#f8fafc';
-        ctx.beginPath();
-        ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      drawMinionSprite(ctx, m, animTime);
     }
 
-    // 4. Enemies & Prey
+    // 4. Prey & Crusade Enemies Sprites
     for (const e of enemies) {
-      if (!e.isHostile) {
-        // Prey: Hamlets & Caravans
-        ctx.fillStyle = e.type === 'fleeing_hamlet' ? '#b45309' : '#d97706';
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#fef08a';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      } else {
-        // Hostiles
-        if (e.type === 'cathedral_titan') {
-          ctx.fillStyle = '#7f1d1d';
-          ctx.beginPath();
-          ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 4;
-          ctx.stroke();
-
-          // Spire cross
-          ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(e.x, e.y - 30);
-          ctx.lineTo(e.x, e.y + 30);
-          ctx.moveTo(e.x - 20, e.y - 10);
-          ctx.lineTo(e.x + 20, e.y - 10);
-          ctx.stroke();
-        } else {
-          ctx.fillStyle = e.type === 'silver_cavalry' ? '#3b82f6' : '#ef4444';
-          ctx.beginPath();
-          ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-      }
-
-      // Health bar for damaged enemies
-      if (e.hp < e.maxHp) {
-        const barW = e.radius * 2;
-        const barH = 4;
-        const barX = e.x - e.radius;
-        const barY = e.y - e.radius - 8;
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(barX, barY, barW, barH);
-        ctx.fillStyle = '#22c55e';
-        ctx.fillRect(barX, barY, barW * Math.max(0, e.hp / e.maxHp), barH);
-      }
+      drawEnemySprite(ctx, e, animTime);
     }
 
-    // 5. Ossuary Citadel & Mounted Sockets
-    ctx.save();
-    ctx.translate(citadel.x, citadel.y);
-    ctx.rotate(citadel.angle);
+    // 5. Ossuary Citadel Sprite (Legs, ribcage, soul furnace, horned ram, turrets)
+    drawCitadelSprite(ctx, citadel, equippedModules, animTime);
 
-    // Citadel Hull
-    ctx.fillStyle = '#1e1b4b';
-    ctx.beginPath();
-    ctx.arc(0, 0, citadel.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Inner bone structure lines
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, citadel.radius * 0.55, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Bone Ram at front
-    ctx.fillStyle = '#f1f5f9';
-    ctx.beginPath();
-    ctx.moveTo(citadel.radius + 16, 0);
-    ctx.lineTo(citadel.radius - 4, -20);
-    ctx.lineTo(citadel.radius - 4, 20);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Sockets & Mounted Weapons
-    const sockets = citadel.getSockets();
-    for (let i = 0; i < sockets.length; i++) {
-      const s = sockets[i];
-      const sx = Math.cos(s.angleOffset) * (citadel.radius * s.distanceRatio);
-      const sy = Math.sin(s.angleOffset) * (citadel.radius * s.distanceRatio);
-
-      const mod = equippedModules[i];
-      if (mod) {
-        // Color by Damage Type
-        ctx.fillStyle = mod.type === 'physical' ? '#94a3b8' : mod.type === 'blight' ? '#22c55e' : '#a855f7';
-      } else {
-        ctx.fillStyle = '#334155'; // Empty socket
-      }
-
-      ctx.beginPath();
-      ctx.arc(sx, sy, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // 6. Projectiles
+    // 6. Projectiles with Glowing Effects
     for (const p of projectiles) {
-      ctx.fillStyle = p.type === 'physical' ? '#ffffff' : p.type === 'blight' ? '#4ade80' : '#c084fc';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-      ctx.fill();
-      if (p.isAoE) {
-        ctx.strokeStyle = '#22c55e';
-        ctx.lineWidth = 1;
+      ctx.save();
+      if (p.type === 'physical') {
+        // High speed marrow harpoon
+        ctx.fillStyle = '#f8fafc';
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
+      } else if (p.type === 'blight') {
+        // Glowing toxic globule
+        const glow = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.radius * 2);
+        glow.addColorStop(0, '#86efac');
+        glow.addColorStop(0.6, '#22c55e');
+        glow.addColorStop(1, 'transparent');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius * 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Occult soul lightning
+        const glow = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.radius * 2);
+        glow.addColorStop(0, '#f0abfc');
+        glow.addColorStop(0.6, '#a855f7');
+        glow.addColorStop(1, 'transparent');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 7. Visual Particles & Splatters
+    const activeParticles: VisualParticle[] = [];
+    for (const pt of this.particles) {
+      pt.x += pt.vx * dt;
+      pt.y += pt.vy * dt;
+      pt.life -= dt;
+      if (pt.life > 0) {
+        const alpha = Math.max(0, pt.life / pt.maxLife);
+        ctx.fillStyle = pt.color;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.size * alpha, 0, Math.PI * 2);
+        ctx.fill();
+        activeParticles.push(pt);
       }
     }
+    this.particles = activeParticles;
+    ctx.globalAlpha = 1.0;
 
     ctx.restore();
   }
 
-  private drawTerrain(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    const gridSize = 120;
-    const startX = Math.floor(this.cameraX / gridSize) * gridSize;
-    const startY = Math.floor(this.cameraY / gridSize) * gridSize;
+  private drawGrimdarkTerrain(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    animTime: number
+  ): void {
+    // Deep dark gothic soil background
+    const startX = Math.floor(this.cameraX / 200) * 200;
+    const startY = Math.floor(this.cameraY / 200) * 200;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 1;
-    for (let x = startX; x < startX + width + gridSize * 2; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, startY);
-      ctx.lineTo(x, startY + height + gridSize * 2);
-      ctx.stroke();
-    }
-    for (let y = startY; y < startY + height + gridSize * 2; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(startX, y);
-      ctx.lineTo(startX + width + gridSize * 2, y);
-      ctx.stroke();
+    // Draw ambient road and tombstone grid
+    for (let x = startX - 200; x < startX + width + 400; x += 200) {
+      for (let y = startY - 200; y < startY + height + 400; y += 200) {
+        // Pseudo-random deterministic placement based on coordinates
+        const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        const seed = hash - Math.floor(hash);
+
+        // Cobblestone ground texture
+        ctx.fillStyle = (x / 200 + y / 200) % 2 === 0 ? '#0b0f19' : '#070a12';
+        ctx.fillRect(x, y, 200, 200);
+
+        // Scattered Tombstones & Gravestones
+        if (seed > 0.65) {
+          ctx.fillStyle = '#334155';
+          ctx.beginPath();
+          ctx.roundRect(x + 50, y + 50, 10, 15, [4, 4, 0, 0]);
+          ctx.fill();
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Inscribed cross on grave
+          ctx.strokeStyle = '#1e293b';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x + 55, y + 54);
+          ctx.lineTo(x + 55, y + 62);
+          ctx.moveTo(x + 52, y + 57);
+          ctx.lineTo(x + 58, y + 57);
+          ctx.stroke();
+        }
+
+        // Dead Tree Stumps / Skeletal Spines
+        if (seed < 0.25) {
+          ctx.strokeStyle = '#1e293b';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(x + 120, y + 130);
+          ctx.lineTo(x + 135, y + 110);
+          ctx.lineTo(x + 150, y + 105);
+          ctx.moveTo(x + 135, y + 110);
+          ctx.lineTo(x + 130, y + 95);
+          ctx.stroke();
+        }
+
+        // Faint desecrated rune circles
+        if (seed > 0.92) {
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.08)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(x + 100, y + 100, 30, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
     }
   }
 }
