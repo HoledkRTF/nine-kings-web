@@ -1,6 +1,6 @@
 import { MinionKind, MINION_SPECS, ActiveMinion, MinionCombatEvent } from './minion-types';
 import { CorpseManager } from '../managers/corpse-manager';
-import { dist, normalize, clamp } from '../engine/math';
+import { dist, normalize } from '../engine/math';
 
 export interface CombatEnemyTarget {
   id: string;
@@ -40,8 +40,8 @@ export class MinionSwarmManager {
     const spec = MINION_SPECS[kind];
     if (!corpseManager.spendCorpses(spec.corpseCost)) return false;
 
-    // Spawn clearly outside the citadel perimeter
-    const spawnDist = citadelRadius + 35 + Math.random() * 25;
+    // Spawn well outside the citadel's perimeter (at least 90-120px out)
+    const spawnDist = citadelRadius + 95 + Math.random() * 30;
     const spreadAngle = (Math.random() - 0.5) * Math.PI + citadelAngle;
 
     this.minions.push({
@@ -55,7 +55,9 @@ export class MinionSwarmManager {
       damage: spec.damage,
       radius: spec.radius,
       attackCooldown: 0,
-      formationOffset: (Math.random() - 0.5) * 2.0
+      formationOffset: (Math.random() - 0.5) * 2.0,
+      facingLeft: false,
+      attackLunge: 0
     });
 
     return true;
@@ -87,34 +89,37 @@ export class MinionSwarmManager {
     const combatEvents: MinionCombatEvent[] = [];
     const animTime = performance.now() / 1000;
 
+    // Citadel exclusion boundary (Minions must maintain at least 85px clearance from citadel edge)
+    const minClearance = citadelRadius + 85;
+
     for (let i = 0; i < this.minions.length; i++) {
       const m = this.minions[i];
       if (m.hp <= 0) continue;
       if (m.attackCooldown > 0) m.attackCooldown -= dt;
+      if (m.attackLunge && m.attackLunge > 0) m.attackLunge -= dt;
 
-      // 1. HARD CITADEL EXCLUSION (Minions MUST never hide inside/under the Citadel)
+      // 1. HARD CITADEL EXCLUSION
+      // If a minion gets pushed inside the clearance zone, strongly propel it outward
       const distToCitadel = dist(m, { x: citadelX, y: citadelY });
-      const minClearance = citadelRadius + m.radius + 18;
-
       if (distToCitadel < minClearance) {
         let pushDir = normalize({ x: m.x - citadelX, y: m.y - citadelY });
         if (pushDir.x === 0 && pushDir.y === 0) {
           pushDir = { x: Math.cos(m.formationOffset), y: Math.sin(m.formationOffset) };
         }
-        const pushForce = (minClearance - distToCitadel) * 14 * dt;
+        const pushForce = (minClearance - distToCitadel) * 16 * dt;
         m.x += pushDir.x * pushForce;
         m.y += pushDir.y * pushForce;
       }
 
-      // 2. Inter-Minion Boids Separation (Prevent clumping into single dot)
+      // 2. Inter-Minion Flocking Separation
       for (let j = 0; j < this.minions.length; j++) {
         if (i === j) continue;
         const other = this.minions[j];
         const dBetween = dist(m, other);
-        const minDist = m.radius + other.radius + 4;
+        const minDist = m.radius + other.radius + 12;
         if (dBetween < minDist && dBetween > 0) {
           const sep = normalize({ x: m.x - other.x, y: m.y - other.y });
-          const sepForce = (minDist - dBetween) * 5 * dt;
+          const sepForce = (minDist - dBetween) * 6 * dt;
           m.x += sep.x * sepForce;
           m.y += sep.y * sepForce;
         }
@@ -127,32 +132,37 @@ export class MinionSwarmManager {
       let enemyTarget: CombatEnemyTarget | null = null;
 
       if (targetX !== undefined && targetY !== undefined) {
-        // Player explicit command point
+        // Player explicit click command: charge target point
         goalX = targetX;
         goalY = targetY;
+        isHuntingEnemy = true;
       } else if (rallyActive) {
-        // Defensive perimeter contracted tightly around citadel
+        // Defensive perimeter contracted around citadel (outside the clearance buffer)
         const orbitAngle = citadelAngle + m.formationOffset * 1.5;
-        const orbitRadius = citadelRadius + 30;
+        const orbitRadius = citadelRadius + 90;
         goalX = citadelX + Math.cos(orbitAngle) * orbitRadius;
         goalY = citadelY + Math.sin(orbitAngle) * orbitRadius;
       } else {
-        // AUTONOMOUS ENEMY TARGETING
-        const aggroRadius = m.kind === 'carrion_specter' ? 520 : m.kind === 'bloated_husk' ? 460 : 380;
+        // AUTONOMOUS ENEMY AGGRO DETECTION
+        // Scan within 550px of minion (or 650px of citadel)
+        const aggroRadius = m.kind === 'carrion_specter' ? 620 : m.kind === 'bloated_husk' ? 560 : 500;
         let bestScore = -Infinity;
 
         for (const e of enemies) {
           if (e.hp <= 0) continue;
-          const d = dist(m, e);
-          if (d > aggroRadius) continue;
+          const dToMinion = dist(m, e);
+          const dToCitadel = dist(e, { x: citadelX, y: citadelY });
 
-          let score = 1000 - d;
+          // Engage if enemy is near the minion OR close to the citadel
+          if (dToMinion > aggroRadius && dToCitadel > 550) continue;
+
+          let score = 1000 - dToMinion;
           if (m.kind === 'bloated_husk' && (e.radius > 20 || e.isHostile)) {
-            score += 500; // Prioritize large siege engines or dangerous hostiles
+            score += 600; // Prioritize heavy siege & boss units
           } else if (m.kind === 'carrion_specter' && !e.isHostile) {
-            score += 200; // Harass fleeing targets
+            score += 300; // Chase down fleeing hamlets/caravans
           } else if (e.isHostile) {
-            score += 150;
+            score += 250;
           }
 
           if (score > bestScore) {
@@ -162,66 +172,92 @@ export class MinionSwarmManager {
         }
 
         if (enemyTarget) {
+          // Locked onto enemy: break formation and pursue!
           isHuntingEnemy = true;
           goalX = enemyTarget.x;
           goalY = enemyTarget.y;
         } else {
-          // NO ENEMY: Maintain Strategic Vanguard Formation around Citadel
+          // NO ENEMY: Form Wide Vanguard Escort around Citadel
           if (m.kind === 'bone_phalanx') {
             // Forward Shield Vanguard (in front of the bone ram)
-            const forwardAngle = citadelAngle + m.formationOffset * 0.5;
-            const forwardDist = citadelRadius + 45;
+            const forwardAngle = citadelAngle + m.formationOffset * 0.45;
+            const forwardDist = citadelRadius + 110;
             goalX = citadelX + Math.cos(forwardAngle) * forwardDist;
             goalY = citadelY + Math.sin(forwardAngle) * forwardDist;
           } else if (m.kind === 'tomb_acolyte') {
-            // Rearguard march behind the citadel
-            const rearAngle = citadelAngle + Math.PI + m.formationOffset * 0.4;
-            const rearDist = citadelRadius + 55;
+            // Rearguard march behind the citadel wake
+            const rearAngle = citadelAngle + Math.PI + m.formationOffset * 0.35;
+            const rearDist = citadelRadius + 100;
             goalX = citadelX + Math.cos(rearAngle) * rearDist;
             goalY = citadelY + Math.sin(rearAngle) * rearDist;
           } else if (m.kind === 'carrion_specter') {
-            // High orbit sweep
-            const sweepAngle = animTime * 2.5 + m.formationOffset * 2;
-            const sweepDist = citadelRadius + 80;
+            // Wide sweeping orbit
+            const sweepAngle = animTime * 2.2 + m.formationOffset * 2.5;
+            const sweepDist = citadelRadius + 145;
             goalX = citadelX + Math.cos(sweepAngle) * sweepDist;
             goalY = citadelY + Math.sin(sweepAngle) * sweepDist;
           } else {
-            // Skeletons, Abominations & Husks patrol the flanking wings
+            // Skeletons, Husks & Abominations guard left/right flanking wings
             const flankSide = m.formationOffset >= 0 ? 1 : -1;
-            const flankAngle = citadelAngle + flankSide * (Math.PI * 0.5) + m.formationOffset * 0.4;
-            const flankDist = citadelRadius + 50 + Math.abs(m.formationOffset) * 20;
+            const flankAngle = citadelAngle + flankSide * (Math.PI * 0.48) + m.formationOffset * 0.35;
+            const flankDist = citadelRadius + 115 + Math.abs(m.formationOffset) * 20;
             goalX = citadelX + Math.cos(flankAngle) * flankDist;
             goalY = citadelY + Math.sin(flankAngle) * flankDist;
           }
         }
       }
 
-      // 4. MOVE TOWARD GOAL
+      // 4. MOVE TOWARDS GOAL (With obstacle steering around citadel)
       const dGoal = dist(m, { x: goalX, y: goalY });
-      const moveThreshold = isHuntingEnemy ? m.radius + 10 : 15;
+      const moveThreshold = isHuntingEnemy ? m.radius + 8 : 16;
 
       if (dGoal > moveThreshold) {
-        const dir = normalize({ x: goalX - m.x, y: goalY - m.y });
-        m.x += dir.x * m.speed * dt;
-        m.y += dir.y * m.speed * dt;
+        let moveDir = normalize({ x: goalX - m.x, y: goalY - m.y });
+
+        // If path to enemy cuts directly through the citadel, route around the hull
+        const nextX = m.x + moveDir.x * 30;
+        const nextY = m.y + moveDir.y * 30;
+        if (dist({ x: nextX, y: nextY }, { x: citadelX, y: citadelY }) < minClearance) {
+          // Tangent avoidance vector
+          const toCenter = normalize({ x: citadelX - m.x, y: citadelY - m.y });
+          const tangent = { x: -toCenter.y, y: toCenter.x };
+          moveDir = normalize({ x: moveDir.x + tangent.x * 1.5, y: moveDir.y + tangent.y * 1.5 });
+        }
+
+        // Sprint boost if far away or pursuing enemy
+        let currentSpeed = m.speed;
+        if (isHuntingEnemy) {
+          currentSpeed *= 1.15; // Sprint into combat!
+        } else if (dGoal > 180) {
+          currentSpeed *= 1.45; // Catch up to formation fast!
+        }
+
+        m.x += moveDir.x * currentSpeed * dt;
+        m.y += moveDir.y * currentSpeed * dt;
+
+        // Facing direction
+        if (Math.abs(moveDir.x) > 0.05) {
+          m.facingLeft = moveDir.x < 0;
+        }
       }
 
-      // 5. ATTACK & KAMIKAZE EXECUTION
-      if (enemyTarget && dist(m, enemyTarget) <= m.radius + enemyTarget.radius + 12) {
+      // 5. COMBAT ATTACK & KAMIKAZE EXECUTION
+      if (enemyTarget && dist(m, enemyTarget) <= m.radius + enemyTarget.radius + 18) {
         if (m.kind === 'bloated_husk') {
-          // Suicide detonation!
+          // Kamikaze detonation!
           combatEvents.push({
             type: 'husk_detonate',
             x: m.x,
             y: m.y,
             damage: m.damage,
-            aoeRadius: 100
+            aoeRadius: 110
           });
-          m.hp = 0; // Sacrificed in explosion
-          continue; // Do not survive
+          m.hp = 0; // Died in explosion
+          continue; // Remove from field
         } else if (m.attackCooldown <= 0) {
-          // Melee / Harass Strike
-          m.attackCooldown = 0.55;
+          // Melee attack thrust
+          m.attackCooldown = 0.5;
+          m.attackLunge = 0.2;
           combatEvents.push({
             type: 'hit',
             x: enemyTarget.x,

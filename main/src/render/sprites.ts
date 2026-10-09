@@ -268,48 +268,79 @@ export function drawMinionSprite(
   ctx.save();
   ctx.translate(m.x, m.y);
 
-  // Pin-sharp pixel rendering
+  // 1. Soft Ground Shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(0, 10, m.radius * 1.1, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Horizontal Facing Flip
+  if (m.facingLeft) {
+    ctx.scale(-1, 1);
+  }
+
+  // 3. Pin-sharp retro pixel art rendering
   ctx.imageSmoothingEnabled = false;
 
   // Walk cycle animation (frame 0 or 1)
-  const frameIndex = Math.floor(animTime * 7) % 2;
-  const scale = m.kind === 'stitched_abomination' ? 3 : 2;
-  const sprite = getPixelArtMinion(m.kind, frameIndex, scale);
+  const frameIndex = Math.floor(animTime * 8) % 2;
+  const scale = m.kind === 'stitched_abomination' ? 3.6 : 2.6;
+  const sprite = getPixelArtMinion(m.kind, frameIndex, Math.round(scale));
 
   // Dynamic vertical bobbing for marching or hovering
   const bob = m.kind === 'carrion_specter'
-    ? Math.sin(animTime * 5 + (m.formationOffset * 10)) * 3
+    ? Math.sin(animTime * 5 + (m.formationOffset * 10)) * 4
     : Math.sin(animTime * 14 + (m.formationOffset * 10)) * 2;
+
+  // Attack Lunge offset
+  const lungeOffset = (m.attackLunge && m.attackLunge > 0) ? 8 : 0;
 
   // Draw cached pixel art sprite centered
   ctx.drawImage(
     sprite.canvas,
-    -sprite.width / 2,
+    -sprite.width / 2 + lungeOffset,
     -sprite.height / 2 + bob
   );
 
-  // Glowing ethereal aura for Specters and Husks
+  // 4. Attack Slash Effect
+  if (m.attackLunge && m.attackLunge > 0) {
+    ctx.save();
+    ctx.strokeStyle = '#e0f2fe';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(sprite.width * 0.35 + lungeOffset, bob, 14, -Math.PI * 0.35, Math.PI * 0.35);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(sprite.width * 0.35 + lungeOffset, bob, 18, -Math.PI * 0.25, Math.PI * 0.25);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 5. Glowing Ethereal Aura for Specters and Husks
   if (m.kind === 'carrion_specter') {
     ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
     ctx.beginPath();
-    ctx.arc(0, bob, 14, 0, Math.PI * 2);
+    ctx.arc(0, bob, 16, 0, Math.PI * 2);
     ctx.fill();
   } else if (m.kind === 'bloated_husk') {
     const pulse = Math.sin(animTime * 8) * 2;
     ctx.fillStyle = 'rgba(190, 242, 100, 0.2)';
     ctx.beginPath();
-    ctx.arc(0, bob, 14 + pulse, 0, Math.PI * 2);
+    ctx.arc(0, bob, 16 + pulse, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Health bar if damaged
+  // 6. Health Bar if damaged
   if (m.hp < m.maxHp) {
-    const barW = Math.max(18, sprite.width * 0.7);
-    const barH = 3;
+    const barW = Math.max(22, sprite.width * 0.65);
+    const barH = 3.5;
     const barX = -barW / 2;
-    const barY = -sprite.height / 2 - 6 + bob;
+    const barY = -sprite.height / 2 - 7 + bob;
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.fillRect(barX, barY, barW, barH);
     ctx.fillStyle = '#22c55e';
     ctx.fillRect(barX, barY, barW * Math.max(0, m.hp / m.maxHp), barH);
@@ -320,6 +351,7 @@ export function drawMinionSprite(
 
   ctx.restore();
 }
+
 
 
 // --- PREY & CRUSADE ENEMY SPRITES ---

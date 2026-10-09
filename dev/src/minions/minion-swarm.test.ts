@@ -52,37 +52,37 @@ describe('MinionSwarmManager', () => {
     const minion = swarm.getAll()[0];
 
     // Force minion near citadel center
-    minion.x = 2;
-    minion.y = 2;
+    minion.x = 5;
+    minion.y = 5;
 
     const citadelRadius = 35;
     swarm.update(0.1, 0, 0, citadelRadius, 0, false, []);
 
     const d = Math.sqrt(minion.x * minion.x + minion.y * minion.y);
-    expect(d).toBeGreaterThan(2); // Ejected outward away from center
+    expect(d).toBeGreaterThan(5); // Strongly ejected outward away from center
   });
 
   it('autonomously pursues enemies within aggro radius', () => {
     corpses.addStock(5);
-    swarm.raiseMinion('skeleton_grunt', 50, 0, corpses);
+    swarm.raiseMinion('skeleton_grunt', 0, 0, corpses);
     const minion = swarm.getAll()[0];
-    minion.x = 60;
+    minion.x = 150;
     minion.y = 0;
 
-    const enemy = { id: 'test_enemy', x: 180, y: 0, hp: 50, radius: 10, isHostile: true };
+    const enemy = { id: 'test_enemy', x: 260, y: 0, hp: 50, radius: 10, isHostile: true };
     swarm.update(0.1, 0, 0, 35, 0, false, [enemy]);
 
-    expect(minion.x).toBeGreaterThan(60); // Moved towards enemy at (180, 0)
+    expect(minion.x).toBeGreaterThan(150); // Moved towards enemy at (260, 0)
   });
 
   it('triggers bloated husk suicide detonation on reaching enemy target', () => {
     corpses.addStock(5);
-    swarm.raiseMinion('bloated_husk', 50, 0, corpses);
+    swarm.raiseMinion('bloated_husk', 0, 0, corpses);
     const husk = swarm.getAll()[0];
-    husk.x = 100;
+    husk.x = 160;
     husk.y = 0;
 
-    const enemy = { id: 'target_phalanx', x: 110, y: 0, hp: 100, radius: 10, isHostile: true };
+    const enemy = { id: 'target_phalanx', x: 170, y: 0, hp: 100, radius: 10, isHostile: true };
     const events = swarm.update(0.1, 0, 0, 35, 0, false, [enemy]);
 
     expect(events.some(e => e.type === 'husk_detonate')).toBe(true);
