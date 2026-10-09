@@ -1,5 +1,6 @@
 import { MinionKind, MINION_SPECS, ActiveMinion, MinionCombatEvent } from './minion-types';
 import { CorpseManager } from '../managers/corpse-manager';
+import { CorpseEntity } from '../entities/corpse';
 import { dist, normalize } from '../engine/math';
 
 export interface CombatEnemyTarget {
@@ -89,7 +90,10 @@ export class MinionSwarmManager {
     citadelRadius: number = 36,
     citadelAngle: number = 0,
     rallyActive: boolean = false,
-    enemies: CombatEnemyTarget[] = []
+    enemies: CombatEnemyTarget[] = [],
+    groundCorpses: CorpseEntity[] = [],
+    scavengeRadius: number = 0,
+    scavengeSpeedMult: number = 1.0
   ): MinionCombatEvent[] {
     const surviving: ActiveMinion[] = [];
     const combatEvents: MinionCombatEvent[] = [];
@@ -136,6 +140,7 @@ export class MinionSwarmManager {
       let goalY = citadelY;
       let isHuntingEnemy = false;
       let enemyTarget: CombatEnemyTarget | null = null;
+      let corpseTarget: CorpseEntity | null = null;
 
       if (rallyActive) {
         // Defensive perimeter contracted around citadel (outside the clearance buffer)
@@ -178,8 +183,33 @@ export class MinionSwarmManager {
           goalX = enemyTarget.x;
           goalY = enemyTarget.y;
         } else {
-          // NO ENEMY: Form Wide Vanguard Escort around Citadel
-          if (m.kind === 'bone_phalanx') {
+          // Check for corpse scavenging if perk is unlocked
+          if (scavengeRadius > 0 && groundCorpses.length > 0) {
+            let closestCorpseDist = scavengeRadius;
+            for (const c of groundCorpses) {
+              const dToCorpse = dist(m, c);
+              if (dToCorpse < closestCorpseDist) {
+                closestCorpseDist = dToCorpse;
+                corpseTarget = c;
+              }
+            }
+          }
+
+          if (corpseTarget) {
+            // Autonomous corpse collection
+            goalX = corpseTarget.x;
+            goalY = corpseTarget.y;
+            if (dist(m, corpseTarget) <= m.radius + corpseTarget.radius + 12) {
+              combatEvents.push({
+                type: 'scavenge_corpse',
+                x: m.x,
+                y: m.y,
+                damage: 0,
+                corpseId: corpseTarget.id,
+                corpseValue: corpseTarget.value
+              });
+            }
+          } else if (m.kind === 'bone_phalanx') {
             // Forward Shield Vanguard (in front of the bone ram)
             const forwardAngle = citadelAngle + m.formationOffset * 0.45;
             const forwardDist = citadelRadius + 110;
@@ -225,10 +255,12 @@ export class MinionSwarmManager {
           moveDir = normalize({ x: moveDir.x + tangent.x * 1.5, y: moveDir.y + tangent.y * 1.5 });
         }
 
-        // Sprint boost if far away or pursuing enemy
+        // Sprint boost if pursuing enemy, harvesting corpse, or far from formation
         let currentSpeed = m.speed;
         if (isHuntingEnemy) {
           currentSpeed *= 1.15; // Sprint into combat!
+        } else if (corpseTarget) {
+          currentSpeed *= scavengeSpeedMult; // Sprint to scavenge corpse!
         } else if (dGoal > 180) {
           currentSpeed *= 1.45; // Catch up to formation fast!
         }

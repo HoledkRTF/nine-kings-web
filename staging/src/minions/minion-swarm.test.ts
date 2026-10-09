@@ -88,4 +88,17 @@ describe('MinionSwarmManager', () => {
     expect(events.some(e => e.type === 'husk_detonate')).toBe(true);
     expect(swarm.getMinionCount()).toBe(0); // Husk died in explosion
   });
+
+  it('scavenges ground corpses when scavenger perk is enabled', () => {
+    corpses.addStock(5);
+    swarm.raiseMinion('skeleton_grunt', 0, 0, corpses);
+    const minion = swarm.getAll()[0];
+    minion.x = 100;
+    minion.y = 100;
+
+    const groundCorpse = corpses.spawnCorpse(108, 108, 3);
+    const events = swarm.update(0.1, 0, 0, 35, 0, false, [], [groundCorpse], 500, 1.25);
+
+    expect(events.some(e => e.type === 'scavenge_corpse' && e.corpseId === groundCorpse.id)).toBe(true);
+  });
 });

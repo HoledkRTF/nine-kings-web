@@ -3,10 +3,12 @@ import { CorpseManager } from './managers/corpse-manager';
 import { WeaponModule, createWeapon } from './weapons/weapon-module';
 import { Projectile } from './weapons/projectile';
 import { MinionSwarmManager } from './minions/minion-swarm';
+import { MinionKind } from './minions/minion-types';
 import { SpellController } from './spells/spell-controller';
 import { CrusadeDirector } from './world/crusade-director';
 import { WorldEnemy } from './world/world-entities';
 import { ShrineManager, BreachReward, RelicUpgradeType } from './world/shrine-entity';
+import { ProgressionManager } from './managers/progression-manager';
 import { InputManager } from './engine/input';
 import { GameRenderer } from './render/renderer';
 import { GameHUD } from './ui/hud';
@@ -29,6 +31,7 @@ const swarm = new MinionSwarmManager(100);
 const spells = new SpellController();
 const crusade = new CrusadeDirector();
 const shrines = new ShrineManager();
+const progression = new ProgressionManager();
 const input = new InputManager();
 const renderer = new GameRenderer();
 const hud = new GameHUD();
@@ -79,6 +82,7 @@ function handleBreachReward(reward: BreachReward) {
   } else {
     citadel.applyRelicBuff(reward.upgradeType);
   }
+  progression.addExp(100);
   hud.showUpgradeBanner(reward.title, reward.description);
   audio.playFire('soul');
   renderer.addShake(18, 0.45);
@@ -91,14 +95,26 @@ function gameLoop(now: number) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
 
-  // Toggle Workshop with [R] or [Tab]
-  if (input.isDown('r') || input.isDown('tab')) {
+  // 0. LEVEL-UP DRAFT MODAL SELECTION
+  if (progression.pendingChoices && progression.pendingChoices.length > 0) {
+    for (let i = 0; i < progression.pendingChoices.length; i++) {
+      const key = String(i + 1);
+      if (input.isDown(key)) {
+        input.keys.delete(key);
+        const chosen = progression.selectChoice(i, citadel, swarm);
+        if (chosen) {
+          audio.playFire('soul');
+          hud.showUpgradeBanner(chosen.title, chosen.description);
+        }
+        break;
+      }
+    }
+  } else if (input.isDown('r') || input.isDown('tab')) {
+    // Toggle Workshop with [R] or [Tab]
     workshopOpen = !workshopOpen;
     input.keys.delete('r');
     input.keys.delete('tab');
-  }
-
-  if (workshopOpen) {
+  } else if (workshopOpen) {
     // Quick grafting in workshop
     const mapKeys: Record<string, string> = {
       '1': 'bone_ballista',
@@ -134,22 +150,30 @@ function gameLoop(now: number) {
     citadel.update(dt, { moveForward, turn, surge });
     corpses.update(dt, citadel.x, citadel.y, citadel.radius + 60);
 
-    // 2. Quick-Raise Minions
-    if (input.isDown('q')) {
-      input.keys.delete('q');
-      const raised = swarm.raiseMinion('skeleton_grunt', citadel.x, citadel.y, corpses, citadel.radius, citadel.angle);
-      if (raised) audio.playCrunch();
-    }
-    if (input.isDown('e')) {
-      input.keys.delete('e');
-      const raised = swarm.raiseMinion('bone_phalanx', citadel.x, citadel.y, corpses, citadel.radius, citadel.angle);
-      if (raised) audio.playCrunch();
+    // 2. Minion Summoning on Keys [1] through [6]
+    const minionHotkeys: { key: string; kind: MinionKind }[] = [
+      { key: '1', kind: 'skeleton_grunt' },
+      { key: '2', kind: 'bone_phalanx' },
+      { key: '3', kind: 'bloated_husk' },
+      { key: '4', kind: 'carrion_specter' },
+      { key: '5', kind: 'stitched_abomination' },
+      { key: '6', kind: 'tomb_acolyte' }
+    ];
+
+    for (const mk of minionHotkeys) {
+      if (input.isDown(mk.key)) {
+        input.keys.delete(mk.key);
+        if (progression.isMinionUnlocked(mk.kind)) {
+          const raised = swarm.raiseMinion(mk.kind, citadel.x, citadel.y, corpses, citadel.radius, citadel.angle);
+          if (raised) audio.playCrunch();
+        }
+      }
     }
 
-    // 3. Active Spells
+    // 3. Active Necromancy Spells on Keys [Q, E, F, C]
     spells.update(dt);
-    if (input.isDown('1')) {
-      input.keys.delete('1');
+    if (input.isDown('q')) {
+      input.keys.delete('q');
       const res = spells.triggerCorpseExplosion(citadel.x, citadel.y, corpses);
       if (res.explodedCount > 0) {
         audio.playFire('physical');
@@ -157,21 +181,21 @@ function gameLoop(now: number) {
         renderer.addParticle(citadel.x, citadel.y, '#84cc16', 24, 220, 4);
       }
     }
-    if (input.isDown('2')) {
-      input.keys.delete('2');
+    if (input.isDown('e')) {
+      input.keys.delete('e');
       spells.triggerUnholyRally();
       renderer.addParticle(citadel.x, citadel.y, '#38bdf8', 12, 100, 3);
     }
-    if (input.isDown('3')) {
-      input.keys.delete('3');
+    if (input.isDown('f')) {
+      input.keys.delete('f');
       const healed = spells.triggerCannibalHarvest(citadel, swarm);
       if (healed > 0) {
         audio.playCrunch();
         renderer.addParticle(citadel.x, citadel.y, '#10b981', 16, 120, 3);
       }
     }
-    if (input.isDown('4')) {
-      input.keys.delete('4');
+    if (input.isDown('c')) {
+      input.keys.delete('c');
       const triggered = spells.triggerReapersWake();
       if (triggered) {
         audio.playFire('soul');
@@ -196,7 +220,7 @@ function gameLoop(now: number) {
       enemies.push(crusade.createEnemy(pick, spawnX, spawnY));
     }
 
-    // 5. Update Autonomous Minion Swarm (Pure autonomous formation & aggro)
+    // 5. Update Autonomous Minion Swarm with Corpse Scavenging
     const minionEvents = swarm.update(
       dt,
       citadel.x,
@@ -204,10 +228,13 @@ function gameLoop(now: number) {
       citadel.radius,
       citadel.angle,
       spells.rallyActiveTimer > 0,
-      enemies
+      enemies,
+      corpses.getAll(),
+      progression.scavengeRadius,
+      progression.scavengeSpeedMultiplier
     );
 
-    // Process Minion Combat Events (Hits & Husk Kamikaze Explosions)
+    // Process Minion Combat & Scavenging Events
     for (const ev of minionEvents) {
       if (ev.type === 'husk_detonate') {
         audio.playCrunch();
@@ -216,16 +243,22 @@ function gameLoop(now: number) {
         const aoeRad = ev.aoeRadius || 100;
         for (const e of enemies) {
           if (dist(ev, e) <= aoeRad + e.radius) {
-            e.hp -= ev.damage;
+            e.hp -= ev.damage * progression.minionDamageMultiplier;
             renderer.addParticle(e.x, e.y, '#22c55e', 5, 80, 2);
           }
         }
       } else if (ev.type === 'hit' && ev.targetId) {
         const target = enemies.find(e => e.id === ev.targetId);
         if (target) {
-          target.hp -= ev.damage;
+          target.hp -= ev.damage * progression.minionDamageMultiplier;
           renderer.addParticle(target.x, target.y, '#f8fafc', 3, 60, 2);
         }
+      } else if (ev.type === 'scavenge_corpse' && ev.corpseId && ev.corpseValue) {
+        // Minion gathered a corpse!
+        corpses.removeCorpseById(ev.corpseId);
+        corpses.addStock(ev.corpseValue);
+        progression.addExp(ev.corpseValue * 6);
+        renderer.addParticle(ev.x, ev.y, '#c084fc', 3, 70, 2);
       }
     }
 
@@ -327,7 +360,7 @@ function gameLoop(now: number) {
       // Minion clashes
       for (const m of swarm.getAll()) {
         if (dist(m, e) <= m.radius + e.radius) {
-          e.hp -= m.damage * dt;
+          e.hp -= (m.damage * progression.minionDamageMultiplier) * dt;
           m.hp -= (e.damage || 5) * dt;
         }
       }
@@ -336,11 +369,12 @@ function gameLoop(now: number) {
         corpses.spawnCorpse(e.x, e.y, e.corpseYield);
         citadel.addBoneMass(e.boneMassYield);
         crusade.addWrath(e.isHostile ? 12 : 25);
+        progression.addExp(e.isHostile ? 12 : 20);
         renderer.addParticle(e.x, e.y, '#f8fafc', 8, 90, 2.5);
         continue;
       }
 
-      // Defensive Garrison Gathering & Hostile AI (No fleeing!)
+      // Defensive Garrison Gathering & Hostile AI
       if (e.assignedShrineId) {
         const s = shrines.shrines.find(sh => sh.id === e.assignedShrineId);
         if (s && !s.isBreached) {
@@ -428,7 +462,19 @@ function gameLoop(now: number) {
     dt,
     shrines.getAll()
   );
-  hud.render(ctx, canvas.width, canvas.height, citadel, corpses, crusade, spells, swarm, equippedModules, workshopOpen);
+  hud.render(
+    ctx,
+    canvas.width,
+    canvas.height,
+    citadel,
+    corpses,
+    crusade,
+    spells,
+    swarm,
+    equippedModules,
+    workshopOpen,
+    progression
+  );
 
   requestAnimationFrame(gameLoop);
 }

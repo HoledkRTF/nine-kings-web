@@ -98,10 +98,12 @@ export interface ActiveMinion {
 }
 
 export interface MinionCombatEvent {
-  type: 'hit' | 'husk_detonate' | 'acolyte_bolt';
+  type: 'hit' | 'husk_detonate' | 'acolyte_bolt' | 'scavenge_corpse';
   x: number;
   y: number;
   damage: number;
   aoeRadius?: number;
   targetId?: string;
+  corpseId?: string;
+  corpseValue?: number;
 }
