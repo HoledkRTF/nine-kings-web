@@ -13,11 +13,19 @@ export interface CombatEnemyTarget {
 
 export class MinionSwarmManager {
   private minions: ActiveMinion[] = [];
-  private readonly maxMinions: number;
+  private maxMinions: number;
   private nextId: number = 1;
 
   constructor(maxMinions: number = 100) {
     this.maxMinions = maxMinions;
+  }
+
+  getMaxMinions(): number {
+    return this.maxMinions;
+  }
+
+  expandMaxMinions(amount: number): void {
+    this.maxMinions += amount;
   }
 
   getMinionCount(): number {

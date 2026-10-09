@@ -4,6 +4,7 @@ import { ActiveMinion } from '../minions/minion-types';
 import { WorldEnemy } from '../world/world-entities';
 import { CorpseEntity } from '../entities/corpse';
 import { getPixelArtMinion } from './pixel-sprites';
+import { HolyShrine } from '../world/shrine-entity';
 
 // --- CITADEL SPRITE RENDERING ---
 
@@ -667,6 +668,141 @@ export function drawCorpseSprite(
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(`+${c.value}`, 0, -8);
+  }
+
+  ctx.restore();
+}
+
+// --- HOLY RELIC SHRINE RENDERING ---
+
+export function drawShrineSprite(
+  ctx: CanvasRenderingContext2D,
+  shrine: HolyShrine,
+  animTime: number
+): void {
+  ctx.save();
+  ctx.translate(shrine.x, shrine.y);
+
+  if (shrine.isBreached) {
+    // Shattered Consecrated Altar (Desecrated by the Necromancer)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+    ctx.beginPath();
+    ctx.arc(0, 0, shrine.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Broken marble fragments
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(-18, -12, 14, 10);
+    ctx.fillRect(8, -16, 12, 14);
+    ctx.fillRect(-10, 8, 22, 12);
+
+    // Dark necrotic smoke wisps
+    const smokeY = (Math.sin(animTime * 3) * 6);
+    ctx.fillStyle = 'rgba(74, 222, 128, 0.25)';
+    ctx.beginPath();
+    ctx.arc(0, -10 + smokeY, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Desecrated emblem
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('DESECRATED', 0, 28);
+  } else {
+    // Active Holy Relic Vault
+    const pulse = Math.sin(animTime * 4) * 0.15 + 0.85;
+
+    // Consecrated Radiant Ground Seal
+    const aura = ctx.createRadialGradient(0, 0, shrine.radius * 0.3, 0, 0, shrine.radius * 1.5);
+    aura.addColorStop(0, 'rgba(250, 204, 21, 0.45)');
+    aura.addColorStop(0.6, 'rgba(234, 179, 8, 0.15)');
+    aura.addColorStop(1, 'transparent');
+
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, shrine.radius * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Holy Ground Ring & Runes
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, shrine.radius * 0.95, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Rotating Divine Orbiting Runes
+    const runeCount = 6;
+    for (let i = 0; i < runeCount; i++) {
+      const angle = shrine.haloAngle + (i * Math.PI * 2) / runeCount;
+      const rx = Math.cos(angle) * (shrine.radius * 1.15);
+      const ry = Math.sin(angle) * (shrine.radius * 1.15);
+
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Sacred Marble Altar Base
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath();
+    ctx.ellipse(0, 4, shrine.radius * 0.65, shrine.radius * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Golden Reliquary Pedestal
+    ctx.fillStyle = '#eab308';
+    ctx.fillRect(-16, -18, 32, 22);
+    ctx.strokeStyle = '#ca8a04';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-16, -18, 32, 22);
+
+    // Golden Cross Finial / Sunburst
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(-3, -32, 6, 16);
+    ctx.fillRect(-8, -27, 16, 5);
+
+    // Flanking Crusade Banners
+    // Left Banner
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(-shrine.radius * 0.8, -25, 10, 22);
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-shrine.radius * 0.8, -25, 10, 22);
+
+    // Right Banner
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(shrine.radius * 0.8 - 10, -25, 10, 22);
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(shrine.radius * 0.8 - 10, -25, 10, 22);
+
+    // Divine Ward Shield Dome
+    ctx.strokeStyle = `rgba(254, 240, 138, ${0.4 + pulse * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, -6, shrine.radius * 0.8, Math.PI, 0, false);
+    ctx.stroke();
+
+    // Ward HP Bar
+    const barW = 60;
+    const barH = 6;
+    const hpPct = shrine.wardHp / shrine.maxWardHp;
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-barW / 2, shrine.radius + 6, barW, barH);
+    ctx.fillStyle = '#eab308';
+    ctx.fillRect(-barW / 2, shrine.radius + 6, barW * hpPct, barH);
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-barW / 2, shrine.radius + 6, barW, barH);
+
+    // Upgrade Badge Label
+    ctx.fillStyle = '#fef08a';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(shrine.upgradeTitle, 0, -38);
   }
 
   ctx.restore();

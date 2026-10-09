@@ -25,6 +25,11 @@ export class CitadelEntity {
   tier: number = 1;
   radius: number = 32;
   socketCount: number = 2;
+  bonusSockets: number = 0;
+  bonusMaxHp: number = 0;
+  crushMultiplier: number = 1.0;
+  speedMultiplier: number = 1.0;
+  fireRateBuff: number = 1.0;
 
   // Steering constants
   readonly maxSpeedBase: number = 380;
@@ -41,43 +46,69 @@ export class CitadelEntity {
     this.y = y;
   }
 
+  unlockAdditionalSocket(): boolean {
+    if (this.socketCount < 8) {
+      this.bonusSockets++;
+      this.socketCount = Math.min(8, this.socketCount + 1);
+      return true;
+    }
+    return false;
+  }
+
+  applyRelicBuff(type: string): void {
+    if (type === 'unlock_socket') {
+      this.unlockAdditionalSocket();
+    } else if (type === 'ironbone_plating') {
+      this.bonusMaxHp += 100;
+      this.maxHp += 100;
+      this.hp = Math.min(this.maxHp, this.hp + 100);
+      this.crushMultiplier *= 1.25;
+    } else if (type === 'zealot_haste') {
+      this.speedMultiplier *= 1.25;
+    } else if (type === 'soul_amplification') {
+      this.fireRateBuff *= 1.3;
+    }
+  }
+
   addBoneMass(amount: number): void {
     this.boneMass += amount;
     this.recalculateGrowth();
   }
 
   private recalculateGrowth(): void {
+    let baseSockets = 2;
     // Tiers at: 0, 100, 250, 500, 900, 1400, 2000
     if (this.boneMass >= 2000) {
       this.tier = 7;
-      this.socketCount = 8;
+      baseSockets = 8;
       this.radius = 70;
     } else if (this.boneMass >= 1400) {
       this.tier = 6;
-      this.socketCount = 7;
+      baseSockets = 7;
       this.radius = 62;
     } else if (this.boneMass >= 900) {
       this.tier = 5;
-      this.socketCount = 6;
+      baseSockets = 6;
       this.radius = 54;
     } else if (this.boneMass >= 500) {
       this.tier = 4;
-      this.socketCount = 5;
+      baseSockets = 5;
       this.radius = 48;
     } else if (this.boneMass >= 250) {
       this.tier = 3;
-      this.socketCount = 4;
+      baseSockets = 4;
       this.radius = 42;
     } else if (this.boneMass >= 100) {
       this.tier = 2;
-      this.socketCount = 3;
+      baseSockets = 3;
       this.radius = 36;
     } else {
       this.tier = 1;
-      this.socketCount = 2;
+      baseSockets = 2;
       this.radius = 32;
     }
-    this.maxHp = 500 + (this.tier - 1) * 150;
+    this.socketCount = Math.min(8, baseSockets + this.bonusSockets);
+    this.maxHp = 500 + (this.tier - 1) * 150 + this.bonusMaxHp;
   }
 
   getSockets(): SocketSlot[] {
@@ -96,16 +127,16 @@ export class CitadelEntity {
   calculateCrushDamage(targetMass: number): number {
     const momentum = Math.abs(this.speed) * (1 + this.tier * 0.4);
     const massDiff = Math.max(1, (this.tier * 15) - targetMass);
-    return Math.floor((momentum * 0.25) + massDiff * 4);
+    return Math.floor(((momentum * 0.25) + massDiff * 4) * this.crushMultiplier);
   }
 
   update(dt: number, input: CitadelInput): void {
     if (this.surgeCooldown > 0) this.surgeCooldown -= dt;
     if (this.surgeActiveTimer > 0) this.surgeActiveTimer -= dt;
 
-    let maxSpeed = this.maxSpeedBase / (1 + this.tier * 0.08);
-    let accel = this.accelerationBase / (1 + this.tier * 0.05);
-    const turnRate = this.turnSpeedBase / (1 + this.tier * 0.09);
+    let maxSpeed = (this.maxSpeedBase / (1 + this.tier * 0.08)) * this.speedMultiplier;
+    let accel = (this.accelerationBase / (1 + this.tier * 0.05)) * this.speedMultiplier;
+    const turnRate = (this.turnSpeedBase / (1 + this.tier * 0.09)) * this.speedMultiplier;
 
     if (input.surge && this.surgeCooldown <= 0) {
       if (this.boneMass >= 2) {

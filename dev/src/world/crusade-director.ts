@@ -33,7 +33,8 @@ export class CrusadeDirector {
   generateWave(playerX: number, playerY: number): WorldEnemy[] {
     const enemies: WorldEnemy[] = [];
     const tier = this.getTier();
-    const spawnCount = 4 + tier * 3;
+    // 2.5x density boost
+    const spawnCount = Math.floor((4 + tier * 3) * 2.5);
     const spawnDist = 600;
 
     for (let i = 0; i < spawnCount; i++) {
@@ -59,12 +60,48 @@ export class CrusadeDirector {
     return enemies;
   }
 
+  generateGarrison(shrineX: number, shrineY: number, shrineId: string): WorldEnemy[] {
+    const garrison: WorldEnemy[] = [];
+
+    // 4 Paladin Phalanxes guarding inner ring
+    for (let i = 0; i < 4; i++) {
+      const angle = (Math.PI * 2 * i) / 4;
+      const p = this.createEnemy('paladin_phalanx', shrineX + Math.cos(angle) * 80, shrineY + Math.sin(angle) * 80);
+      p.assignedShrineId = shrineId;
+      p.guardRadius = 80;
+      p.guardAngle = angle;
+      garrison.push(p);
+    }
+
+    // 4 Silver Cavalry patrolling outer perimeter
+    for (let i = 0; i < 4; i++) {
+      const angle = (Math.PI * 2 * i) / 4 + Math.PI / 4;
+      const c = this.createEnemy('silver_cavalry', shrineX + Math.cos(angle) * 145, shrineY + Math.sin(angle) * 145);
+      c.assignedShrineId = shrineId;
+      c.guardRadius = 145;
+      c.guardAngle = angle;
+      garrison.push(c);
+    }
+
+    // 2 High Inquisitors sanctifying the core
+    for (let i = 0; i < 2; i++) {
+      const angle = (Math.PI * i) + Math.PI / 2;
+      const inq = this.createEnemy('high_inquisitor', shrineX + Math.cos(angle) * 45, shrineY + Math.sin(angle) * 45);
+      inq.assignedShrineId = shrineId;
+      inq.guardRadius = 45;
+      inq.guardAngle = angle;
+      garrison.push(inq);
+    }
+
+    return garrison;
+  }
+
   createEnemy(type: EnemyType, x: number, y: number): WorldEnemy {
     switch (type) {
       case 'peasant_caravan':
-        return { id: `e_${this.nextId++}`, type, x, y, hp: 40, maxHp: 40, radius: 14, speed: 80, damage: 0, corpseYield: 4, boneMassYield: 15, isHostile: false, attackCooldown: 0 };
+        return { id: `e_${this.nextId++}`, type, x, y, hp: 50, maxHp: 50, radius: 14, speed: 85, damage: 0, corpseYield: 4, boneMassYield: 15, isHostile: false, attackCooldown: 0 };
       case 'fleeing_hamlet':
-        return { id: `e_${this.nextId++}`, type, x, y, hp: 90, maxHp: 90, radius: 24, speed: 45, damage: 0, corpseYield: 8, boneMassYield: 35, isHostile: false, attackCooldown: 0 };
+        return { id: `e_${this.nextId++}`, type, x, y, hp: 120, maxHp: 120, radius: 24, speed: 50, damage: 0, corpseYield: 8, boneMassYield: 35, isHostile: false, attackCooldown: 0 };
       case 'silver_cavalry':
         return { id: `e_${this.nextId++}`, type, x, y, hp: 60, maxHp: 60, radius: 12, speed: 170, damage: 18, corpseYield: 2, boneMassYield: 10, isHostile: true, attackCooldown: 0 };
       case 'paladin_phalanx':

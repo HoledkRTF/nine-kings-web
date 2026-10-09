@@ -21,4 +21,7 @@ export interface WorldEnemy {
   boneMassYield: number;
   isHostile: boolean;
   attackCooldown: number;
+  assignedShrineId?: string;
+  guardRadius?: number;
+  guardAngle?: number;
 }

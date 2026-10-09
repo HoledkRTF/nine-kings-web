@@ -6,6 +6,21 @@ import { MinionSwarmManager } from '../minions/minion-swarm';
 import { WeaponModule } from '../weapons/weapon-module';
 
 export class GameHUD {
+  upgradeBanner: { title: string; desc: string; timer: number } | null = null;
+
+  showUpgradeBanner(title: string, desc: string): void {
+    this.upgradeBanner = { title, desc, timer: 5.0 };
+  }
+
+  update(dt: number): void {
+    if (this.upgradeBanner) {
+      this.upgradeBanner.timer -= dt;
+      if (this.upgradeBanner.timer <= 0) {
+        this.upgradeBanner = null;
+      }
+    }
+  }
+
   render(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -44,6 +59,29 @@ export class GameHUD {
       barY - 7
     );
 
+    // 1.5 Top Banner: Conquered Relic Notification
+    if (this.upgradeBanner) {
+      const bannerW = Math.min(520, width * 0.6);
+      const bannerH = 46;
+      const bannerX = (width - bannerW) / 2;
+      const bannerY = barY + barH + 12;
+
+      ctx.fillStyle = 'rgba(20, 24, 38, 0.95)';
+      ctx.fillRect(bannerX, bannerY, bannerW, bannerH);
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bannerX, bannerY, bannerW, bannerH);
+
+      ctx.fillStyle = '#fde047';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`⚡ RELIC CONQUERED: ${this.upgradeBanner.title} ⚡`, width / 2, bannerY + 20);
+
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '12px monospace';
+      ctx.fillText(this.upgradeBanner.desc, width / 2, bannerY + 38);
+    }
+
     // 2. Bottom Center: Citadel Hull Integrity & Bone Mass
     const hullW = Math.min(360, width * 0.35);
     const hullX = (width - hullW) / 2;
@@ -67,7 +105,7 @@ export class GameHUD {
     );
     ctx.font = '12px monospace';
     ctx.fillText(
-      `CORPSES: ${corpses.getTotalStock()}  |  MINIONS: ${swarm.getMinionCount()}/100  |  SOCKETS: ${citadel.socketCount}`,
+      `CORPSES: ${corpses.getTotalStock()}  |  MINIONS: ${swarm.getMinionCount()}/${swarm.getMaxMinions()}  |  SOCKETS: ${citadel.socketCount}/8`,
       width / 2,
       hullY + 30
     );
