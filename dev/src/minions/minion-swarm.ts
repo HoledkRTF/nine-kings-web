@@ -89,9 +89,7 @@ export class MinionSwarmManager {
     citadelRadius: number = 36,
     citadelAngle: number = 0,
     rallyActive: boolean = false,
-    enemies: CombatEnemyTarget[] = [],
-    targetX?: number,
-    targetY?: number
+    enemies: CombatEnemyTarget[] = []
   ): MinionCombatEvent[] {
     const surviving: ActiveMinion[] = [];
     const combatEvents: MinionCombatEvent[] = [];
@@ -139,12 +137,7 @@ export class MinionSwarmManager {
       let isHuntingEnemy = false;
       let enemyTarget: CombatEnemyTarget | null = null;
 
-      if (targetX !== undefined && targetY !== undefined) {
-        // Player explicit click command: charge target point
-        goalX = targetX;
-        goalY = targetY;
-        isHuntingEnemy = true;
-      } else if (rallyActive) {
+      if (rallyActive) {
         // Defensive perimeter contracted around citadel (outside the clearance buffer)
         const orbitAngle = citadelAngle + m.formationOffset * 1.5;
         const orbitRadius = citadelRadius + 90;

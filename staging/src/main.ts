@@ -196,11 +196,7 @@ function gameLoop(now: number) {
       enemies.push(crusade.createEnemy(pick, spawnX, spawnY));
     }
 
-    // 5. Update Autonomous Minion Swarm
-    const worldMouseX = input.mouseX + renderer.cameraX;
-    const worldMouseY = input.mouseY + renderer.cameraY;
-    const isPlayerDirecting = input.mouseClicked;
-
+    // 5. Update Autonomous Minion Swarm (Pure autonomous formation & aggro)
     const minionEvents = swarm.update(
       dt,
       citadel.x,
@@ -208,9 +204,7 @@ function gameLoop(now: number) {
       citadel.radius,
       citadel.angle,
       spells.rallyActiveTimer > 0,
-      enemies,
-      isPlayerDirecting ? worldMouseX : undefined,
-      isPlayerDirecting ? worldMouseY : undefined
+      enemies
     );
 
     // Process Minion Combat Events (Hits & Husk Kamikaze Explosions)
