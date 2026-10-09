@@ -37,11 +37,13 @@ export class ProgressionManager {
   addExp(amount: number): boolean {
     this.currentExp += amount;
     if (this.currentExp >= this.maxExp) {
-      this.currentExp -= this.maxExp;
-      this.level++;
-      this.maxExp = Math.floor(this.maxExp * 1.35 + 30);
-      this.generateLevelChoices();
-      return true;
+      if (!this.pendingChoices || this.pendingChoices.length === 0) {
+        this.currentExp -= this.maxExp;
+        this.level++;
+        this.maxExp = Math.floor(this.maxExp * 1.35 + 30);
+        this.generateLevelChoices();
+        return true;
+      }
     }
     return false;
   }
@@ -107,6 +109,14 @@ export class ProgressionManager {
     const chosen = this.pendingChoices[choiceIndex];
     this.applyChoice(chosen, citadel, swarm);
     this.pendingChoices = null;
+
+    if (this.currentExp >= this.maxExp) {
+      this.currentExp -= this.maxExp;
+      this.level++;
+      this.maxExp = Math.floor(this.maxExp * 1.35 + 30);
+      this.generateLevelChoices();
+    }
+
     return chosen;
   }
 

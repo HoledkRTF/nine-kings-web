@@ -37,4 +37,12 @@ describe('SpellController', () => {
     expect(citadel.hp).toBeGreaterThan(100);
     expect(swarm.getMinionCount()).toBe(0);
   });
+
+  it('provides safe access to spell states via camelCase getters', () => {
+    expect(spells.corpseExplosion.id).toBe('corpse_explosion');
+    expect(spells.unholyRally.id).toBe('unholy_rally');
+    expect(spells.cannibalHarvest.id).toBe('cannibal_harvest');
+    expect(spells.reapersWake.id).toBe('reapers_wake');
+    expect(spells.corpseExplosion.cooldownRemaining).toBe(0);
+  });
 });

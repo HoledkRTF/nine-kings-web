@@ -21,6 +21,11 @@ export class SpellController {
   rallyActiveTimer: number = 0;
   reapersWakeActiveTimer: number = 0;
 
+  get corpseExplosion(): SpellState { return this.spells.corpse_explosion; }
+  get unholyRally(): SpellState { return this.spells.unholy_rally; }
+  get cannibalHarvest(): SpellState { return this.spells.cannibal_harvest; }
+  get reapersWake(): SpellState { return this.spells.reapers_wake; }
+
   update(dt: number): void {
     for (const s of Object.values(this.spells)) {
       if (s.cooldownRemaining > 0) s.cooldownRemaining -= dt;
