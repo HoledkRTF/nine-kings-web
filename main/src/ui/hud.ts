@@ -34,7 +34,9 @@ export class GameHUD {
     swarm: MinionSwarmManager,
     equippedModules: (WeaponModule | null)[],
     workshopOpen: boolean,
-    progression: ProgressionManager
+    progression: ProgressionManager,
+    mouseX?: number,
+    mouseY?: number
   ): void {
     ctx.save();
 
@@ -182,10 +184,10 @@ export class GameHUD {
 
     // 4. Bottom Left: Active Necromancy Spells [Q, E, F, C]
     const spellsList = [
-      { key: 'Q', name: 'Explosion', timer: spells.spells.corpseExplosion.cooldownRemaining },
-      { key: 'E', name: 'Rally', timer: spells.spells.unholyRally.cooldownRemaining },
-      { key: 'F', name: 'Harvest', timer: spells.spells.cannibalHarvest.cooldownRemaining },
-      { key: 'C', name: 'Wake', timer: spells.spells.reapersWake.cooldownRemaining }
+      { key: 'Q', name: 'Explosion', timer: (spells.spells.corpse_explosion || spells.corpseExplosion)?.cooldownRemaining ?? 0 },
+      { key: 'E', name: 'Rally', timer: (spells.spells.unholy_rally || spells.unholyRally)?.cooldownRemaining ?? 0 },
+      { key: 'F', name: 'Harvest', timer: (spells.spells.cannibal_harvest || spells.cannibalHarvest)?.cooldownRemaining ?? 0 },
+      { key: 'C', name: 'Wake', timer: (spells.spells.reapers_wake || spells.reapersWake)?.cooldownRemaining ?? 0 }
     ];
 
     let spellX = 16;
@@ -249,7 +251,7 @@ export class GameHUD {
 
       ctx.fillStyle = '#94a3b8';
       ctx.font = '12px monospace';
-      ctx.fillText('Press [1], [2], or [3] to select your upgrade', width / 2, modalY + 58);
+      ctx.fillText('Press [1], [2], [3] or CLICK card to select', width / 2, modalY + 58);
 
       const cardW = (modalW - 60) / progression.pendingChoices.length;
       for (let i = 0; i < progression.pendingChoices.length; i++) {
@@ -258,14 +260,18 @@ export class GameHUD {
         const cy = modalY + 75;
         const ch = modalH - 95;
 
-        ctx.fillStyle = 'rgba(25, 30, 48, 0.92)';
+        const isHovered = (mouseX !== undefined && mouseY !== undefined) &&
+          mouseX >= cx && mouseX <= cx + cardW &&
+          mouseY >= cy && mouseY <= cy + ch;
+
+        ctx.fillStyle = isHovered ? 'rgba(35, 45, 75, 0.98)' : 'rgba(25, 30, 48, 0.92)';
         ctx.fillRect(cx, cy, cardW, ch);
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = isHovered ? '#facc15' : '#38bdf8';
+        ctx.lineWidth = isHovered ? 2.5 : 1.5;
         ctx.strokeRect(cx, cy, cardW, ch);
 
         // Number Key Badge
-        ctx.fillStyle = '#38bdf8';
+        ctx.fillStyle = isHovered ? '#facc15' : '#38bdf8';
         ctx.fillRect(cx + 8, cy + 8, 26, 22);
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 13px monospace';
@@ -273,7 +279,7 @@ export class GameHUD {
         ctx.fillText(`[${i + 1}]`, cx + 21, cy + 24);
 
         // Card Title
-        ctx.fillStyle = '#f8fafc';
+        ctx.fillStyle = isHovered ? '#fef08a' : '#f8fafc';
         ctx.font = 'bold 13px sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(c.title, cx + 40, cy + 24);
@@ -295,6 +301,12 @@ export class GameHUD {
           }
         }
         ctx.fillText(line, cx + 12, textY);
+
+        // Bottom CTA
+        ctx.fillStyle = isHovered ? '#facc15' : '#64748b';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(isHovered ? '▶ CLICK TO SELECT ◀' : `[PRESS ${i + 1} OR CLICK]`, cx + cardW / 2, cy + ch - 12);
       }
     }
 

@@ -25,6 +25,12 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+canvas.setAttribute('tabindex', '0');
+canvas.focus();
+window.addEventListener('click', () => {
+  canvas.focus();
+});
+
 const citadel = new CitadelEntity(0, 0);
 const corpses = new CorpseManager(250);
 const swarm = new MinionSwarmManager(100);
@@ -97,10 +103,24 @@ function gameLoop(now: number) {
 
   // 0. LEVEL-UP DRAFT MODAL SELECTION
   if (progression.pendingChoices && progression.pendingChoices.length > 0) {
+    const modalW = Math.min(680, canvas.width * 0.88);
+    const modalH = 260;
+    const modalX = (canvas.width - modalW) / 2;
+    const modalY = (canvas.height - modalH) / 2;
+    const cardW = (modalW - 60) / progression.pendingChoices.length;
+    const cardY = modalY + 75;
+    const cardH = modalH - 95;
+
+    const clicked = input.consumeClick();
+
     for (let i = 0; i < progression.pendingChoices.length; i++) {
+      const cardX = modalX + 20 + i * (cardW + 10);
+      const isHovered = input.mouseX >= cardX && input.mouseX <= cardX + cardW &&
+                        input.mouseY >= cardY && input.mouseY <= cardY + cardH;
       const key = String(i + 1);
-      if (input.isDown(key)) {
-        input.keys.delete(key);
+
+      if (input.isDown(key) || (clicked && isHovered)) {
+        input.keys.clear();
         const chosen = progression.selectChoice(i, citadel, swarm);
         if (chosen) {
           audio.playFire('soul');
@@ -114,6 +134,9 @@ function gameLoop(now: number) {
     workshopOpen = !workshopOpen;
     input.keys.delete('r');
     input.keys.delete('tab');
+  } else if (input.isDown('escape') && workshopOpen) {
+    workshopOpen = false;
+    input.keys.delete('escape');
   } else if (workshopOpen) {
     // Quick grafting in workshop
     const mapKeys: Record<string, string> = {
@@ -473,7 +496,9 @@ function gameLoop(now: number) {
     swarm,
     equippedModules,
     workshopOpen,
-    progression
+    progression,
+    input.mouseX,
+    input.mouseY
   );
 
   requestAnimationFrame(gameLoop);

@@ -53,4 +53,20 @@ describe('ProgressionManager', () => {
     expect(progression.scavengerLevel).toBe(1);
     expect(progression.scavengeRadius).toBe(500);
   });
+
+  it('queues exp without wiping existing pending choices, then prompts next level on selection', () => {
+    progression.addExp(100);
+    expect(progression.level).toBe(2);
+    const firstChoices = progression.pendingChoices;
+    expect(firstChoices).not.toBeNull();
+
+    // Adding more exp while pending choices exist preserves existing choices
+    progression.addExp(300);
+    expect(progression.pendingChoices).toBe(firstChoices);
+
+    // After selecting choice, next level-up triggers from surplus exp
+    progression.selectChoice(0, citadel, swarm);
+    expect(progression.level).toBeGreaterThanOrEqual(3);
+    expect(progression.pendingChoices).not.toBeNull();
+  });
 });
