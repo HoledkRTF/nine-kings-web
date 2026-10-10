@@ -453,6 +453,11 @@ export function drawMinionSprite(
 
   ctx.imageSmoothingEnabled = false;
 
+  // Soul Decay Tether Flickering (warning when lifespan < 5s)
+  if (m.lifespan !== undefined && m.lifespan < 5) {
+    ctx.globalAlpha = 0.55 + Math.sin(animTime * 14) * 0.35;
+  }
+
   // Walk Cycle Animation Frame
   const frameIndex = Math.floor(animTime * 8) % 2;
   const scale = m.kind === 'stitched_abomination' ? 3.8 : 2.7;

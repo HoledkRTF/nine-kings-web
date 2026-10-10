@@ -14,6 +14,7 @@ export interface MinionDefinition {
   speed: number;
   damage: number;
   radius: number;
+  lifespan: number;
   role: string;
 }
 
@@ -22,61 +23,67 @@ export const MINION_SPECS: Record<MinionKind, MinionDefinition> = {
     kind: 'skeleton_grunt',
     name: 'Skeleton Grunt',
     corpseCost: 1,
-    hp: 45,
-    speed: 460,
-    damage: 22,
+    hp: 35,
+    speed: 260,
+    damage: 14,
     radius: 12,
-    role: 'Aggressive swarmer & enemy chaser'
+    lifespan: 22,
+    role: 'Fragile swarmer & frontline distraction'
   },
   bone_phalanx: {
     kind: 'bone_phalanx',
     name: 'Bone Phalanx',
     corpseCost: 2,
-    hp: 150,
-    speed: 400,
-    damage: 24,
+    hp: 110,
+    speed: 220,
+    damage: 16,
     radius: 14,
+    lifespan: 28,
     role: 'Vanguard shield-wall intercepting charges'
   },
   bloated_husk: {
     kind: 'bloated_husk',
     name: 'Bloated Husk',
     corpseCost: 2,
-    hp: 55,
-    speed: 440,
-    damage: 130,
+    hp: 40,
+    speed: 240,
+    damage: 90,
     radius: 13,
-    role: 'Kamikaze suicide bomber seeking siege & elites'
+    lifespan: 16,
+    role: 'Volatile suicide bomber seeking elites'
   },
   carrion_specter: {
     kind: 'carrion_specter',
     name: 'Carrion Specter',
     corpseCost: 3,
-    hp: 70,
-    speed: 520,
-    damage: 32,
+    hp: 50,
+    speed: 280,
+    damage: 22,
     radius: 12,
+    lifespan: 24,
     role: 'Flying armor-piercing flanker'
   },
   stitched_abomination: {
     kind: 'stitched_abomination',
     name: 'Stitched Abomination',
     corpseCost: 5,
-    hp: 500,
-    speed: 380,
-    damage: 75,
+    hp: 340,
+    speed: 200,
+    damage: 55,
     radius: 22,
+    lifespan: 35,
     role: 'Frontline heavy bruiser crushing champions'
   },
   tomb_acolyte: {
     kind: 'tomb_acolyte',
     name: 'Tomb Acolyte',
     corpseCost: 3,
-    hp: 65,
-    speed: 400,
-    damage: 18,
+    hp: 50,
+    speed: 220,
+    damage: 15,
     radius: 12,
-    role: 'Rearguard caster buffing modules and firing bolts'
+    lifespan: 28,
+    role: 'Rearguard caster buffing relics and firing bolts'
   }
 };
 
@@ -90,6 +97,8 @@ export interface ActiveMinion {
   speed: number;
   damage: number;
   radius: number;
+  lifespan: number;
+  maxLifespan: number;
   attackCooldown: number;
   formationOffset: number; // Offset for patrol / shield slot
   facingLeft?: boolean;

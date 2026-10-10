@@ -298,6 +298,7 @@ function gameLoop(now: number) {
     if (input.isDown('e')) {
       input.keys.delete('e');
       spells.triggerUnholyRally();
+      swarm.rejuvenateMinions(8);
       renderer.addParticle(citadel.x, citadel.y, '#38bdf8', 12, 100, 3);
     }
     if (input.isDown('f')) {
@@ -317,8 +318,8 @@ function gameLoop(now: number) {
       }
     }
 
-    // 4. Crusade Wave Director
-    const wave = crusade.update(dt, citadel.x, citadel.y);
+    // 4. Crusade Wave Director (Scales with player minion swarm count)
+    const wave = crusade.update(dt, citadel.x, citadel.y, swarm.getMinionCount());
     if (wave.spawnedEnemies.length > 0) {
       enemies.push(...wave.spawnedEnemies);
       renderer.addShake(8, 0.25);
@@ -409,23 +410,46 @@ function gameLoop(now: number) {
       let hit = false;
 
       if (p.isEnemy) {
-        // Enemy Holy Smite bolts can be blocked by minions!
-        for (const m of swarm.getAll()) {
-          if (dist(p, m) <= p.radius + m.radius) {
-            m.hp -= p.damage;
-            hit = true;
-            renderer.addParticle(p.x, p.y, '#facc15', 6, 80, 2);
-            break;
-          }
-        }
+        if (p.isAoE && p.aoeRadius) {
+          const hitNecro = dist(p, citadel) <= p.radius + citadel.radius;
+          const hitMinion = swarm.getAll().some(m => dist(p, m) <= p.radius + m.radius);
 
-        // Holy Bolt hits Necromancer
-        if (!hit && dist(p, citadel) <= p.radius + citadel.radius) {
-          citadel.takeDamage(p.damage);
-          hit = true;
-          renderer.addShake(8, 0.25);
-          renderer.addParticle(p.x, p.y, '#ef4444', 10, 120, 3);
-          audio.playCrunch();
+          if (hitNecro || hitMinion || p.rangeRemaining <= Math.hypot(p.vx, p.vy) * dt) {
+            hit = true;
+            renderer.addShake(11, 0.32);
+            renderer.addParticle(p.x, p.y, '#ea580c', 22, 190, 4);
+            renderer.addParticle(p.x, p.y, '#facc15', 16, 130, 3);
+            audio.playCrunch();
+
+            if (dist(p, citadel) <= p.aoeRadius) {
+              citadel.takeDamage(p.damage);
+            }
+
+            for (const m of swarm.getAll()) {
+              if (dist(p, m) <= p.aoeRadius) {
+                m.hp -= p.damage;
+                renderer.addParticle(m.x, m.y, '#ea580c', 4, 60, 2);
+              }
+            }
+          }
+        } else {
+          // Single target Holy Smite bolt can be blocked by minions
+          for (const m of swarm.getAll()) {
+            if (dist(p, m) <= p.radius + m.radius) {
+              m.hp -= p.damage;
+              hit = true;
+              renderer.addParticle(p.x, p.y, '#facc15', 6, 80, 2);
+              break;
+            }
+          }
+
+          if (!hit && dist(p, citadel) <= p.radius + citadel.radius) {
+            citadel.takeDamage(p.damage);
+            hit = true;
+            renderer.addShake(8, 0.25);
+            renderer.addParticle(p.x, p.y, '#ef4444', 10, 120, 3);
+            audio.playCrunch();
+          }
         }
       } else {
         // Player projectiles check against enemies
@@ -500,11 +524,11 @@ function gameLoop(now: number) {
         renderer.addParticle(e.x, e.y, '#991b1b', 4, 100, 2.5);
       }
 
-      // Minion clashes
+      // Minion clashes (Enemies fight back fiercely against swarms)
       for (const m of swarm.getAll()) {
         if (dist(m, e) <= m.radius + e.radius) {
-          e.hp -= (m.damage * progression.minionDamageMultiplier) * dt;
-          m.hp -= (e.damage || 8) * dt;
+          e.hp -= (m.damage * 0.45 * progression.minionDamageMultiplier) * dt;
+          m.hp -= (e.damage || 15) * 1.8 * dt;
         }
       }
 
@@ -517,21 +541,78 @@ function gameLoop(now: number) {
         continue;
       }
 
-      // --- Hardcore Tactical Enemy Behaviors ---
-      // Silver Cavalry: Gallop Lance Charge Burst
+      // --- Hardcore Anti-Swarm Tactical Enemy Behaviors ---
+      // 1. Silver Cavalry: Gallop Lance Charge & Swarm Trample
       if (e.type === 'silver_cavalry' && e.isHostile) {
         e.chargeTimer = (e.chargeTimer || 0) + dt;
-        if (d < 340 && e.chargeTimer > 2.8) {
-          e.speed = 280; // Gallop sprint!
+        if (d < 360 && e.chargeTimer > 2.6) {
+          e.speed = 285; // Gallop sprint!
           renderer.addParticle(e.x, e.y, '#cbd5e1', 1, 35, 1.8);
+
+          // Trample through any minions in charge path
+          for (const m of swarm.getAll()) {
+            if (dist(e, m) <= e.radius + m.radius + 12) {
+              m.hp -= 34; // Heavy trample damage!
+              const dx = m.x - e.x;
+              const dy = m.y - e.y;
+              const dLen = Math.hypot(dx, dy) || 1;
+              m.x += (dx / dLen) * 26;
+              m.y += (dy / dLen) * 26;
+              renderer.addParticle(m.x, m.y, '#cbd5e1', 2, 40, 2);
+            }
+          }
+
           if (d <= citadel.radius + e.radius + 8) {
             citadel.takeDamage(26);
             e.chargeTimer = 0;
             renderer.addShake(9, 0.28);
             audio.playCrunch();
           }
-        } else if (e.chargeTimer <= 2.8) {
+        } else if (e.chargeTimer <= 2.6) {
           e.speed = 170;
+        }
+      }
+
+      // 2. Paladin Phalanx: Consecrated Greatsword Cleave (Sweeps through minion swarms)
+      if (e.type === 'paladin_phalanx' && e.isHostile) {
+        e.cleaveCooldown = (e.cleaveCooldown === undefined ? 0.6 : e.cleaveCooldown) - dt;
+        if (e.cleaveCooldown <= 0) {
+          let cleavedCount = 0;
+          for (const m of swarm.getAll()) {
+            if (dist(e, m) <= 72) {
+              m.hp -= 34; // Heavy AoE holy cleave!
+              cleavedCount++;
+              renderer.addParticle(m.x, m.y, '#facc15', 3, 60, 2);
+            }
+          }
+          if (cleavedCount > 0) {
+            e.cleaveCooldown = 1.0;
+            renderer.addShake(4, 0.15);
+            audio.playCrunch();
+          }
+        }
+      }
+
+      // 3. High Inquisitor: Radiant Sunburst (Purging Nova against swarms)
+      if (e.type === 'high_inquisitor' && e.isHostile) {
+        e.purgeCooldown = (e.purgeCooldown === undefined ? 2.0 : e.purgeCooldown) - dt;
+        if (e.purgeCooldown <= 0) {
+          const closeMinions = swarm.getAll().filter(m => dist(e, m) <= 140);
+          if (closeMinions.length >= 2) {
+            e.purgeCooldown = 3.6;
+            for (const m of closeMinions) {
+              m.hp -= 42; // Purges nearby skeletons with holy flame!
+              const dx = m.x - e.x;
+              const dy = m.y - e.y;
+              const dLen = Math.hypot(dx, dy) || 1;
+              m.x += (dx / dLen) * 45;
+              m.y += (dy / dLen) * 45;
+            }
+            renderer.addShake(8, 0.25);
+            renderer.addParticle(e.x, e.y, '#fde047', 22, 220, 4);
+            renderer.addParticle(e.x, e.y, '#ea580c', 14, 160, 3);
+            audio.playFire('soul');
+          }
         }
       }
 

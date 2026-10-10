@@ -26,4 +26,6 @@ export interface WorldEnemy {
   guardAngle?: number;
   chargeTimer?: number;
   rangedCooldown?: number;
+  purgeCooldown?: number;
+  cleaveCooldown?: number;
 }

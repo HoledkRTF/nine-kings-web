@@ -63,6 +63,8 @@ export class MinionSwarmManager {
       speed: spec.speed,
       damage: spec.damage,
       radius: spec.radius,
+      lifespan: spec.lifespan,
+      maxLifespan: spec.lifespan,
       attackCooldown: 0,
       formationOffset: (Math.random() - 0.5) * 2.0,
       facingLeft: false,
@@ -70,6 +72,12 @@ export class MinionSwarmManager {
     });
 
     return true;
+  }
+
+  rejuvenateMinions(amount: number = 8): void {
+    for (const m of this.minions) {
+      m.lifespan = Math.min(m.maxLifespan, m.lifespan + amount);
+    }
   }
 
   sacrificeMinions(maxCount: number): number {
@@ -104,7 +112,8 @@ export class MinionSwarmManager {
 
     for (let i = 0; i < this.minions.length; i++) {
       const m = this.minions[i];
-      if (m.hp <= 0) continue;
+      m.lifespan -= dt;
+      if (m.hp <= 0 || m.lifespan <= 0) continue;
       if (m.attackCooldown > 0) m.attackCooldown -= dt;
       if (m.attackLunge && m.attackLunge > 0) m.attackLunge -= dt;
 

@@ -17,20 +17,25 @@ export class CrusadeDirector {
     this.wrath += amount;
   }
 
-  update(dt: number, playerX: number, playerY: number): { spawnedEnemies: WorldEnemy[] } {
-    this.wrath += dt * 1.5; // Passive climb
-    this.waveTimer -= dt;
+  update(dt: number, playerX: number, playerY: number, activeMinionCount: number = 0): { spawnedEnemies: WorldEnemy[] } {
+    // Minion threat scaling: Crusade escalates in response to heretic horde size
+    const swarmThreat = Math.max(0, activeMinionCount - 2) * 0.6;
+    this.wrath += (1.5 + swarmThreat) * dt;
+
+    // Active minion swarms accelerate inquisition wave timer
+    const waveAcceleration = activeMinionCount > 3 ? 1.0 + (activeMinionCount - 3) * 0.12 : 1.0;
+    this.waveTimer -= dt * waveAcceleration;
 
     if (this.waveTimer <= 0) {
-      this.waveTimer = Math.max(18, 35 - this.getTier() * 4);
+      this.waveTimer = Math.max(14, 30 - this.getTier() * 4);
       this.waveCounter++;
-      return { spawnedEnemies: this.generateWave(playerX, playerY) };
+      return { spawnedEnemies: this.generateWave(playerX, playerY, activeMinionCount) };
     }
 
     return { spawnedEnemies: [] };
   }
 
-  generateWave(playerX: number, playerY: number): WorldEnemy[] {
+  generateWave(playerX: number, playerY: number, activeMinionCount: number = 0): WorldEnemy[] {
     const enemies: WorldEnemy[] = [];
     const tier = this.getTier();
     // 2.5x density boost
@@ -43,7 +48,12 @@ export class CrusadeDirector {
       const y = playerY + Math.sin(angle) * spawnDist;
 
       if (tier === 1) {
-        enemies.push(this.createEnemy('silver_cavalry', x, y));
+        // If player already has a swarm in tier 1, mix in anti-swarm paladin cleavers
+        if (activeMinionCount >= 6 && i % 3 === 0) {
+          enemies.push(this.createEnemy('paladin_phalanx', x, y));
+        } else {
+          enemies.push(this.createEnemy('silver_cavalry', x, y));
+        }
       } else if (tier === 2) {
         enemies.push(i % 2 === 0 ? this.createEnemy('silver_cavalry', x, y) : this.createEnemy('paladin_phalanx', x, y));
       } else if (tier === 3) {
@@ -103,13 +113,13 @@ export class CrusadeDirector {
       case 'fleeing_hamlet':
         return { id: `e_${this.nextId++}`, type, x, y, hp: 120, maxHp: 120, radius: 24, speed: 50, damage: 0, corpseYield: 8, boneMassYield: 35, isHostile: false, attackCooldown: 0 };
       case 'silver_cavalry':
-        return { id: `e_${this.nextId++}`, type, x, y, hp: 60, maxHp: 60, radius: 12, speed: 170, damage: 18, corpseYield: 2, boneMassYield: 10, isHostile: true, attackCooldown: 0 };
+        return { id: `e_${this.nextId++}`, type, x, y, hp: 75, maxHp: 75, radius: 12, speed: 170, damage: 22, corpseYield: 2, boneMassYield: 10, isHostile: true, attackCooldown: 0 };
       case 'paladin_phalanx':
-        return { id: `e_${this.nextId++}`, type, x, y, hp: 140, maxHp: 140, radius: 15, speed: 90, damage: 25, corpseYield: 3, boneMassYield: 20, isHostile: true, attackCooldown: 0 };
+        return { id: `e_${this.nextId++}`, type, x, y, hp: 170, maxHp: 170, radius: 15, speed: 90, damage: 28, corpseYield: 3, boneMassYield: 20, isHostile: true, attackCooldown: 0 };
       case 'holy_trebuchet':
-        return { id: `e_${this.nextId++}`, type, x, y, hp: 200, maxHp: 200, radius: 22, speed: 40, damage: 50, corpseYield: 5, boneMassYield: 50, isHostile: true, attackCooldown: 0 };
+        return { id: `e_${this.nextId++}`, type, x, y, hp: 220, maxHp: 220, radius: 22, speed: 40, damage: 50, corpseYield: 5, boneMassYield: 50, isHostile: true, attackCooldown: 0 };
       case 'high_inquisitor':
-        return { id: `e_${this.nextId++}`, type, x, y, hp: 250, maxHp: 250, radius: 16, speed: 110, damage: 35, corpseYield: 6, boneMassYield: 60, isHostile: true, attackCooldown: 0 };
+        return { id: `e_${this.nextId++}`, type, x, y, hp: 280, maxHp: 280, radius: 16, speed: 110, damage: 36, corpseYield: 5, boneMassYield: 60, isHostile: true, attackCooldown: 0 };
       case 'cathedral_titan':
         return { id: `e_${this.nextId++}`, type, x, y, hp: 1200, maxHp: 1200, radius: 60, speed: 65, damage: 80, corpseYield: 25, boneMassYield: 300, isHostile: true, attackCooldown: 0 };
     }

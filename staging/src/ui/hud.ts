@@ -190,7 +190,7 @@ export class GameHUD {
     ctx.fillStyle = '#facc15';
     ctx.fillText(`💀 CORPSES: ${corpses.getTotalStock()}`, width / 2 - 130, hullY + 28);
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText(`⚔ MINIONS: ${swarm.getMinionCount()}/${swarm.getMaxMinions()}`, width / 2, hullY + 28);
+    ctx.fillText(`⚔ MINIONS: ${swarm.getMinionCount()}/${swarm.getMaxMinions()} (SOUL TETHER)`, width / 2, hullY + 28);
     ctx.fillStyle = '#c084fc';
     ctx.fillText(`🛡 RELICS: ${citadel.socketCount}/8`, width / 2 + 130, hullY + 28);
 
@@ -309,7 +309,7 @@ export class GameHUD {
     ctx.fillText('WASD : Walk & Aim', guideX + 12, guideY + 36);
     ctx.fillText('SPACE: Shadow Step (Blink)', guideX + 12, guideY + 52);
     ctx.fillText('1 - 6: Raise Minions', guideX + 12, guideY + 68);
-    ctx.fillText('Q,E,F,C: Necromancy Spells', guideX + 12, guideY + 84);
+    ctx.fillText('Q,E,F,C: Spells ([E] Rejuvenate)', guideX + 12, guideY + 84);
     ctx.fillText('R / TAB: Charnel Workshop', guideX + 12, guideY + 100);
 
     // ==========================================
