@@ -4,14 +4,14 @@ import { CrusadeDirector } from '../world/crusade-director';
 import { SpellController } from '../spells/spell-controller';
 import { MinionSwarmManager } from '../minions/minion-swarm';
 import { WeaponModule } from '../weapons/weapon-module';
+import { MINION_SPECS, MinionKind } from '../minions/minion-types';
 import { ProgressionManager } from '../managers/progression-manager';
-import { MinionKind, MINION_SPECS } from '../minions/minion-types';
 
 export class GameHUD {
   upgradeBanner: { title: string; desc: string; timer: number } | null = null;
 
   showUpgradeBanner(title: string, desc: string): void {
-    this.upgradeBanner = { title, desc, timer: 5.0 };
+    this.upgradeBanner = { title, desc, timer: 4.5 };
   }
 
   update(dt: number): void {
@@ -40,103 +40,160 @@ export class GameHUD {
   ): void {
     ctx.save();
 
-    // 1. Top Center: Inquisition Wrath Gauge
-    const barW = Math.min(420, width * 0.42);
-    const barH = 16;
+    // ==========================================
+    // 1. TOP CENTER: INQUISITION WRATH & SOUL EXP
+    // ==========================================
+    const barW = Math.min(460, width * 0.44);
+    const barH = 18;
     const barX = (width - barW) / 2;
-    const barY = 20;
+    const barY = 18;
 
-    ctx.fillStyle = 'rgba(15, 15, 20, 0.88)';
+    // --- 1.1 Inquisition Wrath Gauge ---
+    this.drawGothicPanel(ctx, barX - 10, barY - 14, barW + 20, 68, '#b91c1c', 'rgba(10, 12, 18, 0.92)');
+
+    // Wrath Track Frame
+    ctx.fillStyle = '#1c0505';
     ctx.fillRect(barX, barY, barW, barH);
     const wrathFrac = Math.min(1.0, crusade.wrath / 1000);
-    ctx.fillStyle = '#dc2626';
+
+    // Burning Fire Gradient
+    const wrathGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+    wrathGrad.addColorStop(0, '#991b1b');
+    wrathGrad.addColorStop(0.5, '#ea580c');
+    wrathGrad.addColorStop(1, '#facc15');
+    ctx.fillStyle = wrathGrad;
     ctx.fillRect(barX, barY, barW * wrathFrac, barH);
-    ctx.strokeStyle = '#f87171';
+
+    // Specular Glass Sheen on Top Half
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillRect(barX, barY, barW, barH * 0.45);
+
+    // Iron Bar Bevels
+    ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(barX, barY, barW, barH);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px monospace';
+    // Header Wrath Title
+    ctx.fillStyle = '#fef2f2';
+    ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(
-      `INQUISITION WRATH: TIER ${crusade.getTier()} (Wave in ${Math.max(0, Math.ceil(crusade.waveTimer))}s)`,
+      `⚔ INQUISITION WRATH: TIER ${crusade.getTier()} (Next Crusade in ${Math.max(0, Math.ceil(crusade.waveTimer))}s) ⚔`,
       width / 2,
-      barY - 6
+      barY - 3
     );
 
-    // 1.2 Top Center: Soul EXP Bar
-    const expBarY = barY + barH + 4;
-    const expBarH = 12;
-    ctx.fillStyle = 'rgba(15, 15, 25, 0.9)';
+    // --- 1.2 Soul Essence EXP Bar ---
+    const expBarY = barY + barH + 7;
+    const expBarH = 14;
+
+    ctx.fillStyle = '#1e112a';
     ctx.fillRect(barX, expBarY, barW, expBarH);
     const expFrac = Math.min(1.0, progression.currentExp / progression.maxExp);
-    ctx.fillStyle = '#a855f7';
+
+    // Glowing Amethyst-to-Cyan Soul Gradient
+    const expGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+    expGrad.addColorStop(0, '#581c87');
+    expGrad.addColorStop(0.5, '#9333ea');
+    expGrad.addColorStop(0.85, '#c084fc');
+    expGrad.addColorStop(1, '#38bdf8');
+    ctx.fillStyle = expGrad;
     ctx.fillRect(barX, expBarY, barW * expFrac, expBarH);
-    ctx.strokeStyle = '#c084fc';
+
+    // Glass sheen
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.fillRect(barX, expBarY, barW, expBarH * 0.45);
+
+    ctx.strokeStyle = '#a855f7';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(barX, expBarY, barW, expBarH);
 
+    // Soul EXP Text
     ctx.fillStyle = '#f3e8ff';
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(
-      `SOUL ESSENCE: LEVEL ${progression.level} (${progression.currentExp} / ${progression.maxExp} EXP)`,
+      `✦ SOUL ESSENCE: LEVEL ${progression.level} (${progression.currentExp} / ${progression.maxExp} EXP) ✦`,
       width / 2,
-      expBarY + 9
+      expBarY + 10
     );
 
-    // 1.5 Relic Conquest Banner
+    // --- 1.5 Relic Conquest Banner ---
     if (this.upgradeBanner) {
-      const bannerW = Math.min(520, width * 0.6);
-      const bannerH = 46;
+      const bannerW = Math.min(540, width * 0.65);
+      const bannerH = 50;
       const bannerX = (width - bannerW) / 2;
-      const bannerY = expBarY + expBarH + 12;
+      const bannerY = expBarY + expBarH + 16;
 
-      ctx.fillStyle = 'rgba(20, 24, 38, 0.95)';
-      ctx.fillRect(bannerX, bannerY, bannerW, bannerH);
-      ctx.strokeStyle = '#facc15';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(bannerX, bannerY, bannerW, bannerH);
+      this.drawGothicPanel(ctx, bannerX, bannerY, bannerW, bannerH, '#facc15', 'rgba(15, 20, 32, 0.96)');
 
-      ctx.fillStyle = '#fde047';
+      ctx.fillStyle = '#fef08a';
       ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`⚡ RELIC CONQUERED: ${this.upgradeBanner.title} ⚡`, width / 2, bannerY + 20);
+      ctx.fillText(`⚡ RELIC BREACHED: ${this.upgradeBanner.title} ⚡`, width / 2, bannerY + 22);
 
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = '12px monospace';
-      ctx.fillText(this.upgradeBanner.desc, width / 2, bannerY + 38);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(this.upgradeBanner.desc, width / 2, bannerY + 40);
     }
 
-    // 2. Bottom Center: Citadel Hull Integrity & Bone Mass
-    const hullW = Math.min(360, width * 0.35);
+    // ==========================================
+    // 2. BOTTOM CENTER: HULL INTEGRITY & STATS
+    // ==========================================
+    const hullW = Math.min(420, width * 0.4);
     const hullX = (width - hullW) / 2;
-    const hullY = height - 105;
+    const hullY = height - 120;
 
-    ctx.fillStyle = 'rgba(15, 15, 20, 0.88)';
+    // Bottom Stats Plaque
+    this.drawGothicPanel(ctx, hullX - 12, hullY - 14, hullW + 24, 52, '#3b82f6', 'rgba(10, 12, 18, 0.94)');
+
+    // Life Tube Gauge
+    ctx.fillStyle = '#062419';
     ctx.fillRect(hullX, hullY, hullW, 16);
     const hpFrac = Math.max(0, citadel.hp / citadel.maxHp);
-    ctx.fillStyle = hpFrac > 0.3 ? '#10b981' : '#ef4444';
+
+    const hpGrad = ctx.createLinearGradient(hullX, 0, hullX + hullW, 0);
+    if (hpFrac > 0.3) {
+      hpGrad.addColorStop(0, '#047857');
+      hpGrad.addColorStop(0.7, '#10b981');
+      hpGrad.addColorStop(1, '#34d399');
+    } else {
+      hpGrad.addColorStop(0, '#7f1d1d');
+      hpGrad.addColorStop(0.7, '#dc2626');
+      hpGrad.addColorStop(1, '#f87171');
+    }
+    ctx.fillStyle = hpGrad;
     ctx.fillRect(hullX, hullY, hullW * hpFrac, 16);
-    ctx.strokeStyle = '#34d399';
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.fillRect(hullX, hullY, hullW, 7);
+
+    ctx.strokeStyle = hpFrac > 0.3 ? '#10b981' : '#ef4444';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(hullX, hullY, hullW, 16);
 
+    // Life Text
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px monospace';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
     ctx.fillText(
-      `HULL: ${Math.ceil(citadel.hp)} / ${citadel.maxHp}  |  BONE MASS: ${citadel.boneMass} (Tier ${citadel.tier})`,
+      `HULL INTEGRITY: ${Math.ceil(citadel.hp)} / ${citadel.maxHp}  |  BONE MASS: ${citadel.boneMass} (Tier ${citadel.tier})`,
       width / 2,
-      hullY - 6
-    );
-    ctx.font = '12px monospace';
-    ctx.fillText(
-      `CORPSES: ${corpses.getTotalStock()}  |  MINIONS: ${swarm.getMinionCount()}/${swarm.getMaxMinions()}  |  SOCKETS: ${citadel.socketCount}/8`,
-      width / 2,
-      hullY + 28
+      hullY - 3
     );
 
-    // 3. Minion Summon Hotbar on Keys 1, 2, 3, 4, 5, 6
+    // Sub-status line: Corpses, Minions, Sockets
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = '#facc15';
+    ctx.fillText(`💀 CORPSES: ${corpses.getTotalStock()}`, width / 2 - 130, hullY + 28);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`⚔ MINIONS: ${swarm.getMinionCount()}/${swarm.getMaxMinions()}`, width / 2, hullY + 28);
+    ctx.fillStyle = '#c084fc';
+    ctx.fillText(`🛡 SOCKETS: ${citadel.socketCount}/8`, width / 2 + 130, hullY + 28);
+
+    // ==========================================
+    // 3. MINION SUMMON HOTBAR (Keys 1 - 6)
+    // ==========================================
     const minionOrder: { key: string; kind: MinionKind; label: string }[] = [
       { key: '1', kind: 'skeleton_grunt', label: 'Grunt' },
       { key: '2', kind: 'bone_phalanx', label: 'Phalanx' },
@@ -146,11 +203,11 @@ export class GameHUD {
       { key: '6', kind: 'tomb_acolyte', label: 'Acolyte' }
     ];
 
-    const slotW = 68;
-    const slotH = 44;
+    const slotW = 72;
+    const slotH = 46;
     const totalSlotW = minionOrder.length * (slotW + 6);
     const startSlotX = (width - totalSlotW) / 2;
-    const slotY = height - 56;
+    const slotY = height - 58;
 
     for (let i = 0; i < minionOrder.length; i++) {
       const it = minionOrder[i];
@@ -159,30 +216,40 @@ export class GameHUD {
       const canAfford = corpses.getTotalStock() >= spec.corpseCost;
       const sx = startSlotX + i * (slotW + 6);
 
-      ctx.fillStyle = isUnlocked ? (canAfford ? 'rgba(30, 41, 59, 0.92)' : 'rgba(30, 25, 25, 0.85)') : 'rgba(15, 18, 24, 0.75)';
+      // Card Background
+      ctx.fillStyle = isUnlocked
+        ? (canAfford ? 'rgba(20, 26, 40, 0.94)' : 'rgba(15, 18, 26, 0.88)')
+        : 'rgba(10, 12, 16, 0.85)';
       ctx.fillRect(sx, slotY, slotW, slotH);
 
-      ctx.strokeStyle = isUnlocked ? (canAfford ? '#38bdf8' : '#e2e8f0') : '#475569';
-      ctx.lineWidth = 1.5;
+      // Border with status color
+      ctx.strokeStyle = isUnlocked
+        ? (canAfford ? '#38bdf8' : '#475569')
+        : '#334155';
+      ctx.lineWidth = isUnlocked && canAfford ? 2 : 1;
       ctx.strokeRect(sx, slotY, slotW, slotH);
 
-      ctx.fillStyle = isUnlocked ? '#ffffff' : '#64748b';
+      // Key Badge
+      ctx.fillStyle = isUnlocked && canAfford ? '#38bdf8' : '#64748b';
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(`[${it.key}] ${it.label}`, sx + slotW / 2, slotY + 16);
 
+      // Cost or Lock Label
       if (isUnlocked) {
         ctx.fillStyle = canAfford ? '#facc15' : '#ef4444';
-        ctx.font = '10px monospace';
-        ctx.fillText(`${spec.corpseCost} Corpses`, sx + slotW / 2, slotY + 34);
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText(`${spec.corpseCost} Corpses`, sx + slotW / 2, slotY + 36);
       } else {
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#64748b';
         ctx.font = '9px monospace';
-        ctx.fillText('🔒 LOCKED', sx + slotW / 2, slotY + 34);
+        ctx.fillText('🔒 LOCKED', sx + slotW / 2, slotY + 36);
       }
     }
 
-    // 4. Bottom Left: Active Necromancy Spells [Q, E, F, C]
+    // ==========================================
+    // 4. BOTTOM LEFT: NECROMANCY SPELLS [Q, E, F, C]
+    // ==========================================
     const spellsList = [
       { key: 'Q', name: 'Explosion', timer: (spells.spells.corpse_explosion || spells.corpseExplosion)?.cooldownRemaining ?? 0 },
       { key: 'E', name: 'Rally', timer: (spells.spells.unholy_rally || spells.unholyRally)?.cooldownRemaining ?? 0 },
@@ -190,81 +257,92 @@ export class GameHUD {
       { key: 'C', name: 'Wake', timer: (spells.spells.reapers_wake || spells.reapersWake)?.cooldownRemaining ?? 0 }
     ];
 
-    let spellX = 16;
+    let spellX = 18;
     const spellBoxW = 68;
-    const spellBoxH = 44;
-    const spellY = height - 56;
+    const spellBoxH = 46;
+    const spellY = height - 58;
 
     for (const sp of spellsList) {
       const isReady = sp.timer <= 0;
-      ctx.fillStyle = isReady ? 'rgba(30, 41, 59, 0.92)' : 'rgba(25, 25, 30, 0.8)';
+
+      // Stone Tile
+      ctx.fillStyle = isReady ? 'rgba(25, 34, 52, 0.95)' : 'rgba(15, 18, 24, 0.85)';
       ctx.fillRect(spellX, spellY, spellBoxW, spellBoxH);
-      ctx.strokeStyle = isReady ? '#a855f7' : '#64748b';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = isReady ? '#a855f7' : '#475569';
+      ctx.lineWidth = isReady ? 2 : 1;
       ctx.strokeRect(spellX, spellY, spellBoxW, spellBoxH);
 
+      // Hotkey Badge
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 10px monospace';
+      ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(`[${sp.key}]`, spellX + spellBoxW / 2, spellY + 16);
 
+      // Ready or Cooldown
       ctx.fillStyle = isReady ? '#4ade80' : '#f87171';
-      ctx.font = '10px monospace';
-      ctx.fillText(isReady ? sp.name : `${sp.timer.toFixed(1)}s`, spellX + spellBoxW / 2, spellY + 34);
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(isReady ? sp.name : `${sp.timer.toFixed(1)}s`, spellX + spellBoxW / 2, spellY + 35);
 
       spellX += spellBoxW + 6;
     }
 
-    // 5. Top Right: Controls Guide Banner
-    ctx.fillStyle = 'rgba(15, 15, 20, 0.85)';
-    ctx.fillRect(width - 240, 16, 224, 115);
-    ctx.strokeStyle = '#475569';
-    ctx.strokeRect(width - 240, 16, 224, 115);
+    // ==========================================
+    // 5. TOP RIGHT: CONTROLS GUIDE BANNER
+    // ==========================================
+    const guideW = 230;
+    const guideH = 118;
+    const guideX = width - guideW - 16;
+    const guideY = 16;
 
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '11px monospace';
+    this.drawGothicPanel(ctx, guideX, guideY, guideW, guideH, '#64748b', 'rgba(10, 14, 22, 0.88)');
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('CONTROLS:', width - 230, 32);
-    ctx.fillText('WASD : Steer & Ram', width - 230, 48);
-    ctx.fillText('SPACE: Death Surge', width - 230, 64);
-    ctx.fillText('1 - 6: Summon Minions', width - 230, 80);
-    ctx.fillText('Q,E,F,C: Necromancy Spells', width - 230, 96);
-    ctx.fillText('R / TAB: Workshop Forge', width - 230, 112);
+    ctx.fillText('COMMAND GUIDE:', guideX + 12, guideY + 18);
 
-    // 6. Level-Up Choice Drafting Modal
+    ctx.font = '11px monospace';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillText('WASD : Steer & Ram', guideX + 12, guideY + 36);
+    ctx.fillText('SPACE: Death Surge', guideX + 12, guideY + 52);
+    ctx.fillText('1 - 6: Summon Minions', guideX + 12, guideY + 68);
+    ctx.fillText('Q,E,F,C: Necromancy Spells', guideX + 12, guideY + 84);
+    ctx.fillText('R / TAB: Charnel Forge', guideX + 12, guideY + 100);
+
+    // ==========================================
+    // 6. LEVEL-UP DRAFT MODAL
+    // ==========================================
     if (progression.pendingChoices && progression.pendingChoices.length > 0) {
-      const modalW = Math.min(680, width * 0.88);
-      const modalH = 260;
+      const modalW = Math.min(700, width * 0.9);
+      const modalH = 270;
       const modalX = (width - modalW) / 2;
       const modalY = (height - modalH) / 2;
 
-      ctx.fillStyle = 'rgba(10, 10, 18, 0.96)';
-      ctx.fillRect(modalX, modalY, modalW, modalH);
-      ctx.strokeStyle = '#c084fc';
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(modalX, modalY, modalW, modalH);
+      // Dark Obsidian Tombstone Tablet
+      this.drawGothicPanel(ctx, modalX, modalY, modalW, modalH, '#c084fc', 'rgba(8, 10, 16, 0.98)');
 
       ctx.fillStyle = '#f3e8ff';
-      ctx.font = 'bold 20px monospace';
+      ctx.font = 'bold 20px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`⚡ LEVEL UP! SELECT YOUR DARK BOON (LVL ${progression.level}) ⚡`, width / 2, modalY + 36);
+      ctx.fillText(`⚡ LEVEL UP! SELECT YOUR DARK BOON (LVL ${progression.level}) ⚡`, width / 2, modalY + 38);
 
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '12px monospace';
-      ctx.fillText('Press [1], [2], [3] or CLICK card to select', width / 2, modalY + 58);
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Press [1], [2], [3] or CLICK card to select', width / 2, modalY + 60);
 
       const cardW = (modalW - 60) / progression.pendingChoices.length;
       for (let i = 0; i < progression.pendingChoices.length; i++) {
         const c = progression.pendingChoices[i];
         const cx = modalX + 20 + i * (cardW + 10);
-        const cy = modalY + 75;
-        const ch = modalH - 95;
+        const cy = modalY + 78;
+        const ch = modalH - 98;
 
         const isHovered = (mouseX !== undefined && mouseY !== undefined) &&
           mouseX >= cx && mouseX <= cx + cardW &&
           mouseY >= cy && mouseY <= cy + ch;
 
-        ctx.fillStyle = isHovered ? 'rgba(35, 45, 75, 0.98)' : 'rgba(25, 30, 48, 0.92)';
+        // Card Fill
+        ctx.fillStyle = isHovered ? 'rgba(38, 48, 76, 0.98)' : 'rgba(22, 28, 44, 0.94)';
         ctx.fillRect(cx, cy, cardW, ch);
         ctx.strokeStyle = isHovered ? '#facc15' : '#38bdf8';
         ctx.lineWidth = isHovered ? 2.5 : 1.5;
@@ -272,27 +350,27 @@ export class GameHUD {
 
         // Number Key Badge
         ctx.fillStyle = isHovered ? '#facc15' : '#38bdf8';
-        ctx.fillRect(cx + 8, cy + 8, 26, 22);
+        ctx.fillRect(cx + 8, cy + 8, 28, 22);
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 13px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`[${i + 1}]`, cx + 21, cy + 24);
+        ctx.fillText(`[${i + 1}]`, cx + 22, cy + 24);
 
         // Card Title
         ctx.fillStyle = isHovered ? '#fef08a' : '#f8fafc';
         ctx.font = 'bold 13px sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(c.title, cx + 40, cy + 24);
+        ctx.fillText(c.title, cx + 42, cy + 24);
 
         // Card Description
         ctx.fillStyle = '#cbd5e1';
         ctx.font = '12px sans-serif';
         const words = c.description.split(' ');
         let line = '';
-        let textY = cy + 54;
+        let textY = cy + 56;
         for (const w of words) {
           const testLine = line + w + ' ';
-          if (testLine.length > 24) {
+          if (testLine.length > 22) {
             ctx.fillText(line, cx + 12, textY);
             line = w + ' ';
             textY += 18;
@@ -310,51 +388,87 @@ export class GameHUD {
       }
     }
 
-    // 7. Workshop Overlay (Press R / Tab)
+    // ==========================================
+    // 7. WORKSHOP OVERLAY (Press R / Tab)
+    // ==========================================
     if (workshopOpen) {
-      const modalW = Math.min(620, width * 0.8);
-      const modalH = Math.min(440, height * 0.75);
+      const modalW = Math.min(640, width * 0.85);
+      const modalH = Math.min(460, height * 0.78);
       const modalX = (width - modalW) / 2;
       const modalY = (height - modalH) / 2;
 
-      ctx.fillStyle = 'rgba(10, 10, 18, 0.95)';
-      ctx.fillRect(modalX, modalY, modalW, modalH);
-      ctx.strokeStyle = '#a855f7';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(modalX, modalY, modalW, modalH);
+      this.drawGothicPanel(ctx, modalX, modalY, modalW, modalH, '#a855f7', 'rgba(8, 10, 16, 0.98)');
 
       ctx.fillStyle = '#c084fc';
-      ctx.font = 'bold 18px monospace';
+      ctx.font = 'bold 20px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('CHARNEL WORKSHOP - GRAFTING FORGE', width / 2, modalY + 36);
+      ctx.fillText('⚔ CHARNEL WORKSHOP — GRAFTING FORGE ⚔', width / 2, modalY + 38);
 
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '12px monospace';
-      ctx.fillText('Press [R] or [Tab] to Return | Press Number to Graft to Next Socket', width / 2, modalY + 60);
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Press [R], [Tab], or [ESC] to Return | Press Number to Graft to Next Socket', width / 2, modalY + 62);
 
       const items = [
-        { key: '1', name: 'Bone Ballista', type: 'Physical', cost: 10, desc: 'High-speed piercing marrow harpoon' },
-        { key: '2', name: 'Plague Mortar', type: 'Blight', cost: 12, desc: 'Splashes corrosive bile acid puddle' },
-        { key: '3', name: 'Soul Siphon Spire', type: 'Soul', cost: 15, desc: 'Direct dark beam that leeches health' },
-        { key: '4', name: 'Spine Flail', type: 'Physical', cost: 8, desc: 'Spinning bone chain shredding close foes' },
-        { key: '5', name: 'Putrid Smog Vent', type: 'Blight', cost: 10, desc: '360° poison cloud slowing pursuers' },
-        { key: '6', name: 'Grave Lightning', type: 'Soul', cost: 20, desc: 'Necrotic lightning arcing across squads' }
+        { key: '1', name: 'Bone Ballista', type: 'Physical', cost: 10, desc: 'High-speed piercing marrow harpoon bolt' },
+        { key: '2', name: 'Plague Mortar', type: 'Blight', cost: 12, desc: 'Lobs explosive corrosive bile acid splash' },
+        { key: '3', name: 'Soul Siphon Spire', type: 'Soul', cost: 15, desc: 'Direct dark beam that leeches enemy essence' },
+        { key: '4', name: 'Spine Flail', type: 'Physical', cost: 8, desc: 'Spinning articulated bone chain shredding close foes' },
+        { key: '5', name: 'Putrid Smog Vent', type: 'Blight', cost: 10, desc: '360° toxic exhaust cloud slowing pursuers' },
+        { key: '6', name: 'Grave Lightning', type: 'Soul', cost: 20, desc: 'Necrotic electricity arcing between holy squads' }
       ];
 
-      let rowY = modalY + 100;
+      let rowY = modalY + 102;
       for (const it of items) {
-        ctx.fillStyle = '#f1f5f9';
-        ctx.font = 'bold 12px monospace';
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 13px sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(`[${it.key}] ${it.name} (${it.type}) - ${it.cost} Corpses`, modalX + 40, rowY);
+        ctx.fillText(`[${it.key}] ${it.name} (${it.type}) — ${it.cost} Corpses`, modalX + 42, rowY);
 
-        ctx.fillStyle = '#64748b';
-        ctx.font = '11px monospace';
-        ctx.fillText(it.desc, modalX + 40, rowY + 16);
-        rowY += 46;
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(it.desc, modalX + 42, rowY + 18);
+        rowY += 50;
       }
     }
 
     ctx.restore();
+  }
+
+  // --- Gothic Ornamental Panel Helper ---
+  private drawGothicPanel(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    accentColor: string,
+    bgColor: string
+  ): void {
+    // Background
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(x, y, w, h);
+
+    // Inner subtle border
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+
+    // Outer frame
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x, y, w, h);
+
+    // Ornamental Filigree Corner Diamonds
+    ctx.fillStyle = accentColor;
+    for (const [cx, cy] of [
+      [x, y],
+      [x + w, y],
+      [x, y + h],
+      [x + w, y + h]
+    ]) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
