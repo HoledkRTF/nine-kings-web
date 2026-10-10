@@ -22,6 +22,9 @@ export class ProgressionManager {
   scavengeRadius: number = 480;
   scavengeSpeedMultiplier: number = 1.25;
 
+  autoSelectTimer: number = 5.0;
+  readonly AUTO_SELECT_DURATION: number = 5.0;
+
   readonly ALL_UNLOCKABLE_MINIONS: { kind: MinionKind; name: string; desc: string; key: string }[] = [
     { kind: 'bone_phalanx', name: 'Bone Phalanx', desc: 'Frontline shield wall vanguard', key: '2' },
     { kind: 'bloated_husk', name: 'Bloated Husk', desc: 'Kamikaze suicide bomber exploding in poison', key: '3' },
@@ -99,7 +102,19 @@ export class ProgressionManager {
     // Shuffle and pick up to 3 distinct cards
     const shuffled = [...cards].sort(() => Math.random() - 0.5);
     this.pendingChoices = shuffled.slice(0, 3);
+    this.autoSelectTimer = this.AUTO_SELECT_DURATION;
     return this.pendingChoices;
+  }
+
+  updateTimer(dt: number, citadel: CitadelEntity, swarm: MinionSwarmManager): LevelUpgradeCard | null {
+    if (!this.pendingChoices || this.pendingChoices.length === 0) {
+      return null;
+    }
+    this.autoSelectTimer -= dt;
+    if (this.autoSelectTimer <= 0) {
+      return this.selectChoice(0, citadel, swarm);
+    }
+    return null;
   }
 
   selectChoice(choiceIndex: number, citadel: CitadelEntity, swarm: MinionSwarmManager): LevelUpgradeCard | null {

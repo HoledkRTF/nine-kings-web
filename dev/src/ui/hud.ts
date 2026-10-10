@@ -327,11 +327,23 @@ export class GameHUD {
       ctx.fillStyle = '#f3e8ff';
       ctx.font = 'bold 20px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`⚡ LEVEL UP! SELECT YOUR DARK BOON (LVL ${progression.level}) ⚡`, width / 2, modalY + 38);
+      ctx.fillText(`⚡ LEVEL UP! SELECT YOUR DARK BOON (LVL ${progression.level}) ⚡`, width / 2, modalY + 36);
 
-      ctx.fillStyle = '#94a3b8';
+      const timeLeft = Math.max(0, progression.autoSelectTimer).toFixed(1);
+      ctx.fillStyle = '#cbd5e1';
       ctx.font = '12px sans-serif';
-      ctx.fillText('Press [1], [2], [3] or CLICK card to select', width / 2, modalY + 60);
+      ctx.fillText(`Press [1], [2], [3] or CLICK card  •  Auto-selecting [1] in ${timeLeft}s`, width / 2, modalY + 56);
+
+      // Countdown Bar
+      const barW = modalW - 60;
+      const barH = 4;
+      const barX = modalX + 30;
+      const barY = modalY + 66;
+      const timerFrac = Math.max(0, Math.min(1, progression.autoSelectTimer / progression.AUTO_SELECT_DURATION));
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = timerFrac < 0.25 ? '#ef4444' : (timerFrac < 0.55 ? '#facc15' : '#c084fc');
+      ctx.fillRect(barX, barY, barW * timerFrac, barH);
 
       const cardW = (modalW - 60) / progression.pendingChoices.length;
       for (let i = 0; i < progression.pendingChoices.length; i++) {
@@ -347,17 +359,24 @@ export class GameHUD {
         // Card Fill
         ctx.fillStyle = isHovered ? 'rgba(38, 48, 76, 0.98)' : 'rgba(22, 28, 44, 0.94)';
         ctx.fillRect(cx, cy, cardW, ch);
-        ctx.strokeStyle = isHovered ? '#facc15' : '#38bdf8';
+        ctx.strokeStyle = isHovered ? '#facc15' : (i === 0 ? '#e879f9' : '#38bdf8');
         ctx.lineWidth = isHovered ? 2.5 : 1.5;
         ctx.strokeRect(cx, cy, cardW, ch);
 
         // Number Key Badge
-        ctx.fillStyle = isHovered ? '#facc15' : '#38bdf8';
+        ctx.fillStyle = isHovered ? '#facc15' : (i === 0 ? '#e879f9' : '#38bdf8');
         ctx.fillRect(cx + 8, cy + 8, 28, 22);
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 13px monospace';
         ctx.textAlign = 'center';
         ctx.fillText(`[${i + 1}]`, cx + 22, cy + 24);
+
+        if (i === 0) {
+          ctx.font = 'bold 10px monospace';
+          ctx.fillStyle = '#e879f9';
+          ctx.textAlign = 'right';
+          ctx.fillText(`DEFAULT (${timeLeft}s)`, cx + cardW - 10, cy + 22);
+        }
 
         // Card Title
         ctx.fillStyle = isHovered ? '#fef08a' : '#f8fafc';
