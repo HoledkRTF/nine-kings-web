@@ -101,4 +101,25 @@ describe('MinionSwarmManager', () => {
 
     expect(events.some(e => e.type === 'scavenge_corpse' && e.corpseId === groundCorpse.id)).toBe(true);
   });
+
+  it('decays minions when soul tether lifespan expires and allows rejuvenation', () => {
+    corpses.addStock(5);
+    swarm.raiseMinion('skeleton_grunt', 0, 0, corpses);
+    expect(swarm.getMinionCount()).toBe(1);
+    const minion = swarm.getAll()[0];
+    minion.lifespan = 0.5;
+
+    // Advance 0.2s: minion still alive
+    swarm.update(0.2, 0, 0, 35, 0, false, []);
+    expect(swarm.getMinionCount()).toBe(1);
+
+    // Rejuvenate adds lifespan back
+    swarm.rejuvenateMinions(10);
+    expect(minion.lifespan).toBeGreaterThan(5);
+
+    // Advance beyond lifespan
+    minion.lifespan = 0.1;
+    swarm.update(0.2, 0, 0, 35, 0, false, []);
+    expect(swarm.getMinionCount()).toBe(0); // Minion decayed to dust
+  });
 });
