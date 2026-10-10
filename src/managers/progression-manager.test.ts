@@ -69,4 +69,37 @@ describe('ProgressionManager', () => {
     expect(progression.level).toBeGreaterThanOrEqual(3);
     expect(progression.pendingChoices).not.toBeNull();
   });
+
+  it('initializes autoSelectTimer to 5.0 and auto-selects first choice when timer reaches 0', () => {
+    progression.generateLevelChoices();
+    expect(progression.autoSelectTimer).toBe(5.0);
+    const firstChoice = progression.pendingChoices![0];
+
+    // Decrement partial time (3 seconds)
+    const resultPartial = progression.updateTimer(3.0, citadel, swarm);
+    expect(resultPartial).toBeNull();
+    expect(progression.autoSelectTimer).toBeCloseTo(2.0);
+    expect(progression.pendingChoices).not.toBeNull();
+
+    // Decrement remaining time past 0 (2.5 seconds)
+    const resultFinal = progression.updateTimer(2.5, citadel, swarm);
+    expect(resultFinal).toBe(firstChoice);
+    // After selection, if no queued exp, pendingChoices becomes null
+    expect(progression.pendingChoices).toBeNull();
+  });
+
+  it('resets autoSelectTimer to 5.0 when next level-up choice triggers from surplus exp', () => {
+    progression.addExp(400); // multiple level ups worth
+    expect(progression.autoSelectTimer).toBe(5.0);
+
+    // Simulate elapsed 4 seconds on current choice
+    progression.updateTimer(4.0, citadel, swarm);
+    expect(progression.autoSelectTimer).toBeCloseTo(1.0);
+
+    // Select choice
+    progression.selectChoice(0, citadel, swarm);
+    // Next level triggers from surplus exp, timer resets to 5.0
+    expect(progression.pendingChoices).not.toBeNull();
+    expect(progression.autoSelectTimer).toBe(5.0);
+  });
 });

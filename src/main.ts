@@ -123,6 +123,8 @@ function resetGame() {
   progression.level = 1;
   progression.maxExp = 100;
   progression.unlockedMinions = new Set(['skeleton_grunt']);
+  progression.pendingChoices = null;
+  progression.autoSelectTimer = progression.AUTO_SELECT_DURATION;
   projectiles = [];
   workshopOpen = false;
   gameOver = false;
@@ -189,22 +191,29 @@ function gameLoop(now: number) {
     const cardY = modalY + 75;
     const cardH = modalH - 95;
 
-    const clicked = input.consumeClick();
+    // Auto-select first choice if no upgrade chosen within 5 seconds
+    const autoChosen = progression.updateTimer(dt, citadel, swarm);
+    if (autoChosen) {
+      audio.playFire('soul');
+      hud.showUpgradeBanner(`[AUTO] ${autoChosen.title}`, autoChosen.description);
+    } else {
+      const clicked = input.consumeClick();
 
-    for (let i = 0; i < progression.pendingChoices.length; i++) {
-      const cardX = modalX + 20 + i * (cardW + 10);
-      const isHovered = input.mouseX >= cardX && input.mouseX <= cardX + cardW &&
-                        input.mouseY >= cardY && input.mouseY <= cardY + cardH;
-      const key = String(i + 1);
+      for (let i = 0; i < progression.pendingChoices.length; i++) {
+        const cardX = modalX + 20 + i * (cardW + 10);
+        const isHovered = input.mouseX >= cardX && input.mouseX <= cardX + cardW &&
+                          input.mouseY >= cardY && input.mouseY <= cardY + cardH;
+        const key = String(i + 1);
 
-      if (input.isDown(key) || (clicked && isHovered)) {
-        input.keys.clear();
-        const chosen = progression.selectChoice(i, citadel, swarm);
-        if (chosen) {
-          audio.playFire('soul');
-          hud.showUpgradeBanner(chosen.title, chosen.description);
+        if (input.isDown(key) || (clicked && isHovered)) {
+          input.keys.clear();
+          const chosen = progression.selectChoice(i, citadel, swarm);
+          if (chosen) {
+            audio.playFire('soul');
+            hud.showUpgradeBanner(chosen.title, chosen.description);
+          }
+          break;
         }
-        break;
       }
     }
   } else if (input.isDown('r') || input.isDown('tab')) {
