@@ -109,33 +109,32 @@ export class GameRenderer {
       if (this.shakeTime <= 0) this.shakeIntensity = 0;
     }
 
-    // Record Citadel Tread Impressions when moving
-    if (Math.abs(citadel.speed) > 12) {
+    // Record Necromancer Shadow Mist Steps when moving
+    if (Math.abs(citadel.speed) > 10) {
       this.lastTrackDist += Math.abs(citadel.speed) * dt;
-      if (this.lastTrackDist > 20) {
+      if (this.lastTrackDist > 16) {
         this.lastTrackDist = 0;
-        const r = citadel.radius;
+        const footSide = (this.tracks.length % 2 === 0 ? 1 : -1);
         const normAngle = citadel.angle + Math.PI / 2;
-        // Left & right tread ruts
-        const leftX = citadel.x + Math.cos(normAngle) * (r * 0.72);
-        const leftY = citadel.y + Math.sin(normAngle) * (r * 0.72);
-        const rightX = citadel.x - Math.cos(normAngle) * (r * 0.72);
-        const rightY = citadel.y - Math.sin(normAngle) * (r * 0.72);
+        const footX = citadel.x + Math.cos(normAngle) * (footSide * 6);
+        const footY = citadel.y + Math.sin(normAngle) * (footSide * 6);
 
-        this.tracks.push(
-          { x: leftX, y: leftY, angle: citadel.angle, alpha: 0.8 },
-          { x: rightX, y: rightY, angle: citadel.angle, alpha: 0.8 }
-        );
+        this.tracks.push({
+          x: footX,
+          y: footY,
+          angle: citadel.angle,
+          alpha: 0.75
+        });
 
-        if (this.tracks.length > 200) {
-          this.tracks.splice(0, 20);
+        if (this.tracks.length > 120) {
+          this.tracks.splice(0, 15);
         }
       }
     }
 
-    // Update track alpha
+    // Update mist step alpha decay
     for (const tr of this.tracks) {
-      tr.alpha = Math.max(0, tr.alpha - dt * 0.08);
+      tr.alpha = Math.max(0, tr.alpha - dt * 0.12);
     }
     this.tracks = this.tracks.filter(t => t.alpha > 0.02);
 
@@ -202,7 +201,33 @@ export class GameRenderer {
     // 7. Projectiles with Glowing Trails & Particle Cores
     for (const p of projectiles) {
       ctx.save();
-      if (p.type === 'physical') {
+      if (p.isEnemy) {
+        // High Inquisitor Radiant Holy Bolt / Consecration Orb
+        const holyGlow = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.radius * 3.4);
+        holyGlow.addColorStop(0, '#ffffff');
+        holyGlow.addColorStop(0.3, '#facc15');
+        holyGlow.addColorStop(0.65, '#ea580c');
+        holyGlow.addColorStop(1, 'transparent');
+        ctx.fillStyle = holyGlow;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius * 3.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius * 0.9, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Consecrated Holy Cross Core
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(p.x - p.radius * 1.3, p.y);
+        ctx.lineTo(p.x + p.radius * 1.3, p.y);
+        ctx.moveTo(p.x, p.y - p.radius * 1.3);
+        ctx.lineTo(p.x, p.y + p.radius * 1.3);
+        ctx.stroke();
+      } else if (p.type === 'physical') {
         // High speed jagged bone harpoon with motion streak
         ctx.strokeStyle = 'rgba(248, 250, 252, 0.4)';
         ctx.lineWidth = 2;
@@ -293,25 +318,17 @@ export class GameRenderer {
       ctx.translate(tr.x, tr.y);
       ctx.rotate(tr.angle);
 
-      // Crushed rut indentation in soil
-      ctx.fillStyle = `rgba(5, 8, 14, ${tr.alpha * 0.85})`;
-      ctx.fillRect(-8, -4, 16, 8);
-
-      // Grooved tread cleats
-      ctx.strokeStyle = `rgba(2, 4, 8, ${tr.alpha * 0.95})`;
-      ctx.lineWidth = 1.5;
+      // Faint shadowy footprint on the earth
+      ctx.fillStyle = `rgba(10, 8, 18, ${tr.alpha * 0.75})`;
       ctx.beginPath();
-      ctx.moveTo(-6, -4);
-      ctx.lineTo(-6, 4);
-      ctx.moveTo(0, -4);
-      ctx.lineTo(0, 4);
-      ctx.moveTo(6, -4);
-      ctx.lineTo(6, 4);
-      ctx.stroke();
+      ctx.ellipse(0, 0, 5, 2.8, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-      // Faint purple necrotic trail
-      ctx.fillStyle = `rgba(168, 85, 247, ${tr.alpha * 0.18})`;
-      ctx.fillRect(-6, -2, 12, 4);
+      // Spectral amethyst/cyan soul mist wisp rising from footstep
+      ctx.fillStyle = `rgba(168, 85, 247, ${tr.alpha * 0.35})`;
+      ctx.beginPath();
+      ctx.ellipse(-1, 0, 4, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
 
       ctx.restore();
     }
@@ -324,12 +341,12 @@ export class GameRenderer {
     shrines: HolyShrine[]
   ): void {
     ctx.save();
-    // Warm/Spectral lantern bloom around the Citadel pushing back the dark gloom
-    const rad = citadel.radius * 3.6;
-    const bloom = ctx.createRadialGradient(citadel.x, citadel.y, citadel.radius * 0.5, citadel.x, citadel.y, rad);
-    bloom.addColorStop(0, 'rgba(168, 85, 247, 0.16)');
-    bloom.addColorStop(0.4, 'rgba(56, 189, 248, 0.08)');
-    bloom.addColorStop(0.8, 'rgba(15, 23, 42, 0.04)');
+    // Warm/Spectral soul lantern bloom around the Necromancer pushing back the dark gloom
+    const rad = Math.max(135, citadel.radius * 6.5);
+    const bloom = ctx.createRadialGradient(citadel.x, citadel.y, 8, citadel.x, citadel.y, rad);
+    bloom.addColorStop(0, 'rgba(168, 85, 247, 0.18)');
+    bloom.addColorStop(0.35, 'rgba(56, 189, 248, 0.09)');
+    bloom.addColorStop(0.75, 'rgba(15, 23, 42, 0.03)');
     bloom.addColorStop(1, 'transparent');
 
     ctx.fillStyle = bloom;
