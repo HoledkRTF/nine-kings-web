@@ -12,4 +12,5 @@ export interface Projectile {
   radius: number;
   isAoE: boolean;
   aoeRadius?: number;
+  isEnemy?: boolean;
 }

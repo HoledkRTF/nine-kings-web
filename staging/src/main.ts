@@ -44,6 +44,7 @@ const hud = new GameHUD();
 const audio = new SoundEffects();
 
 let workshopOpen = false;
+let gameOver = false;
 let projectiles: Projectile[] = [];
 let enemies: WorldEnemy[] = [];
 const equippedModules: (WeaponModule | null)[] = [
@@ -61,26 +62,32 @@ const shrineTypes: RelicUpgradeType[] = [
   'soul_amplification'
 ];
 
-shrineTypes.forEach((type, idx) => {
-  const angle = (idx * Math.PI * 2) / shrineTypes.length + 0.35;
-  const distFromCenter = 720 + (idx % 2) * 450;
-  const sx = Math.cos(angle) * distFromCenter;
-  const sy = Math.sin(angle) * distFromCenter;
-  const shrine = shrines.spawnShrine(sx, sy, type);
+function seedWorldEnemies() {
+  shrines.shrines = [];
+  enemies = [];
+  shrineTypes.forEach((type, idx) => {
+    const angle = (idx * Math.PI * 2) / shrineTypes.length + 0.35;
+    const distFromCenter = 720 + (idx % 2) * 450;
+    const sx = Math.cos(angle) * distFromCenter;
+    const sy = Math.sin(angle) * distFromCenter;
+    const shrine = shrines.spawnShrine(sx, sy, type);
 
-  // Generate fortified garrison defending this shrine
-  const garrison = crusade.generateGarrison(sx, sy, shrine.id);
-  shrine.garrisonEnemyIds = garrison.map(g => g.id);
-  enemies.push(...garrison);
-});
+    // Generate fortified garrison defending this shrine
+    const garrison = crusade.generateGarrison(sx, sy, shrine.id);
+    shrine.garrisonEnemyIds = garrison.map(g => g.id);
+    enemies.push(...garrison);
+  });
 
-// Seed additional ambient patrol troops around the wasteland
-for (let i = 0; i < 16; i++) {
-  const angle = Math.random() * Math.PI * 2;
-  const d = 400 + Math.random() * 850;
-  const eType = i % 2 === 0 ? 'silver_cavalry' : 'peasant_caravan';
-  enemies.push(crusade.createEnemy(eType, Math.cos(angle) * d, Math.sin(angle) * d));
+  // Seed additional ambient patrol troops around the wasteland
+  for (let i = 0; i < 18; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const d = 400 + Math.random() * 850;
+    const eType = i % 2 === 0 ? 'silver_cavalry' : 'peasant_caravan';
+    enemies.push(crusade.createEnemy(eType, Math.cos(angle) * d, Math.sin(angle) * d));
+  }
 }
+
+seedWorldEnemies();
 
 function handleBreachReward(reward: BreachReward) {
   if (reward.upgradeType === 'expand_swarm') {
@@ -95,13 +102,84 @@ function handleBreachReward(reward: BreachReward) {
   renderer.addParticle(reward.shrine.x, reward.shrine.y, '#facc15', 36, 280, 5);
 }
 
+function resetGame() {
+  citadel.x = 0;
+  citadel.y = 0;
+  citadel.hp = citadel.maxHp;
+  citadel.speed = 0;
+  citadel.vx = 0;
+  citadel.vy = 0;
+  citadel.boneMass = 0;
+  citadel.shadowStepCooldown = 0;
+  citadel.shadowStepActiveTimer = 0;
+
+  corpses.corpses = [];
+  corpses.totalStock = 14;
+  swarm.minions = [];
+  crusade.wrath = 0;
+  crusade.waveCounter = 1;
+  crusade.waveTimer = 30;
+  progression.currentExp = 0;
+  progression.level = 1;
+  progression.maxExp = 100;
+  progression.unlockedMinions = new Set(['skeleton_grunt']);
+  projectiles = [];
+  workshopOpen = false;
+  gameOver = false;
+
+  seedWorldEnemies();
+}
+
 let lastTime = performance.now();
 
 function gameLoop(now: number) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
 
-  // 0. LEVEL-UP DRAFT MODAL SELECTION
+  // 0. GAME OVER STATE
+  if (gameOver) {
+    const clicked = input.consumeClick();
+    if (input.isDown('r') || clicked) {
+      input.keys.clear();
+      resetGame();
+    }
+
+    hud.update(dt);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    renderer.render(
+      ctx,
+      canvas.width,
+      canvas.height,
+      citadel,
+      corpses.getAll(),
+      swarm.getAll(),
+      enemies,
+      projectiles,
+      equippedModules,
+      dt,
+      shrines.getAll()
+    );
+    hud.render(
+      ctx,
+      canvas.width,
+      canvas.height,
+      citadel,
+      corpses,
+      crusade,
+      spells,
+      swarm,
+      equippedModules,
+      workshopOpen,
+      progression,
+      input.mouseX,
+      input.mouseY,
+      true
+    );
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  // 0.5 LEVEL-UP DRAFT MODAL SELECTION
   if (progression.pendingChoices && progression.pendingChoices.length > 0) {
     const modalW = Math.min(680, canvas.width * 0.88);
     const modalH = 260;
@@ -165,12 +243,25 @@ function gameLoop(now: number) {
       }
     }
   } else {
-    // 1. Citadel Steering & Momentum
-    const moveForward = (input.isDown('w') || input.isDown('arrowup') ? 1 : 0) - (input.isDown('s') || input.isDown('arrowdown') ? 1 : 0);
-    const turn = (input.isDown('d') || input.isDown('arrowright') ? 1 : 0) - (input.isDown('a') || input.isDown('arrowleft') ? 1 : 0);
+    // 1. Necromancer 8-Directional WASD Movement & Shadow Step (Space/Shift)
+    const moveX = (input.isDown('d') || input.isDown('arrowright') ? 1 : 0) - (input.isDown('a') || input.isDown('arrowleft') ? 1 : 0);
+    const moveY = (input.isDown('s') || input.isDown('arrowdown') ? 1 : 0) - (input.isDown('w') || input.isDown('arrowup') ? 1 : 0);
     const surge = input.isDown(' ') || input.isDown('shift');
 
-    citadel.update(dt, { moveForward, turn, surge });
+    // Aim scythe and spells towards world coordinates of cursor
+    const worldMouseX = renderer.cameraX + input.mouseX;
+    const worldMouseY = renderer.cameraY + input.mouseY;
+    const targetAngle = Math.atan2(worldMouseY - citadel.y, worldMouseX - citadel.x);
+
+    const wasDashing = citadel.isInvulnerable();
+    citadel.update(dt, { moveX, moveY, surge, targetAngle });
+
+    if (!wasDashing && citadel.isInvulnerable()) {
+      audio.playFire('soul');
+      renderer.addShake(7, 0.2);
+      renderer.addParticle(citadel.x, citadel.y, '#c084fc', 18, 220, 3.5);
+    }
+
     corpses.update(dt, citadel.x, citadel.y, citadel.radius + 60);
 
     // 2. Minion Summoning on Keys [1] through [6]
@@ -230,13 +321,13 @@ function gameLoop(now: number) {
     const wave = crusade.update(dt, citadel.x, citadel.y);
     if (wave.spawnedEnemies.length > 0) {
       enemies.push(...wave.spawnedEnemies);
-      renderer.addShake(6, 0.2);
+      renderer.addShake(8, 0.25);
     }
 
     // Maintain dense enemy population (~35+ active enemies)
-    if (enemies.length < 32) {
+    if (enemies.length < 34) {
       const angle = Math.random() * Math.PI * 2;
-      const d = 500 + Math.random() * 800;
+      const d = 520 + Math.random() * 800;
       const spawnX = citadel.x + Math.cos(angle) * d;
       const spawnY = citadel.y + Math.sin(angle) * d;
       const pick = Math.random() > 0.4 ? 'silver_cavalry' : 'peasant_caravan';
@@ -277,7 +368,6 @@ function gameLoop(now: number) {
           renderer.addParticle(target.x, target.y, '#f8fafc', 3, 60, 2);
         }
       } else if (ev.type === 'scavenge_corpse' && ev.corpseId && ev.corpseValue) {
-        // Minion gathered a corpse!
         corpses.removeCorpseById(ev.corpseId);
         corpses.addStock(ev.corpseValue);
         progression.addExp(ev.corpseValue * 6);
@@ -285,18 +375,23 @@ function gameLoop(now: number) {
       }
     }
 
-    // 6. Auto-fire modules in 360 degrees
+    // 6. Auto-fire orbiting arcane relics in 360 degrees
     const buff = swarm.getBuffMultiplier();
     const sockets = citadel.getSockets();
+    const orbitSpeed = 1.1;
+    const animTime = performance.now() / 1000;
+
     for (let i = 0; i < sockets.length; i++) {
       const mod = equippedModules[i];
       if (mod) {
         mod.update(dt);
         const s = sockets[i];
-        const sx = citadel.x + Math.cos(citadel.angle + s.angleOffset) * (citadel.radius * s.distanceRatio);
-        const sy = citadel.y + Math.sin(citadel.angle + s.angleOffset) * (citadel.radius * s.distanceRatio);
+        const orbitAngle = animTime * orbitSpeed + s.angleOffset;
+        const orbitDist = 28 + (citadel.radius * 0.9);
+        const sx = citadel.x + Math.cos(orbitAngle) * orbitDist;
+        const sy = citadel.y + Math.sin(orbitAngle) * orbitDist;
 
-        const shot = mod.tryFire(sx, sy, citadel.angle, enemies, buff);
+        const shot = mod.tryFire(sx, sy, orbitAngle, enemies, buff);
         if (shot) {
           projectiles.push(shot);
           audio.playFire(mod.type);
@@ -304,32 +399,55 @@ function gameLoop(now: number) {
       }
     }
 
-    // 7. Update Projectiles & Hits
+    // 7. Update Projectiles (Player & Enemy Holy Bolts)
     const nextProj: Projectile[] = [];
     for (const p of projectiles) {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.rangeRemaining -= Math.sqrt(p.vx * p.vx + p.vy * p.vy) * dt;
+      p.rangeRemaining -= Math.hypot(p.vx, p.vy) * dt;
 
       let hit = false;
-      for (const e of enemies) {
-        if (dist(p, e) <= p.radius + e.radius) {
-          e.hp -= p.damage;
-          hit = true;
-          renderer.addParticle(p.x, p.y, p.type === 'blight' ? '#4ade80' : p.type === 'soul' ? '#c084fc' : '#f8fafc', 4, 80, 2);
-          break;
-        }
-      }
 
-      // Check hits on unbreached holy shrines
-      if (!hit) {
-        for (const s of shrines.getAll()) {
-          if (!s.isBreached && dist(p, s) <= p.radius + s.radius) {
-            const reward = shrines.damageShrine(s.id, p.damage);
+      if (p.isEnemy) {
+        // Enemy Holy Smite bolts can be blocked by minions!
+        for (const m of swarm.getAll()) {
+          if (dist(p, m) <= p.radius + m.radius) {
+            m.hp -= p.damage;
             hit = true;
-            renderer.addParticle(p.x, p.y, '#fef08a', 5, 90, 2);
-            if (reward) handleBreachReward(reward);
+            renderer.addParticle(p.x, p.y, '#facc15', 6, 80, 2);
             break;
+          }
+        }
+
+        // Holy Bolt hits Necromancer
+        if (!hit && dist(p, citadel) <= p.radius + citadel.radius) {
+          citadel.takeDamage(p.damage);
+          hit = true;
+          renderer.addShake(8, 0.25);
+          renderer.addParticle(p.x, p.y, '#ef4444', 10, 120, 3);
+          audio.playCrunch();
+        }
+      } else {
+        // Player projectiles check against enemies
+        for (const e of enemies) {
+          if (dist(p, e) <= p.radius + e.radius) {
+            e.hp -= p.damage;
+            hit = true;
+            renderer.addParticle(p.x, p.y, p.type === 'blight' ? '#4ade80' : p.type === 'soul' ? '#c084fc' : '#f8fafc', 4, 80, 2);
+            break;
+          }
+        }
+
+        // Check hits on unbreached holy shrines
+        if (!hit) {
+          for (const s of shrines.getAll()) {
+            if (!s.isBreached && dist(p, s) <= p.radius + s.radius) {
+              const reward = shrines.damageShrine(s.id, p.damage);
+              hit = true;
+              renderer.addParticle(p.x, p.y, '#fef08a', 5, 90, 2);
+              if (reward) handleBreachReward(reward);
+              break;
+            }
           }
         }
       }
@@ -338,14 +456,13 @@ function gameLoop(now: number) {
     }
     projectiles = nextProj;
 
-    // 8. Crush, Shrine Siege & Enemy AI
+    // 8. Shrine Siege & Tactical Hardcore Enemy AI
     shrines.update(dt);
 
-    // Shrine siege by Citadel ramming & minion swarm
     for (const s of shrines.getAll()) {
       if (s.isBreached) continue;
 
-      // Citadel Ramming against Shrine Ward
+      // Contact against Shrine Ward
       const dCitadel = dist(citadel, s);
       if (dCitadel <= citadel.radius + s.radius) {
         const crush = citadel.calculateCrushDamage(s.radius);
@@ -371,20 +488,23 @@ function gameLoop(now: number) {
     for (const e of enemies) {
       const d = dist(citadel, e);
 
-      // Trample / Ramming Crush
+      // Close Contact: Spectral Scythe Reap & Enemy Contact Hurt
       if (d <= citadel.radius + e.radius) {
-        const crush = citadel.calculateCrushDamage(e.radius);
-        e.hp -= crush;
+        const reap = citadel.calculateCrushDamage(e.radius);
+        e.hp -= reap;
+        if (!citadel.isInvulnerable() && e.isHostile) {
+          citadel.takeDamage(e.damage * 0.4 * dt * 60);
+        }
         audio.playCrunch();
-        renderer.addShake(7, 0.2);
-        renderer.addParticle(e.x, e.y, '#991b1b', 6, 120, 3);
+        renderer.addShake(5, 0.15);
+        renderer.addParticle(e.x, e.y, '#991b1b', 4, 100, 2.5);
       }
 
       // Minion clashes
       for (const m of swarm.getAll()) {
         if (dist(m, e) <= m.radius + e.radius) {
           e.hp -= (m.damage * progression.minionDamageMultiplier) * dt;
-          m.hp -= (e.damage || 5) * dt;
+          m.hp -= (e.damage || 8) * dt;
         }
       }
 
@@ -397,28 +517,91 @@ function gameLoop(now: number) {
         continue;
       }
 
-      // Defensive Garrison Gathering & Hostile AI
+      // --- Hardcore Tactical Enemy Behaviors ---
+      // Silver Cavalry: Gallop Lance Charge Burst
+      if (e.type === 'silver_cavalry' && e.isHostile) {
+        e.chargeTimer = (e.chargeTimer || 0) + dt;
+        if (d < 340 && e.chargeTimer > 2.8) {
+          e.speed = 280; // Gallop sprint!
+          renderer.addParticle(e.x, e.y, '#cbd5e1', 1, 35, 1.8);
+          if (d <= citadel.radius + e.radius + 8) {
+            citadel.takeDamage(26);
+            e.chargeTimer = 0;
+            renderer.addShake(9, 0.28);
+            audio.playCrunch();
+          }
+        } else if (e.chargeTimer <= 2.8) {
+          e.speed = 170;
+        }
+      }
+
+      // High Inquisitor: Ranged Holy Smite Bolts
+      if (e.type === 'high_inquisitor' && e.isHostile) {
+        e.rangedCooldown = (e.rangedCooldown === undefined ? 1.5 + Math.random() : e.rangedCooldown) - dt;
+        if (d < 460 && e.rangedCooldown <= 0) {
+          e.rangedCooldown = 2.8;
+          const aimAngle = Math.atan2(citadel.y - e.y, citadel.x - e.x);
+          projectiles.push({
+            id: `holy_${Date.now()}_${Math.random()}`,
+            x: e.x + Math.cos(aimAngle) * (e.radius + 8),
+            y: e.y + Math.sin(aimAngle) * (e.radius + 8),
+            vx: Math.cos(aimAngle) * 230,
+            vy: Math.sin(aimAngle) * 230,
+            damage: 22,
+            type: 'soul',
+            rangeRemaining: 500,
+            radius: 7,
+            isAoE: false,
+            isEnemy: true
+          });
+          renderer.addParticle(e.x, e.y, '#facc15', 6, 90, 2.5);
+        }
+      }
+
+      // Holy Trebuchet: Consecration Firebombs
+      if (e.type === 'holy_trebuchet' && e.isHostile) {
+        e.rangedCooldown = (e.rangedCooldown === undefined ? 2.0 : e.rangedCooldown) - dt;
+        if (d < 620 && e.rangedCooldown <= 0) {
+          e.rangedCooldown = 4.2;
+          const aimAngle = Math.atan2(citadel.y - e.y, citadel.x - e.x);
+          projectiles.push({
+            id: `bomb_${Date.now()}_${Math.random()}`,
+            x: e.x,
+            y: e.y,
+            vx: Math.cos(aimAngle) * 190,
+            vy: Math.sin(aimAngle) * 190,
+            damage: 32,
+            type: 'physical',
+            rangeRemaining: 650,
+            radius: 10,
+            isAoE: true,
+            aoeRadius: 85,
+            isEnemy: true
+          });
+          renderer.addParticle(e.x, e.y, '#ea580c', 8, 100, 3);
+        }
+      }
+
+      // Navigation & Perimeter Defense
       if (e.assignedShrineId) {
         const s = shrines.shrines.find(sh => sh.id === e.assignedShrineId);
         if (s && !s.isBreached) {
           const distToCitadel = dist(citadel, e);
           const distShrineToCitadel = dist(citadel, s);
 
-          // If invader comes close (<480px from shrine or <380px from defender), counter-attack!
           if (distShrineToCitadel < 480 || distToCitadel < 380) {
             const dir = { x: citadel.x - e.x, y: citadel.y - e.y };
-            const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+            const len = Math.hypot(dir.x, dir.y);
             if (len > 0) {
               e.x += (dir.x / len) * e.speed * dt;
               e.y += (dir.y / len) * e.speed * dt;
             }
           } else {
-            // Patrol and defend assigned perimeter around shrine
             e.guardAngle = ((e.guardAngle || 0) + dt * 0.7) % (Math.PI * 2);
             const targetX = s.x + Math.cos(e.guardAngle) * (e.guardRadius || 90);
             const targetY = s.y + Math.sin(e.guardAngle) * (e.guardRadius || 90);
             const gDir = { x: targetX - e.x, y: targetY - e.y };
-            const gLen = Math.sqrt(gDir.x * gDir.x + gDir.y * gDir.y);
+            const gLen = Math.hypot(gDir.x, gDir.y);
             if (gLen > 6) {
               const spd = Math.min(e.speed, gLen * 3);
               e.x += (gDir.x / gLen) * spd * dt;
@@ -426,9 +609,8 @@ function gameLoop(now: number) {
             }
           }
         } else {
-          // Relic breached: enraged defenders charge directly at the citadel
           const dir = { x: citadel.x - e.x, y: citadel.y - e.y };
-          const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+          const len = Math.hypot(dir.x, dir.y);
           if (len > 0) {
             e.x += (dir.x / len) * e.speed * dt;
             e.y += (dir.y / len) * e.speed * dt;
@@ -436,17 +618,16 @@ function gameLoop(now: number) {
         }
       } else if (e.isHostile) {
         const dir = { x: citadel.x - e.x, y: citadel.y - e.y };
-        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+        const len = Math.hypot(dir.x, dir.y);
         if (len > 0) {
           e.x += (dir.x / len) * e.speed * dt;
           e.y += (dir.y / len) * e.speed * dt;
         }
       } else {
-        // Caravans and non-hostiles gather towards the nearest unbreached shrine for shelter
         const nearestShrine = shrines.getNearestShrine(e.x, e.y);
         if (nearestShrine && !nearestShrine.isBreached) {
           const sDir = { x: nearestShrine.x - e.x, y: nearestShrine.y - e.y };
-          const sLen = Math.sqrt(sDir.x * sDir.x + sDir.y * sDir.y);
+          const sLen = Math.hypot(sDir.x, sDir.y);
           if (sLen > 90) {
             e.x += (sDir.x / sLen) * e.speed * dt;
             e.y += (sDir.y / sLen) * e.speed * dt;
@@ -454,19 +635,28 @@ function gameLoop(now: number) {
         }
       }
 
-      // Melee attack citadel if within range
-      if (d <= citadel.radius + e.radius + 10) {
+      // Melee attack against Necromancer if in strike distance
+      if (d <= citadel.radius + e.radius + 8) {
         e.attackCooldown -= dt;
         if (e.attackCooldown <= 0) {
-          citadel.takeDamage(e.damage || 10);
-          e.attackCooldown = 1.0;
-          renderer.addShake(4, 0.15);
+          citadel.takeDamage(e.damage || 15);
+          e.attackCooldown = 0.85;
+          renderer.addShake(6, 0.2);
+          renderer.addParticle(citadel.x, citadel.y, '#ef4444', 8, 110, 2.5);
+          audio.playCrunch();
         }
       }
 
       livingEnemies.push(e);
     }
     enemies = livingEnemies;
+
+    // Check player death / game over
+    if (citadel.hp <= 0) {
+      gameOver = true;
+      audio.playCrunch();
+      renderer.addShake(16, 0.5);
+    }
   }
 
   // 9. Render Frame
@@ -498,7 +688,8 @@ function gameLoop(now: number) {
     workshopOpen,
     progression,
     input.mouseX,
-    input.mouseY
+    input.mouseY,
+    gameOver
   );
 
   requestAnimationFrame(gameLoop);

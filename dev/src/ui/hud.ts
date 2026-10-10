@@ -36,7 +36,8 @@ export class GameHUD {
     workshopOpen: boolean,
     progression: ProgressionManager,
     mouseX?: number,
-    mouseY?: number
+    mouseY?: number,
+    isGameOver?: boolean
   ): void {
     ctx.save();
 
@@ -176,8 +177,10 @@ export class GameHUD {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
+    const dashReady = citadel.shadowStepCooldown <= 0;
+    const dashText = dashReady ? 'READY' : `${citadel.shadowStepCooldown.toFixed(1)}s`;
     ctx.fillText(
-      `HULL INTEGRITY: ${Math.ceil(citadel.hp)} / ${citadel.maxHp}  |  BONE MASS: ${citadel.boneMass} (Tier ${citadel.tier})`,
+      `SOUL INTEGRITY: ${Math.ceil(citadel.hp)} / ${citadel.maxHp}  |  SHADOW STEP [SPACE]: ${dashText}  |  TIER ${citadel.tier}`,
       width / 2,
       hullY - 3
     );
@@ -189,7 +192,7 @@ export class GameHUD {
     ctx.fillStyle = '#38bdf8';
     ctx.fillText(`⚔ MINIONS: ${swarm.getMinionCount()}/${swarm.getMaxMinions()}`, width / 2, hullY + 28);
     ctx.fillStyle = '#c084fc';
-    ctx.fillText(`🛡 SOCKETS: ${citadel.socketCount}/8`, width / 2 + 130, hullY + 28);
+    ctx.fillText(`🛡 RELICS: ${citadel.socketCount}/8`, width / 2 + 130, hullY + 28);
 
     // ==========================================
     // 3. MINION SUMMON HOTBAR (Keys 1 - 6)
@@ -303,11 +306,11 @@ export class GameHUD {
 
     ctx.font = '11px monospace';
     ctx.fillStyle = '#cbd5e1';
-    ctx.fillText('WASD : Steer & Ram', guideX + 12, guideY + 36);
-    ctx.fillText('SPACE: Death Surge', guideX + 12, guideY + 52);
-    ctx.fillText('1 - 6: Summon Minions', guideX + 12, guideY + 68);
+    ctx.fillText('WASD : Walk & Aim', guideX + 12, guideY + 36);
+    ctx.fillText('SPACE: Shadow Step (Blink)', guideX + 12, guideY + 52);
+    ctx.fillText('1 - 6: Raise Minions', guideX + 12, guideY + 68);
     ctx.fillText('Q,E,F,C: Necromancy Spells', guideX + 12, guideY + 84);
-    ctx.fillText('R / TAB: Charnel Forge', guideX + 12, guideY + 100);
+    ctx.fillText('R / TAB: Charnel Workshop', guideX + 12, guideY + 100);
 
     // ==========================================
     // 6. LEVEL-UP DRAFT MODAL
@@ -429,6 +432,63 @@ export class GameHUD {
         ctx.fillText(it.desc, modalX + 42, rowY + 18);
         rowY += 50;
       }
+    }
+
+    // ==========================================
+    // 8. GAME OVER SCREEN OVERLAY
+    // ==========================================
+    if (isGameOver) {
+      // Fullscreen ominous dark veil
+      ctx.fillStyle = 'rgba(4, 4, 8, 0.88)';
+      ctx.fillRect(0, 0, width, height);
+
+      const goW = Math.min(620, width * 0.88);
+      const goH = 340;
+      const goX = (width - goW) / 2;
+      const goY = (height - goH) / 2;
+
+      this.drawGothicPanel(ctx, goX, goY, goW, goH, '#ef4444', 'rgba(12, 10, 16, 0.98)');
+
+      // Burning Crimson Title
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 24px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('☠ THE SOUL HAS DISSIPATED ☠', width / 2, goY + 46);
+
+      ctx.fillStyle = '#fca5a5';
+      ctx.font = 'italic 14px sans-serif';
+      ctx.fillText('The Holy Crusade has purged the wasteland of your dark magic.', width / 2, goY + 74);
+
+      // Stat Plaque
+      ctx.fillStyle = '#161320';
+      ctx.fillRect(goX + 30, goY + 98, goW - 60, 136);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(goX + 30, goY + 98, goW - 60, 136);
+
+      ctx.font = 'bold 13px monospace';
+      ctx.fillStyle = '#f8fafc';
+      ctx.textAlign = 'left';
+      ctx.fillText(`⚔ CRUSADE WAVE REACHED : Wave ${crusade.waveCounter}`, goX + 50, goY + 130);
+      ctx.fillText(`🔥 INQUISITION WRATH   : ${Math.floor(crusade.wrath)}`, goX + 50, goY + 158);
+      ctx.fillText(`✦ SOUL ESSENCE LEVEL   : Level ${progression.level}`, goX + 50, goY + 186);
+      ctx.fillText(`💀 CORPSES HARVESTED   : ${corpses.getTotalStock()}`, goX + 50, goY + 214);
+
+      // Resurrect Button CTA
+      const btnHover = (mouseX !== undefined && mouseY !== undefined) &&
+        mouseX >= goX + 60 && mouseX <= goX + goW - 60 &&
+        mouseY >= goY + 256 && mouseY <= goY + 304;
+
+      ctx.fillStyle = btnHover ? '#991b1b' : '#7f1d1d';
+      ctx.fillRect(goX + 60, goY + 256, goW - 120, 48);
+      ctx.strokeStyle = btnHover ? '#fecaca' : '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(goX + 60, goY + 256, goW - 120, 48);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡ RESURRECT & RETRY [PRESS R OR CLICK] ⚡', width / 2, goY + 286);
     }
 
     ctx.restore();

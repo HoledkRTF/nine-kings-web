@@ -18,335 +18,252 @@ export function drawCitadelSprite(
 ): void {
   ctx.save();
   ctx.translate(citadel.x, citadel.y);
-  ctx.rotate(citadel.angle);
 
-  const r = citadel.radius;
-  const isMoving = Math.abs(citadel.speed) > 8;
-  const movePhase = (animTime * 14 * Math.sign(citadel.speed || 1)) % (Math.PI * 2);
+  const isDashing = citadel.isInvulnerable();
+  const isMoving = Math.abs(citadel.speed) > 10;
+  const walkBob = isMoving ? Math.sin(animTime * 14) * 2 : 0;
+  const walkSway = isMoving ? Math.cos(animTime * 14) * 0.08 : 0;
 
-  // --- 0. Heavy Ground Shadow (Ambient Occlusion) ---
+  // --- 0. Shadow Step Ghost Afterimages ---
+  if (isDashing) {
+    for (let g = 1; g <= 3; g++) {
+      ctx.save();
+      const ghostDist = g * 12;
+      const moveAngle = citadel.speed > 0 ? citadel.angle : citadel.angle + Math.PI;
+      ctx.translate(-Math.cos(moveAngle) * ghostDist, -Math.sin(moveAngle) * ghostDist);
+      ctx.globalAlpha = 0.35 / g;
+      ctx.fillStyle = '#a855f7';
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // --- 1. Soft Ambient Ground Shadow & Void Mist ---
   ctx.save();
-  const shadowGrad = ctx.createRadialGradient(0, 4, r * 0.4, 0, 4, r * 1.35);
-  shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.75)');
-  shadowGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.45)');
+  const shadowGrad = ctx.createRadialGradient(0, 6, 2, 0, 6, 20);
+  shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+  shadowGrad.addColorStop(0.6, 'rgba(15, 23, 42, 0.4)');
   shadowGrad.addColorStop(1, 'transparent');
   ctx.fillStyle = shadowGrad;
   ctx.beginPath();
-  ctx.ellipse(0, 4, r * 1.3, r * 1.05, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 6, 18, 10, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // --- 1. Dual Heavy Spiked Caterpillar Treads (Left & Right Flanks) ---
-  const treadW = r * 1.7;
-  const treadH = r * 0.32;
-  const treadYOff = r * 0.72;
-
-  for (const side of [-1, 1]) {
-    const ty = side * treadYOff;
-
-    // Tread Housing Frame (Dark Cast Iron)
-    ctx.fillStyle = '#0a0d14';
-    ctx.fillRect(-treadW * 0.5, ty - treadH * 0.5, treadW, treadH);
-    ctx.strokeStyle = '#2d3748';
-    ctx.lineWidth = 2.5;
-    ctx.strokeRect(-treadW * 0.5, ty - treadH * 0.5, treadW, treadH);
-
-    // Tread Plate Cleats (Animated with movement)
-    const cleatCount = 10;
-    const cleatStep = treadW / cleatCount;
-    const scrollOff = isMoving ? ((animTime * (citadel.speed * 0.25)) % cleatStep) : 0;
-
-    ctx.strokeStyle = '#4a5568';
-    ctx.lineWidth = 2;
-    for (let i = -1; i <= cleatCount + 1; i++) {
-      const cx = -treadW * 0.5 + i * cleatStep + scrollOff;
-      if (cx >= -treadW * 0.5 && cx <= treadW * 0.5) {
-        ctx.beginPath();
-        ctx.moveTo(cx, ty - treadH * 0.5);
-        ctx.lineTo(cx, ty + treadH * 0.5);
-        ctx.stroke();
-
-        // Bone spurs on outer edge
-        ctx.fillStyle = '#e2e8f0';
-        ctx.beginPath();
-        ctx.moveTo(cx - 2, ty + side * (treadH * 0.5));
-        ctx.lineTo(cx, ty + side * (treadH * 0.5 + 4));
-        ctx.lineTo(cx + 2, ty + side * (treadH * 0.5));
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-
-    // Heavy Drive Sprocket Wheels inside housing
-    for (const wx of [-treadW * 0.4, 0, treadW * 0.4]) {
-      ctx.fillStyle = '#1a202c';
-      ctx.beginPath();
-      ctx.arc(wx, ty, treadH * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#718096';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Rotating axle spokes
-      const spokeAngle = isMoving ? animTime * 8 : 0;
-      ctx.beginPath();
-      ctx.moveTo(wx - Math.cos(spokeAngle) * 4, ty - Math.sin(spokeAngle) * 4);
-      ctx.lineTo(wx + Math.cos(spokeAngle) * 4, ty + Math.sin(spokeAngle) * 4);
-      ctx.stroke();
-    }
-  }
-
-  // --- 2. Heavy Armored Obsidian-Bone Hull Chassis ---
-  // Base Obsidian Skirt
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, r * 1.08, r * 0.82, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#1e293b';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  // Beveled Inner Bone Armor Plates (Warm Weathered Ivory)
-  ctx.fillStyle = '#1e2538';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, r * 0.95, r * 0.72, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // Iron Plate Rivets along the hull rim
-  const rivetCount = 16;
-  ctx.fillStyle = '#94a3b8';
-  for (let i = 0; i < rivetCount; i++) {
-    const angle = (i * Math.PI * 2) / rivetCount;
-    const rx = Math.cos(angle) * (r * 0.98);
-    const ry = Math.sin(angle) * (r * 0.75);
-    ctx.beginPath();
-    ctx.arc(rx, ry, 1.8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // --- 3. Gothic Bone Exhaust Chimneys (Rear Stern) ---
-  for (const side of [-1, 1]) {
-    const exX = -r * 0.72;
-    const exY = side * (r * 0.42);
-
-    // Chimney Base
-    ctx.fillStyle = '#1a1f2c';
-    ctx.fillRect(exX - 8, exY - 7, 16, 14);
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(exX - 8, exY - 7, 16, 14);
-
-    // Pipe Spout
-    ctx.fillStyle = '#334155';
-    ctx.beginPath();
-    ctx.arc(exX - 4, exY, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Billowing Necrotic Exhaust Smoke Puffs
-    const smokeDrift = (animTime * 18 + side * 4) % 28;
-    const smokeAlpha = Math.max(0, 1 - smokeDrift / 28) * 0.6;
-    ctx.fillStyle = `rgba(168, 85, 247, ${smokeAlpha})`;
-    ctx.beginPath();
-    ctx.arc(exX - 10 - smokeDrift, exY + (side * smokeDrift * 0.3), 5 + smokeDrift * 0.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Burning Cinder Sparks
-    if (isMoving) {
-      ctx.fillStyle = '#facc15';
-      ctx.beginPath();
-      ctx.arc(exX - 12 - smokeDrift * 0.8, exY + (Math.sin(animTime * 12 + side) * 5), 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // --- 4. Central Skeletal Spine & Interlocking Ribcage ---
-  // Spinal Column (Segmented 3D Vertebrae running along hull axis)
-  const vertCount = 8;
-  for (let i = 0; i < vertCount; i++) {
-    const vx = ((i / (vertCount - 1)) * 2 - 1) * (r * 0.62);
-
-    // Vertebra Bone Disk
-    ctx.fillStyle = '#f8fafc';
-    ctx.beginPath();
-    ctx.roundRect(vx - 4, -5, 8, 10, [2]);
-    ctx.fill();
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Center marrow channel
-    ctx.fillStyle = '#334155';
-    ctx.beginPath();
-    ctx.arc(vx, 0, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Interlocking Ivory Ribcage Arches
-  const ribCount = Math.max(5, Math.floor(r / 6.5));
-  for (let i = 0; i < ribCount; i++) {
-    const rx = ((i / (ribCount - 1)) * 2 - 1) * (r * 0.62);
-    const ry = Math.sqrt(Math.max(0, (r * 0.68) ** 2 - rx ** 2));
-
-    // Under-rib depth shadow
-    ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.lineWidth = 4.5;
-    ctx.beginPath();
-    ctx.arc(rx - 1, 1, ry, -Math.PI * 0.46, Math.PI * 0.46, false);
-    ctx.stroke();
-
-    // Ivory Rib Bone with highlight
-    ctx.strokeStyle = '#f1f5f9';
-    ctx.lineWidth = 3.2;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(rx, 0, ry, -Math.PI * 0.46, Math.PI * 0.46, false);
-    ctx.stroke();
-
-    // Bone tip caps
-    ctx.fillStyle = '#e2e8f0';
-    ctx.beginPath();
-    ctx.arc(rx + Math.cos(Math.PI * 0.46) * ry, Math.sin(Math.PI * 0.46) * ry, 2.5, 0, Math.PI * 2);
-    ctx.arc(rx + Math.cos(-Math.PI * 0.46) * ry, Math.sin(-Math.PI * 0.46) * ry, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // --- 5. Central Necrotic Soul Engine (Swirling Soul Core) ---
-  const pulse = Math.sin(animTime * 4.5) * 0.12 + 0.88;
-  const coreRadius = r * 0.36 * pulse;
-
-  // Rotating Runic Ring
+  // --- 2. Rotating Occult Summoning Sigil Underfoot ---
   ctx.save();
-  ctx.rotate(animTime * 0.8);
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-  ctx.lineWidth = 1.5;
+  ctx.rotate(animTime * 0.9);
+  ctx.strokeStyle = isDashing ? 'rgba(168, 85, 247, 0.6)' : 'rgba(168, 85, 247, 0.22)';
+  ctx.lineWidth = 1.2;
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
-  ctx.arc(0, 0, coreRadius * 1.35, 0, Math.PI * 2);
+  ctx.arc(0, 0, 22, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 
-  // Swirling Soul Plasma Gradient
-  const furnaceGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, coreRadius);
-  furnaceGrad.addColorStop(0, '#ffffff'); // Blinding soul core
-  furnaceGrad.addColorStop(0.25, '#67e8f9'); // Cyan soul flame
-  furnaceGrad.addColorStop(0.55, '#a855f7'); // Amethyst necromancy
-  furnaceGrad.addColorStop(0.85, '#064e3b'); // Dark necrotic deep
-  furnaceGrad.addColorStop(1, 'transparent');
+  // Rotate entire character towards facing angle
+  ctx.rotate(citadel.angle);
 
-  ctx.fillStyle = furnaceGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, coreRadius, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Center Soul Skull with burning eyes
-  ctx.fillStyle = '#f8fafc';
-  ctx.beginPath();
-  ctx.arc(0, -3, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillRect(-5, 1, 10, 5);
-
-  // Burning Cyan Eye Sockets
-  ctx.fillStyle = '#00f2fe';
-  ctx.beginPath();
-  ctx.arc(-3, -3, 2, 0, Math.PI * 2);
-  ctx.arc(3, -3, 2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Orbiting Soul Wisps
-  for (let i = 0; i < 3; i++) {
-    const orbAngle = animTime * 3 + (i * Math.PI * 2) / 3;
-    const ox = Math.cos(orbAngle) * (coreRadius * 0.85);
-    const oy = Math.sin(orbAngle) * (coreRadius * 0.85);
-    ctx.fillStyle = '#c084fc';
-    ctx.beginPath();
-    ctx.arc(ox, oy, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // --- 6. Colossal Horned Skull Ram at Prow (Front) ---
+  // --- 3. Flowing Tattered Dark Robes & Cloak ---
   ctx.save();
-  const ramX = r * 0.68;
+  ctx.translate(0, walkBob);
+  ctx.rotate(walkSway);
 
-  // Heavy Iron Ram Base & Armor
-  ctx.fillStyle = '#1e293b';
+  // Billowing Cloak Tails (Trailing Behind Heading)
+  const cloakFlutter = isMoving ? Math.sin(animTime * 16) * 4 : Math.sin(animTime * 3) * 1.5;
+  ctx.fillStyle = '#090814';
   ctx.beginPath();
-  ctx.moveTo(r + 32, 0);
-  ctx.lineTo(ramX, -r * 0.58);
-  ctx.lineTo(ramX - 10, -r * 0.25);
-  ctx.lineTo(ramX - 10, r * 0.25);
-  ctx.lineTo(ramX, r * 0.58);
+  ctx.moveTo(0, -10);
+  ctx.lineTo(-14, -12 + cloakFlutter);
+  ctx.lineTo(-20, -5 + cloakFlutter);
+  ctx.lineTo(-18, 5 - cloakFlutter);
+  ctx.lineTo(-14, 12 - cloakFlutter);
+  ctx.lineTo(0, 10);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = '#475569';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // Massive Sweeping Demon Ivory Horns with Iron Reinforcement Bands
-  for (const side of [-1, 1]) {
-    // Under-horn Shadow
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 7;
-    ctx.beginPath();
-    ctx.arc(r * 0.75, side * (r * 0.42), r * 0.42, side * -0.2, side * Math.PI * 0.85, side < 0);
-    ctx.stroke();
-
-    // Horn Ivory Arc
-    ctx.strokeStyle = '#f8fafc';
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.arc(r * 0.75, side * (r * 0.42), r * 0.42, side * -0.2, side * Math.PI * 0.85, side < 0);
-    ctx.stroke();
-
-    // Gold/Iron Binding Rings on Horns
-    ctx.strokeStyle = '#eab308';
-    ctx.lineWidth = 2;
-    const hx = r * 0.75 + Math.cos(side * 0.6) * (r * 0.42);
-    const hy = side * (r * 0.42) + Math.sin(side * 0.6) * (r * 0.42);
-    ctx.strokeRect(hx - 2, hy - 3, 4, 6);
-  }
-
-  // Center Ramming Spike with Crimson Blood Stains
-  ctx.fillStyle = '#e2e8f0';
-  ctx.beginPath();
-  ctx.moveTo(r + 34, 0);
-  ctx.lineTo(r + 14, -7);
-  ctx.lineTo(r + 14, 7);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#94a3b8';
+  ctx.strokeStyle = '#1e1b4b';
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Fresh Blood Splatter on Prow
-  ctx.fillStyle = '#881337';
+  // Cloak Hem Tatters
+  ctx.fillStyle = '#05040a';
+  for (let t = -8; t <= 8; t += 4) {
+    ctx.beginPath();
+    ctx.moveTo(-16, t);
+    ctx.lineTo(-22, t + Math.sin(animTime * 12 + t) * 2);
+    ctx.lineTo(-17, t + 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Torso Robe (Deep Obsidian with Midnight Purple Folds)
+  const robeGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 14);
+  robeGrad.addColorStop(0, '#1e1b4b');
+  robeGrad.addColorStop(0.7, '#0f0c1b');
+  robeGrad.addColorStop(1, '#06050b');
+  ctx.fillStyle = robeGrad;
   ctx.beginPath();
-  ctx.arc(r + 22, 0, 4.5, 0, Math.PI * 2);
-  ctx.arc(r + 16, -3, 3, 0, Math.PI * 2);
-  ctx.arc(r + 17, 3.5, 3.5, 0, Math.PI * 2);
+  ctx.ellipse(-1, 0, 11, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#312e81';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  // Weathered Ivory Bone Pauldrons on Shoulders
+  for (const side of [-1, 1]) {
+    const py = side * 10;
+    // Pauldron Horn Plate
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath();
+    ctx.ellipse(0, py, 4, 3, side * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Shoulder Bone Spikes
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.moveTo(-2, py);
+    ctx.lineTo(-7, py + side * 4);
+    ctx.lineTo(2, py);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // --- 4. Deep Arched Hood Cowl & Piercing Cyan Soul Eyes ---
+  // Hood Outer Arc
+  ctx.fillStyle = '#0f0e1a';
+  ctx.beginPath();
+  ctx.arc(3, 0, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#2e1065';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Deep Cowl Face Cavity (Pitch Black Void)
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.ellipse(5, 0, 5.5, 6.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Two Piercing Soul-Cyan Eyes Shining From the Void
+  for (const ey of [-2.8, 2.8]) {
+    // Eye Glow Bloom
+    const eyeBloom = ctx.createRadialGradient(5.5, ey, 0.5, 5.5, ey, 4.5);
+    eyeBloom.addColorStop(0, '#ffffff');
+    eyeBloom.addColorStop(0.4, '#00f2fe');
+    eyeBloom.addColorStop(1, 'transparent');
+    ctx.fillStyle = eyeBloom;
+    ctx.beginPath();
+    ctx.arc(5.5, ey, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eye Core
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(5.5, ey, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eye Trail Flare
+    ctx.strokeStyle = 'rgba(0, 242, 254, 0.7)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(5.5, ey);
+    ctx.lineTo(2, ey + (ey > 0 ? 1 : -1));
+    ctx.stroke();
+  }
+
+  // --- 5. Ebony & Bone Scythe of the Reaper (Held in Right Hand) ---
+  ctx.save();
+  ctx.translate(6, 9);
+  ctx.rotate(0.35 + (isMoving ? Math.sin(animTime * 14) * 0.1 : 0));
+
+  // Staff Shaft (Dark Carved Bone & Iron)
+  ctx.strokeStyle = '#18181b';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-16, 0);
+  ctx.lineTo(20, 0);
+  ctx.stroke();
+
+  // Silver Rune Bandings on Shaft
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-8, -1.5, 3, 3);
+  ctx.strokeRect(4, -1.5, 3, 3);
+
+  // Crescent Ivory Scythe Blade
+  ctx.save();
+  ctx.translate(18, 0);
+  ctx.rotate(-Math.PI * 0.4);
+
+  // Ivory Blade Body
+  ctx.fillStyle = '#f8fafc';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(18, 14, 26, 4);
+  ctx.quadraticCurveTo(16, 6, 0, -3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Razor Serrated Edge with Occult Gleam
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(18, 14, 26, 4);
+  ctx.stroke();
+
+  // Amethyst Soul Crystal at Blade Socket
+  const gemPulse = Math.sin(animTime * 6) * 0.5 + 2.5;
+  ctx.fillStyle = '#c084fc';
+  ctx.beginPath();
+  ctx.arc(0, 0, gemPulse, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 
-  // --- 7. Sockets & Mounted Weapon Turrets ---
+  ctx.restore(); // End scythe
+
+  ctx.restore(); // End character body
+
+  // --- 6. Orbiting Arcane Relics (Equipped Weapon Modules) ---
   const sockets = citadel.getSockets();
+  const orbitSpeed = 1.1;
+
   for (let i = 0; i < sockets.length; i++) {
     const s = sockets[i];
-    const sx = Math.cos(s.angleOffset) * (r * s.distanceRatio);
-    const sy = Math.sin(s.angleOffset) * (r * s.distanceRatio);
+    // Dynamic orbital rotation around the Necromancer
+    const orbitAngle = animTime * orbitSpeed + s.angleOffset;
+    const orbitDist = 28 + (citadel.radius * 0.9);
+    const sx = Math.cos(orbitAngle) * orbitDist;
+    const sy = Math.sin(orbitAngle) * orbitDist;
     const mod = equippedModules[i];
 
-    drawWeaponTurret(ctx, sx, sy, s.angleOffset, mod, animTime);
+    // Faint ethereal tether beam linking Necromancer to active relic
+    if (mod) {
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(sx, sy);
+      ctx.stroke();
+    }
+
+    drawWeaponTurret(ctx, sx, sy, orbitAngle, mod, animTime);
   }
 
   ctx.restore();
 }
 
 // ==========================================
-// 2. WEAPON TURRETS RENDERING
+// 2. ORBITING ARCANE RELICS RENDERING
 // ==========================================
 
 function drawWeaponTurret(
@@ -360,27 +277,31 @@ function drawWeaponTurret(
   ctx.save();
   ctx.translate(x, y);
 
-  // Heavy Cast-Iron Socket Base Pedestal
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.arc(0, 0, 13, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#475569';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  // Levitating Rune Pedestal / Soul Disc
+  const hoverBob = Math.sin(animTime * 4.5 + mountAngle) * 2.5;
+  ctx.translate(0, hoverBob);
 
-  // Brass Ring
-  ctx.strokeStyle = '#d97706';
-  ctx.lineWidth = 1;
+  // Faint glowing rune aura
+  const auraGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 12);
+  auraGrad.addColorStop(0, mod ? 'rgba(192, 132, 252, 0.35)' : 'rgba(51, 65, 85, 0.2)');
+  auraGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = auraGrad;
   ctx.beginPath();
-  ctx.arc(0, 0, 10, 0, Math.PI * 2);
+  ctx.arc(0, 0, 12, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Floating Runic Sigil Ring
+  ctx.strokeStyle = mod ? '#c084fc' : '#475569';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 7.5, 0, Math.PI * 2);
   ctx.stroke();
 
   if (!mod) {
-    // Empty socket slot: Dark hollow rune well
-    ctx.fillStyle = '#05070d';
+    // Empty socket slot: Floating hollow spirit well
+    ctx.fillStyle = '#090d16';
     ctx.beginPath();
-    ctx.arc(0, 0, 7, 0, Math.PI * 2);
+    ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;

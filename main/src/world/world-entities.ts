@@ -24,4 +24,6 @@ export interface WorldEnemy {
   assignedShrineId?: string;
   guardRadius?: number;
   guardAngle?: number;
+  chargeTimer?: number;
+  rangedCooldown?: number;
 }
