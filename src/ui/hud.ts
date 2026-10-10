@@ -6,6 +6,7 @@ import { MinionSwarmManager } from '../minions/minion-swarm';
 import { WeaponModule } from '../weapons/weapon-module';
 import { MINION_SPECS, MinionKind } from '../minions/minion-types';
 import { ProgressionManager } from '../managers/progression-manager';
+import { MetaProgressionManager, META_UPGRADE_DEFS } from '../managers/meta-progression';
 
 export class GameHUD {
   upgradeBanner: { title: string; desc: string; timer: number } | null = null;
@@ -37,7 +38,8 @@ export class GameHUD {
     progression: ProgressionManager,
     mouseX?: number,
     mouseY?: number,
-    isGameOver?: boolean
+    isGameOver?: boolean,
+    metaProgression?: MetaProgressionManager
   ): void {
     ctx.save();
 
@@ -317,7 +319,7 @@ export class GameHUD {
     // ==========================================
     if (progression.pendingChoices && progression.pendingChoices.length > 0) {
       const modalW = Math.min(700, width * 0.9);
-      const modalH = 270;
+      const modalH = 310;
       const modalX = (width - modalW) / 2;
       const modalY = (height - modalH) / 2;
 
@@ -346,25 +348,29 @@ export class GameHUD {
       ctx.fillRect(barX, barY, barW * timerFrac, barH);
 
       const cardW = (modalW - 60) / progression.pendingChoices.length;
+      const ch = modalH - 138;
       for (let i = 0; i < progression.pendingChoices.length; i++) {
         const c = progression.pendingChoices[i];
         const cx = modalX + 20 + i * (cardW + 10);
         const cy = modalY + 78;
-        const ch = modalH - 98;
 
         const isHovered = (mouseX !== undefined && mouseY !== undefined) &&
           mouseX >= cx && mouseX <= cx + cardW &&
           mouseY >= cy && mouseY <= cy + ch;
 
+        const isTome = c.type === 'tome';
+
         // Card Fill
-        ctx.fillStyle = isHovered ? 'rgba(38, 48, 76, 0.98)' : 'rgba(22, 28, 44, 0.94)';
+        ctx.fillStyle = isHovered
+          ? (isTome ? 'rgba(48, 28, 76, 0.98)' : 'rgba(38, 48, 76, 0.98)')
+          : (isTome ? 'rgba(28, 18, 44, 0.94)' : 'rgba(22, 28, 44, 0.94)');
         ctx.fillRect(cx, cy, cardW, ch);
-        ctx.strokeStyle = isHovered ? '#facc15' : (i === 0 ? '#e879f9' : '#38bdf8');
-        ctx.lineWidth = isHovered ? 2.5 : 1.5;
+        ctx.strokeStyle = isHovered ? '#facc15' : (isTome ? '#e879f9' : (i === 0 ? '#38bdf8' : '#64748b'));
+        ctx.lineWidth = isHovered ? 2.5 : (isTome ? 2 : 1.5);
         ctx.strokeRect(cx, cy, cardW, ch);
 
         // Number Key Badge
-        ctx.fillStyle = isHovered ? '#facc15' : (i === 0 ? '#e879f9' : '#38bdf8');
+        ctx.fillStyle = isHovered ? '#facc15' : (isTome ? '#e879f9' : '#38bdf8');
         ctx.fillRect(cx + 8, cy + 8, 28, 22);
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 13px monospace';
@@ -373,13 +379,18 @@ export class GameHUD {
 
         if (i === 0) {
           ctx.font = 'bold 10px monospace';
-          ctx.fillStyle = '#e879f9';
+          ctx.fillStyle = '#38bdf8';
           ctx.textAlign = 'right';
           ctx.fillText(`DEFAULT (${timeLeft}s)`, cx + cardW - 10, cy + 22);
+        } else if (isTome) {
+          ctx.font = 'bold 10px monospace';
+          ctx.fillStyle = '#e879f9';
+          ctx.textAlign = 'right';
+          ctx.fillText('★ TOME SYNERGY', cx + cardW - 10, cy + 22);
         }
 
         // Card Title
-        ctx.fillStyle = isHovered ? '#fef08a' : '#f8fafc';
+        ctx.fillStyle = isHovered ? '#fef08a' : (isTome ? '#f5d0fe' : '#f8fafc');
         ctx.font = 'bold 13px sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(c.title, cx + 42, cy + 24);
@@ -389,7 +400,7 @@ export class GameHUD {
         ctx.font = '12px sans-serif';
         const words = c.description.split(' ');
         let line = '';
-        let textY = cy + 56;
+        let textY = cy + 54;
         for (const w of words) {
           const testLine = line + w + ' ';
           if (testLine.length > 22) {
@@ -406,8 +417,31 @@ export class GameHUD {
         ctx.fillStyle = isHovered ? '#facc15' : '#64748b';
         ctx.font = 'bold 11px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(isHovered ? '▶ CLICK TO SELECT ◀' : `[PRESS ${i + 1} OR CLICK]`, cx + cardW / 2, cy + ch - 12);
+        ctx.fillText(isHovered ? '▶ CLICK TO SELECT ◀' : `[PRESS ${i + 1} OR CLICK]`, cx + cardW / 2, cy + ch - 10);
       }
+
+      // Reroll Button [R]
+      const canAffordReroll = corpses.getTotalStock() >= progression.rerollCost;
+      const rerollW = 320;
+      const rerollH = 26;
+      const rerollX = (width - rerollW) / 2;
+      const rerollY = modalY + modalH - 34;
+      const isRerollHovered = (mouseX !== undefined && mouseY !== undefined) &&
+        mouseX >= rerollX && mouseX <= rerollX + rerollW &&
+        mouseY >= rerollY && mouseY <= rerollY + rerollH;
+
+      ctx.fillStyle = isRerollHovered
+        ? (canAffordReroll ? 'rgba(157, 23, 77, 0.95)' : 'rgba(51, 65, 85, 0.9)')
+        : (canAffordReroll ? 'rgba(131, 24, 67, 0.85)' : 'rgba(30, 41, 59, 0.8)');
+      ctx.fillRect(rerollX, rerollY, rerollW, rerollH);
+      ctx.strokeStyle = canAffordReroll ? (isRerollHovered ? '#f472b6' : '#db2777') : '#475569';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(rerollX, rerollY, rerollW, rerollH);
+
+      ctx.fillStyle = canAffordReroll ? (isRerollHovered ? '#ffffff' : '#fbcfe8') : '#94a3b8';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`[R] REROLL BOONS (${progression.rerollCost} Corpses) | Reserve: ${corpses.getTotalStock()}`, width / 2, rerollY + 17);
     }
 
     // ==========================================
@@ -458,56 +492,116 @@ export class GameHUD {
     // ==========================================
     if (isGameOver) {
       // Fullscreen ominous dark veil
-      ctx.fillStyle = 'rgba(4, 4, 8, 0.88)';
+      ctx.fillStyle = 'rgba(4, 4, 8, 0.92)';
       ctx.fillRect(0, 0, width, height);
 
-      const goW = Math.min(620, width * 0.88);
-      const goH = 340;
+      const goW = Math.min(680, width * 0.92);
+      const goH = 460;
       const goX = (width - goW) / 2;
       const goY = (height - goH) / 2;
 
-      this.drawGothicPanel(ctx, goX, goY, goW, goH, '#ef4444', 'rgba(12, 10, 16, 0.98)');
+      this.drawGothicPanel(ctx, goX, goY, goW, goH, '#c084fc', 'rgba(10, 8, 16, 0.98)');
 
-      // Burning Crimson Title
+      // Title
       ctx.fillStyle = '#ef4444';
-      ctx.font = 'bold 24px serif';
+      ctx.font = 'bold 22px serif';
       ctx.textAlign = 'center';
-      ctx.fillText('☠ THE SOUL HAS DISSIPATED ☠', width / 2, goY + 46);
+      ctx.fillText('☠ THE SOUL HAS DISSIPATED ☠', width / 2, goY + 36);
 
-      ctx.fillStyle = '#fca5a5';
-      ctx.font = 'italic 14px sans-serif';
-      ctx.fillText('The Holy Crusade has purged the wasteland of your dark magic.', width / 2, goY + 74);
-
-      // Stat Plaque
-      ctx.fillStyle = '#161320';
-      ctx.fillRect(goX + 30, goY + 98, goW - 60, 136);
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(goX + 30, goY + 98, goW - 60, 136);
-
+      const ashCount = metaProgression ? metaProgression.soulAsh : 0;
+      ctx.fillStyle = '#c084fc';
       ctx.font = 'bold 13px monospace';
+      ctx.fillText(`✦ ETERNAL SOUL ASH VAULT: ${ashCount} ✦`, width / 2, goY + 58);
+
+      // Stat summary line
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '11px monospace';
+      ctx.fillText(`Wave Reached: ${crusade.waveCounter}  |  Wrath: ${Math.floor(crusade.wrath)}  |  Level: ${progression.level}  |  Corpses: ${corpses.getTotalStock()}`, width / 2, goY + 78);
+
+      // Crypt Reliquary Header
       ctx.fillStyle = '#f8fafc';
-      ctx.textAlign = 'left';
-      ctx.fillText(`⚔ CRUSADE WAVE REACHED : Wave ${crusade.waveCounter}`, goX + 50, goY + 130);
-      ctx.fillText(`🔥 INQUISITION WRATH   : ${Math.floor(crusade.wrath)}`, goX + 50, goY + 158);
-      ctx.fillText(`✦ SOUL ESSENCE LEVEL   : Level ${progression.level}`, goX + 50, goY + 186);
-      ctx.fillText(`💀 CORPSES HARVESTED   : ${corpses.getTotalStock()}`, goX + 50, goY + 214);
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('🏛 ETERNAL CRYPT RELIQUARY (PERMANENT UPGRADES) 🏛', width / 2, goY + 104);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('Press keys [1] - [4] or CLICK card to forge eternal power for future runs', width / 2, goY + 120);
+
+      // Render 4 Crypt Meta Upgrades
+      const upgradeKeys = ['unholyReserves', 'mistWalker', 'vitalVessel', 'soulMagnet'];
+      const cardW = (goW - 50) / 2;
+      const cardH = 92;
+
+      for (let i = 0; i < upgradeKeys.length; i++) {
+        const uId = upgradeKeys[i];
+        const def = META_UPGRADE_DEFS[uId];
+        const lvl = metaProgression ? metaProgression.getUpgradeLevel(uId) : 0;
+        const cost = metaProgression ? metaProgression.getUpgradeCost(uId) : null;
+        const canAfford = cost !== null && metaProgression && metaProgression.soulAsh >= cost;
+
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const cx = goX + 20 + col * (cardW + 10);
+        const cy = goY + 135 + row * (cardH + 10);
+
+        const isHovered = (mouseX !== undefined && mouseY !== undefined) &&
+          mouseX >= cx && mouseX <= cx + cardW &&
+          mouseY >= cy && mouseY <= cy + cardH;
+
+        ctx.fillStyle = isHovered
+          ? (canAfford ? 'rgba(38, 48, 76, 0.98)' : 'rgba(28, 20, 36, 0.95)')
+          : (cost === null ? 'rgba(15, 23, 42, 0.85)' : 'rgba(20, 16, 32, 0.92)');
+        ctx.fillRect(cx, cy, cardW, cardH);
+
+        ctx.strokeStyle = cost === null ? '#10b981' : (canAfford ? (isHovered ? '#facc15' : '#c084fc') : '#475569');
+        ctx.lineWidth = isHovered ? 2 : 1.2;
+        ctx.strokeRect(cx, cy, cardW, cardH);
+
+        // Card key badge
+        ctx.fillStyle = cost === null ? '#10b981' : (canAfford ? '#c084fc' : '#64748b');
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`[${i + 1}] ${def.name} (Lv ${lvl}/${def.maxLevel})`, cx + 10, cy + 18);
+
+        // Cost
+        ctx.textAlign = 'right';
+        ctx.fillStyle = cost === null ? '#10b981' : (canAfford ? '#facc15' : '#94a3b8');
+        ctx.fillText(cost === null ? '✔ MAXED' : `${cost} Ash`, cx + cardW - 10, cy + 18);
+
+        // Desc
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(def.description, cx + 10, cy + 36);
+
+        // Current / Next Rank
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = 'bold 10px monospace';
+        const rankText = lvl > 0 ? `Current: ${def.rankDescriptions[lvl - 1]}` : 'Locked';
+        const nextText = cost !== null ? `Next: ${def.rankDescriptions[lvl]}` : 'Fully Mastered';
+        ctx.fillText(`${rankText}  →  ${nextText}`, cx + 10, cy + 56);
+
+        // Click prompt
+        ctx.fillStyle = isHovered && canAfford ? '#facc15' : '#64748b';
+        ctx.font = '9px monospace';
+        ctx.fillText(cost === null ? 'MASTERED' : (canAfford ? 'CLICK OR PRESS KEY TO BUY' : 'NEED MORE ASH'), cx + 10, cy + 76);
+      }
 
       // Resurrect Button CTA
+      const btnY = goY + goH - 62;
       const btnHover = (mouseX !== undefined && mouseY !== undefined) &&
-        mouseX >= goX + 60 && mouseX <= goX + goW - 60 &&
-        mouseY >= goY + 256 && mouseY <= goY + 304;
+        mouseX >= goX + 50 && mouseX <= goX + goW - 50 &&
+        mouseY >= btnY && mouseY <= btnY + 44;
 
-      ctx.fillStyle = btnHover ? '#991b1b' : '#7f1d1d';
-      ctx.fillRect(goX + 60, goY + 256, goW - 120, 48);
-      ctx.strokeStyle = btnHover ? '#fecaca' : '#ef4444';
+      ctx.fillStyle = btnHover ? '#047857' : '#064e3b';
+      ctx.fillRect(goX + 50, btnY, goW - 100, 44);
+      ctx.strokeStyle = btnHover ? '#6ee7b7' : '#10b981';
       ctx.lineWidth = 2;
-      ctx.strokeRect(goX + 60, goY + 256, goW - 120, 48);
+      ctx.strokeRect(goX + 50, btnY, goW - 100, 44);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 15px sans-serif';
+      ctx.font = 'bold 13px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('⚡ RESURRECT & RETRY [PRESS R OR CLICK] ⚡', width / 2, goY + 286);
+      ctx.fillText('⚡ RESURRECT & EMBARK UPON CRUSADE [PRESS R, SPACE OR CLICK] ⚡', width / 2, btnY + 27);
     }
 
     ctx.restore();
