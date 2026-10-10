@@ -102,4 +102,44 @@ describe('ProgressionManager', () => {
     expect(progression.pendingChoices).not.toBeNull();
     expect(progression.autoSelectTimer).toBe(5.0);
   });
+
+  it('allows rerolling draft choices by spending corpses', () => {
+    progression.generateLevelChoices();
+    const mockStockpile = {
+      stock: 10,
+      spendCorpses(amount: number) {
+        if (this.stock >= amount) {
+          this.stock -= amount;
+          return true;
+        }
+        return false;
+      }
+    };
+
+    const rerolled = progression.rerollChoices(mockStockpile);
+    expect(rerolled).toBe(true);
+    expect(mockStockpile.stock).toBe(7); // 10 - 3 = 7
+    expect(progression.pendingChoices).not.toBeNull();
+    expect(progression.autoSelectTimer).toBe(5.0);
+
+    // If insufficient corpses, reroll fails
+    mockStockpile.stock = 2;
+    const failedReroll = progression.rerollChoices(mockStockpile);
+    expect(failedReroll).toBe(false);
+    expect(mockStockpile.stock).toBe(2);
+  });
+
+  it('activates multiplicative tome synergies upon selection', () => {
+    progression.pendingChoices = [
+      {
+        id: 'tome_legion',
+        title: 'Tome of the Legion',
+        description: 'boosts scythe by swarm',
+        type: 'tome'
+      }
+    ];
+
+    progression.selectChoice(0, citadel, swarm);
+    expect(progression.hasLegionTome).toBe(true);
+  });
 });

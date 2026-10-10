@@ -9,6 +9,7 @@ import { CrusadeDirector } from './world/crusade-director';
 import { WorldEnemy } from './world/world-entities';
 import { ShrineManager, BreachReward, RelicUpgradeType } from './world/shrine-entity';
 import { ProgressionManager } from './managers/progression-manager';
+import { MetaProgressionManager } from './managers/meta-progression';
 import { InputManager } from './engine/input';
 import { GameRenderer } from './render/renderer';
 import { GameHUD } from './ui/hud';
@@ -31,8 +32,16 @@ window.addEventListener('click', () => {
   canvas.focus();
 });
 
+const metaProgression = new MetaProgressionManager();
 const citadel = new CitadelEntity(0, 0);
+citadel.bonusMaxHp = metaProgression.getBonusMaxHp();
+citadel.maxHp = 120 + citadel.bonusMaxHp;
+citadel.hp = citadel.maxHp;
+citadel.shadowStepCooldownMax = Math.max(0.7, 1.8 * metaProgression.getDashCooldownMultiplier());
+
 const corpses = new CorpseManager(250);
+corpses.addStock(metaProgression.getBonusStartingCorpses());
+
 const swarm = new MinionSwarmManager(100);
 const spells = new SpellController();
 const crusade = new CrusadeDirector();
@@ -42,6 +51,9 @@ const input = new InputManager();
 const renderer = new GameRenderer();
 const hud = new GameHUD();
 const audio = new SoundEffects();
+
+let hitStopTimer = 0;
+let soulAshAwarded = false;
 
 let workshopOpen = false;
 let gameOver = false;
@@ -105,6 +117,8 @@ function handleBreachReward(reward: BreachReward) {
 function resetGame() {
   citadel.x = 0;
   citadel.y = 0;
+  citadel.bonusMaxHp = metaProgression.getBonusMaxHp();
+  citadel.maxHp = 120 + citadel.bonusMaxHp;
   citadel.hp = citadel.maxHp;
   citadel.speed = 0;
   citadel.vx = 0;
@@ -112,9 +126,10 @@ function resetGame() {
   citadel.boneMass = 0;
   citadel.shadowStepCooldown = 0;
   citadel.shadowStepActiveTimer = 0;
+  citadel.shadowStepCooldownMax = Math.max(0.7, 1.8 * metaProgression.getDashCooldownMultiplier());
 
   corpses.corpses = [];
-  corpses.totalStock = 14;
+  corpses.totalStock = 14 + metaProgression.getBonusStartingCorpses();
   swarm.minions = [];
   crusade.wrath = 0;
   crusade.waveCounter = 1;
@@ -123,11 +138,17 @@ function resetGame() {
   progression.level = 1;
   progression.maxExp = 100;
   progression.unlockedMinions = new Set(['skeleton_grunt']);
+  progression.hasPestilenceTome = false;
+  progression.hasLegionTome = false;
+  progression.hasVelocityTome = false;
+  progression.hasSiphonTome = false;
   progression.pendingChoices = null;
   progression.autoSelectTimer = progression.AUTO_SELECT_DURATION;
   projectiles = [];
   workshopOpen = false;
   gameOver = false;
+  soulAshAwarded = false;
+  hitStopTimer = 0;
 
   seedWorldEnemies();
 }
@@ -138,10 +159,51 @@ function gameLoop(now: number) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
 
-  // 0. GAME OVER STATE
+  // 0. GAME OVER STATE & CRYPT RELIQUARY (Hades-style Hub)
   if (gameOver) {
+    if (!soulAshAwarded) {
+      const earned = Math.max(5, Math.floor(crusade.waveCounter * 8 + progression.level * 4 + corpses.getTotalStock() * 0.4));
+      metaProgression.addSoulAsh(earned);
+      soulAshAwarded = true;
+    }
+
     const clicked = input.consumeClick();
-    if (input.isDown('r') || clicked) {
+    const goW = Math.min(680, canvas.width * 0.92);
+    const goH = 460;
+    const goX = (canvas.width - goW) / 2;
+    const goY = (canvas.height - goH) / 2;
+
+    // Check Crypt Upgrade purchases (Keys 1-4 or clicking)
+    const upgradeKeys = ['unholyReserves', 'mistWalker', 'vitalVessel', 'soulMagnet'];
+    const cardW = (goW - 50) / 2;
+    const cardH = 92;
+
+    for (let i = 0; i < upgradeKeys.length; i++) {
+      const keyStr = String(i + 1);
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const cx = goX + 20 + col * (cardW + 10);
+      const cy = goY + 135 + row * (cardH + 10);
+      const isHovered = input.mouseX >= cx && input.mouseX <= cx + cardW &&
+                        input.mouseY >= cy && input.mouseY <= cy + cardH;
+
+      if (input.isDown(keyStr) || (clicked && isHovered)) {
+        input.keys.delete(keyStr);
+        const bought = metaProgression.purchaseUpgrade(upgradeKeys[i]);
+        if (bought) {
+          audio.playUpgrade();
+          renderer.addShake(4, 0.15);
+        }
+        break;
+      }
+    }
+
+    // Resurrect CTA check
+    const btnY = goY + goH - 62;
+    const btnHover = input.mouseX >= goX + 50 && input.mouseX <= goX + goW - 50 &&
+                     input.mouseY >= btnY && input.mouseY <= btnY + 44;
+
+    if (input.isDown('r') || input.isDown(' ') || input.isDown('enter') || (clicked && btnHover)) {
       input.keys.clear();
       resetGame();
     }
@@ -175,44 +237,99 @@ function gameLoop(now: number) {
       progression,
       input.mouseX,
       input.mouseY,
-      true
+      true,
+      metaProgression
     );
     requestAnimationFrame(gameLoop);
     return;
   }
 
-  // 0.5 LEVEL-UP DRAFT MODAL SELECTION
+  // 0.2 HIT-STOP MICRO-FREEZE (Megabonk Juice on heavy impacts)
+  if (hitStopTimer > 0) {
+    hitStopTimer -= dt;
+    hud.update(dt);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    renderer.render(
+      ctx,
+      canvas.width,
+      canvas.height,
+      citadel,
+      corpses.getAll(),
+      swarm.getAll(),
+      enemies,
+      projectiles,
+      equippedModules,
+      dt,
+      shrines.getAll()
+    );
+    hud.render(
+      ctx,
+      canvas.width,
+      canvas.height,
+      citadel,
+      corpses,
+      crusade,
+      spells,
+      swarm,
+      equippedModules,
+      workshopOpen,
+      progression,
+      input.mouseX,
+      input.mouseY,
+      false,
+      metaProgression
+    );
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  // 0.5 LEVEL-UP DRAFT MODAL SELECTION & CORPSE REROLL
   if (progression.pendingChoices && progression.pendingChoices.length > 0) {
-    const modalW = Math.min(680, canvas.width * 0.88);
-    const modalH = 260;
+    const modalW = Math.min(700, canvas.width * 0.9);
+    const modalH = 310;
     const modalX = (canvas.width - modalW) / 2;
     const modalY = (canvas.height - modalH) / 2;
     const cardW = (modalW - 60) / progression.pendingChoices.length;
-    const cardY = modalY + 75;
-    const cardH = modalH - 95;
+    const cardY = modalY + 78;
+    const cardH = modalH - 138;
 
-    // Auto-select first choice if no upgrade chosen within 5 seconds
-    const autoChosen = progression.updateTimer(dt, citadel, swarm);
-    if (autoChosen) {
-      audio.playFire('soul');
-      hud.showUpgradeBanner(`[AUTO] ${autoChosen.title}`, autoChosen.description);
+    // Check Reroll button [R]
+    const rerollW = 320;
+    const rerollH = 26;
+    const rerollX = (canvas.width - rerollW) / 2;
+    const rerollY = modalY + modalH - 34;
+    const isRerollHovered = input.mouseX >= rerollX && input.mouseX <= rerollX + rerollW &&
+                            input.mouseY >= rerollY && input.mouseY <= rerollY + rerollH;
+
+    const clicked = input.consumeClick();
+    if (input.isDown('r') || (clicked && isRerollHovered)) {
+      input.keys.delete('r');
+      if (progression.rerollChoices(corpses)) {
+        audio.playReroll();
+        renderer.addShake(6, 0.18);
+      }
     } else {
-      const clicked = input.consumeClick();
+      // Auto-select first choice if no upgrade chosen within 5 seconds
+      const autoChosen = progression.updateTimer(dt, citadel, swarm);
+      if (autoChosen) {
+        audio.playFire('soul');
+        hud.showUpgradeBanner(`[AUTO] ${autoChosen.title}`, autoChosen.description);
+      } else {
+        for (let i = 0; i < progression.pendingChoices.length; i++) {
+          const cardX = modalX + 20 + i * (cardW + 10);
+          const isHovered = input.mouseX >= cardX && input.mouseX <= cardX + cardW &&
+                            input.mouseY >= cardY && input.mouseY <= cardY + cardH;
+          const key = String(i + 1);
 
-      for (let i = 0; i < progression.pendingChoices.length; i++) {
-        const cardX = modalX + 20 + i * (cardW + 10);
-        const isHovered = input.mouseX >= cardX && input.mouseX <= cardX + cardW &&
-                          input.mouseY >= cardY && input.mouseY <= cardY + cardH;
-        const key = String(i + 1);
-
-        if (input.isDown(key) || (clicked && isHovered)) {
-          input.keys.clear();
-          const chosen = progression.selectChoice(i, citadel, swarm);
-          if (chosen) {
-            audio.playFire('soul');
-            hud.showUpgradeBanner(chosen.title, chosen.description);
+          if (input.isDown(key) || (clicked && isHovered)) {
+            input.keys.clear();
+            const chosen = progression.selectChoice(i, citadel, swarm);
+            if (chosen) {
+              audio.playFire('soul');
+              hud.showUpgradeBanner(chosen.title, chosen.description);
+            }
+            break;
           }
-          break;
         }
       }
     }
@@ -466,6 +583,7 @@ function gameLoop(now: number) {
           if (dist(p, e) <= p.radius + e.radius) {
             e.hp -= p.damage;
             hit = true;
+            renderer.addFloatingText(e.x, e.y, `${Math.ceil(p.damage)}`, p.type === 'blight' ? '#4ade80' : p.type === 'soul' ? '#c084fc' : '#f8fafc');
             renderer.addParticle(p.x, p.y, p.type === 'blight' ? '#4ade80' : p.type === 'soul' ? '#c084fc' : '#f8fafc', 4, 80, 2);
             break;
           }
@@ -523,20 +641,35 @@ function gameLoop(now: number) {
 
       // Close Contact: Spectral Scythe Reap & Enemy Contact Hurt
       if (d <= citadel.radius + e.radius) {
-        const reap = citadel.calculateCrushDamage(e.radius);
+        let reap = citadel.calculateCrushDamage(e.radius);
+        const isCrit = progression.hasLegionTome && swarm.getMinionCount() >= 4;
+        if (progression.hasLegionTome) {
+          reap *= (1.0 + swarm.getMinionCount() * 0.04);
+        }
         e.hp -= reap;
         if (!citadel.isInvulnerable() && e.isHostile) {
           citadel.takeDamage(e.damage * 0.4 * dt * 60);
         }
-        audio.playCrunch();
+        if (isCrit) {
+          audio.playCrit();
+          hitStopTimer = 0.035;
+          renderer.addFloatingText(e.x, e.y, `${Math.ceil(reap)}!`, '#facc15', true);
+        } else {
+          audio.playCrunch();
+          renderer.addFloatingText(e.x, e.y, `${Math.ceil(reap)}`, '#cbd5e1', false);
+        }
         renderer.addShake(5, 0.15);
-        renderer.addParticle(e.x, e.y, '#991b1b', 4, 100, 2.5);
+        renderer.addParticle(e.x, e.y, isCrit ? '#facc15' : '#991b1b', 4, 100, 2.5);
       }
 
       // Minion clashes (Enemies fight back fiercely against swarms)
       for (const m of swarm.getAll()) {
         if (dist(m, e) <= m.radius + e.radius) {
-          e.hp -= (m.damage * 0.45 * progression.minionDamageMultiplier) * dt;
+          let minionDps = m.damage * 0.45 * progression.minionDamageMultiplier;
+          if (progression.hasVelocityTome) {
+            minionDps *= 1.3;
+          }
+          e.hp -= minionDps * dt;
           m.hp -= (e.damage || 15) * 1.8 * dt;
         }
       }
@@ -547,6 +680,21 @@ function gameLoop(now: number) {
         crusade.addWrath(e.isHostile ? 12 : 25);
         progression.addExp(e.isHostile ? 12 : 20);
         renderer.addParticle(e.x, e.y, '#f8fafc', 8, 90, 2.5);
+
+        // Megabonk hit-stop crunch on kill
+        hitStopTimer = 0.025;
+
+        // Tome of Siphoning synergy: chance to leech HP or drop bonus corpse
+        if (progression.hasSiphonTome && Math.random() < 0.25) {
+          citadel.hp = Math.min(citadel.maxHp, citadel.hp + 4);
+          renderer.addFloatingText(citadel.x, citadel.y - 12, '+4 HP', '#4ade80', false);
+          corpses.spawnCorpse(e.x + (Math.random() - 0.5) * 20, e.y + (Math.random() - 0.5) * 20, 1);
+        }
+
+        // Tome of Pestilence synergy: poisonous smog burst
+        if (progression.hasPestilenceTome) {
+          renderer.addParticle(e.x, e.y, '#22c55e', 12, 110, 4);
+        }
         continue;
       }
 
@@ -779,7 +927,8 @@ function gameLoop(now: number) {
     progression,
     input.mouseX,
     input.mouseY,
-    gameOver
+    gameOver,
+    metaProgression
   );
 
   requestAnimationFrame(gameLoop);

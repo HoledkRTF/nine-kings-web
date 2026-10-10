@@ -41,6 +41,18 @@ export interface SoulWisp {
   maxLife: number;
 }
 
+export interface FloatingText {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  size: number;
+  life: number;
+  maxLife: number;
+  vy: number;
+  isCrit?: boolean;
+}
+
 export class GameRenderer {
   cameraX: number = 0;
   cameraY: number = 0;
@@ -48,6 +60,7 @@ export class GameRenderer {
   shakeTime: number = 0;
   shakeIntensity: number = 0;
   particles: VisualParticle[] = [];
+  floatingTexts: FloatingText[] = [];
   private tracks: TreadTrack[] = [];
   private soulWisps: SoulWisp[] = [];
   private lastTrackDist: number = 0;
@@ -55,6 +68,20 @@ export class GameRenderer {
   addShake(intensity: number, duration: number = 0.2): void {
     this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
     this.shakeTime = Math.max(this.shakeTime, duration);
+  }
+
+  addFloatingText(x: number, y: number, text: string, color: string = '#ffffff', isCrit: boolean = false): void {
+    this.floatingTexts.push({
+      x: x + (Math.random() - 0.5) * 16,
+      y: y - 10,
+      text,
+      color: isCrit ? '#facc15' : color,
+      size: isCrit ? 18 : 12,
+      life: isCrit ? 0.8 : 0.55,
+      maxLife: isCrit ? 0.8 : 0.55,
+      vy: isCrit ? -70 : -45,
+      isCrit
+    });
   }
 
   addParticle(x: number, y: number, color: string, count: number = 4, speed: number = 60, size: number = 3): void {
@@ -290,6 +317,29 @@ export class GameRenderer {
       }
     }
     this.particles = activeParticles;
+    ctx.globalAlpha = 1.0;
+
+    // 8.2 Floating Damage & Impact Combat Numbers (Megabonk Juice)
+    const activeTexts: FloatingText[] = [];
+    for (const ft of this.floatingTexts) {
+      ft.y += ft.vy * dt;
+      ft.life -= dt;
+      if (ft.life > 0) {
+        const alpha = Math.max(0, ft.life / ft.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = `bold ${ft.size}px monospace`;
+        ctx.textAlign = 'center';
+        // Dark drop shadow
+        ctx.fillStyle = '#020617';
+        ctx.fillText(ft.text, ft.x + 1, ft.y + 1);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+        activeTexts.push(ft);
+      }
+    }
+    this.floatingTexts = activeTexts;
     ctx.globalAlpha = 1.0;
 
     // 8.5 Ambient Soul Wisps floating over battlefield

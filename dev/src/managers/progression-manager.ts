@@ -6,7 +6,7 @@ export interface LevelUpgradeCard {
   id: string;
   title: string;
   description: string;
-  type: 'unlock_minion' | 'scavenger' | 'buff';
+  type: 'unlock_minion' | 'scavenger' | 'buff' | 'tome';
   minionKind?: MinionKind;
 }
 
@@ -24,6 +24,13 @@ export class ProgressionManager {
 
   autoSelectTimer: number = 5.0;
   readonly AUTO_SELECT_DURATION: number = 5.0;
+  readonly rerollCost: number = 3;
+
+  // Multiplicative Tome Synergies
+  hasPestilenceTome: boolean = false;
+  hasLegionTome: boolean = false;
+  hasVelocityTome: boolean = false;
+  hasSiphonTome: boolean = false;
 
   readonly ALL_UNLOCKABLE_MINIONS: { kind: MinionKind; name: string; desc: string; key: string }[] = [
     { kind: 'bone_phalanx', name: 'Bone Phalanx', desc: 'Frontline shield wall vanguard', key: '2' },
@@ -99,11 +106,55 @@ export class ProgressionManager {
       type: 'buff'
     });
 
+    // 4. Multiplicative Tome Synergies (Megabonk / Hades style)
+    if (!this.hasPestilenceTome) {
+      cards.push({
+        id: 'tome_pestilence',
+        title: 'Tome of Pestilence',
+        description: 'Bloated Husks create +60% wider toxic blights; corpse blasts leave lingering poison smog',
+        type: 'tome'
+      });
+    }
+
+    if (!this.hasLegionTome) {
+      cards.push({
+        id: 'tome_legion',
+        title: 'Tome of the Legion',
+        description: 'Undead swarm empowers scythe: +4% Scythe reap damage per active minion & +25% minion HP',
+        type: 'tome'
+      });
+    }
+
+    if (!this.hasVelocityTome) {
+      cards.push({
+        id: 'tome_velocity',
+        title: 'Tome of Velocity',
+        description: '+25% Necromancer speed & minion attack rate scales with your movement speed',
+        type: 'tome'
+      });
+    }
+
+    if (!this.hasSiphonTome) {
+      cards.push({
+        id: 'tome_siphon',
+        title: 'Tome of Siphoning',
+        description: 'Minion strikes have 25% chance to siphon +4 Soul HP or produce bonus corpses',
+        type: 'tome'
+      });
+    }
+
     // Shuffle and pick up to 3 distinct cards
     const shuffled = [...cards].sort(() => Math.random() - 0.5);
     this.pendingChoices = shuffled.slice(0, 3);
     this.autoSelectTimer = this.AUTO_SELECT_DURATION;
     return this.pendingChoices;
+  }
+
+  rerollChoices(corpses: { spendCorpses: (amount: number) => boolean }): boolean {
+    if (!this.pendingChoices || this.pendingChoices.length === 0) return false;
+    if (!corpses.spendCorpses(this.rerollCost)) return false;
+    this.generateLevelChoices();
+    return true;
   }
 
   updateTimer(dt: number, citadel: CitadelEntity, swarm: MinionSwarmManager): LevelUpgradeCard | null {
@@ -151,6 +202,15 @@ export class ProgressionManager {
       citadel.bonusMaxHp += 200;
       citadel.maxHp += 200;
       citadel.hp = citadel.maxHp;
+    } else if (card.id === 'tome_pestilence') {
+      this.hasPestilenceTome = true;
+    } else if (card.id === 'tome_legion') {
+      this.hasLegionTome = true;
+    } else if (card.id === 'tome_velocity') {
+      this.hasVelocityTome = true;
+      citadel.speedMultiplier *= 1.25;
+    } else if (card.id === 'tome_siphon') {
+      this.hasSiphonTome = true;
     }
   }
 }
