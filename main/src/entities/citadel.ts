@@ -39,12 +39,15 @@ export class CitadelEntity {
   // Shadow Step / Mist Blink Dash state
   shadowStepCooldown: number = 0;
   shadowStepActiveTimer: number = 0;
+  dashBufferTimer: number = 0; // 0.15s input buffer window
+  dashDirX: number = 0;
+  dashDirY: number = 0;
   readonly shadowStepCooldownMax: number = 1.8;
 
   // Movement constants
-  readonly maxSpeedBase: number = 210;
-  readonly accelerationBase: number = 1200;
-  readonly friction: number = 0.88;
+  readonly maxSpeedBase: number = 235;
+  readonly accelerationBase: number = 2400;
+  readonly friction: number = 0.78;
 
   constructor(x: number, y: number) {
     this.x = x;
@@ -142,42 +145,105 @@ export class CitadelEntity {
   update(dt: number, input: CitadelInput): void {
     if (this.shadowStepCooldown > 0) this.shadowStepCooldown -= dt;
     if (this.shadowStepActiveTimer > 0) this.shadowStepActiveTimer -= dt;
+    if (this.dashBufferTimer > 0) this.dashBufferTimer -= dt;
 
-    if (input.surge && this.shadowStepCooldown <= 0) {
+    if (input.surge) {
+      this.dashBufferTimer = 0.15;
+    }
+
+    const baseSpeed = this.maxSpeedBase * this.speedMultiplier;
+    const maxSpeed = baseSpeed;
+
+    // Dash activation with input buffer and instantaneous burst impulse
+    if (this.dashBufferTimer > 0 && this.shadowStepCooldown <= 0) {
       this.shadowStepActiveTimer = 0.22;
       this.shadowStepCooldown = this.shadowStepCooldownMax;
+      this.dashBufferTimer = 0;
+
+      let dx = input.moveX !== undefined ? input.moveX : 0;
+      let dy = input.moveY !== undefined ? input.moveY : 0;
+      const dLen = Math.hypot(dx, dy);
+      if (dLen > 0.001) {
+        this.dashDirX = dx / dLen;
+        this.dashDirY = dy / dLen;
+      } else {
+        const facing = input.targetAngle !== undefined ? input.targetAngle : this.angle;
+        this.dashDirX = Math.cos(facing);
+        this.dashDirY = Math.sin(facing);
+      }
+
+      const dashSpeed = baseSpeed * 2.75;
+      this.vx = this.dashDirX * dashSpeed;
+      this.vy = this.dashDirY * dashSpeed;
     }
 
     const isDashing = this.shadowStepActiveTimer > 0;
-    const baseSpeed = this.maxSpeedBase * this.speedMultiplier;
-    const maxSpeed = isDashing ? baseSpeed * 2.6 : baseSpeed;
 
     // Check if direct 8-way movement is provided
     if (input.moveX !== undefined || input.moveY !== undefined) {
-      const mx = input.moveX || 0;
-      const my = input.moveY || 0;
-      const len = Math.hypot(mx, my);
+      let mx = input.moveX || 0;
+      let my = input.moveY || 0;
+      let len = Math.hypot(mx, my);
+
+      if (input.targetAngle !== undefined) {
+        this.angle = input.targetAngle;
+      }
+
+      if (isDashing) {
+        // Maintain dash vector throughout blink window
+        if (len <= 0.001) {
+          mx = this.dashDirX;
+          my = this.dashDirY;
+          len = 1;
+        }
+      }
 
       if (len > 0.001) {
         const normX = mx / len;
         const normY = my / len;
-        const targetVx = normX * maxSpeed;
-        const targetVy = normY * maxSpeed;
-        const accel = (this.accelerationBase * (isDashing ? 3.5 : 1)) * dt;
+        const targetSpeed = isDashing ? baseSpeed * 2.75 : maxSpeed;
+        const targetVx = normX * targetSpeed;
+        const targetVy = normY * targetSpeed;
 
-        this.vx += (targetVx - this.vx) * Math.min(1, accel * 0.015);
-        this.vy += (targetVy - this.vy) * Math.min(1, accel * 0.015);
+        // Counter-steering: 2.8x sharp braking when steering against existing velocity
+        const currentSpeed = Math.hypot(this.vx, this.vy);
+        let counterSteerMultiplier = 1.0;
+        if (currentSpeed > 10) {
+          const dot = (this.vx * normX + this.vy * normY) / currentSpeed;
+          if (dot < 0) {
+            counterSteerMultiplier = 2.8;
+          }
+        }
+
+        const effectiveAccel = isDashing
+          ? this.accelerationBase * 4.0
+          : this.accelerationBase * counterSteerMultiplier;
+
+        const step = effectiveAccel * dt;
+        const diffX = targetVx - this.vx;
+        const diffY = targetVy - this.vy;
+        const diffDist = Math.hypot(diffX, diffY);
+
+        if (diffDist <= step) {
+          this.vx = targetVx;
+          this.vy = targetVy;
+        } else {
+          this.vx += (diffX / diffDist) * step;
+          this.vy += (diffY / diffDist) * step;
+        }
 
         if (input.targetAngle === undefined) {
           this.angle = Math.atan2(this.vy, this.vx);
         }
       } else {
-        this.vx *= Math.pow(this.friction, dt * 60);
-        this.vy *= Math.pow(this.friction, dt * 60);
-      }
-
-      if (input.targetAngle !== undefined) {
-        this.angle = input.targetAngle;
+        // Crisp stopping friction with micro-stop deadzone (no ice-skating)
+        const decay = Math.pow(this.friction, dt * 60);
+        this.vx *= decay;
+        this.vy *= decay;
+        if (Math.hypot(this.vx, this.vy) < 12) {
+          this.vx = 0;
+          this.vy = 0;
+        }
       }
 
       this.x += this.vx * dt;

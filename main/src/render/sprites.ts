@@ -20,16 +20,18 @@ export function drawCitadelSprite(
   ctx.translate(citadel.x, citadel.y);
 
   const isDashing = citadel.isInvulnerable();
-  const isMoving = Math.abs(citadel.speed) > 10;
-  const walkBob = isMoving ? Math.sin(animTime * 14) * 2 : 0;
-  const walkSway = isMoving ? Math.cos(animTime * 14) * 0.08 : 0;
+  const currentSpeed = Math.hypot(citadel.vx, citadel.vy);
+  const isMoving = currentSpeed > 10;
+  const speedRatio = Math.min(2.5, Math.max(0.6, currentSpeed / 235));
+  const walkBob = isMoving ? Math.sin(animTime * 14 * speedRatio) * 2 : 0;
+  const walkSway = isMoving ? Math.cos(animTime * 14 * speedRatio) * 0.08 : 0;
 
   // --- 0. Shadow Step Ghost Afterimages ---
   if (isDashing) {
+    const moveAngle = currentSpeed > 10 ? Math.atan2(citadel.vy, citadel.vx) : citadel.angle;
     for (let g = 1; g <= 3; g++) {
       ctx.save();
-      const ghostDist = g * 12;
-      const moveAngle = citadel.speed > 0 ? citadel.angle : citadel.angle + Math.PI;
+      const ghostDist = g * 14;
       ctx.translate(-Math.cos(moveAngle) * ghostDist, -Math.sin(moveAngle) * ghostDist);
       ctx.globalAlpha = 0.35 / g;
       ctx.fillStyle = '#a855f7';
@@ -73,7 +75,7 @@ export function drawCitadelSprite(
   ctx.rotate(walkSway);
 
   // Billowing Cloak Tails (Trailing Behind Heading)
-  const cloakFlutter = isMoving ? Math.sin(animTime * 16) * 4 : Math.sin(animTime * 3) * 1.5;
+  const cloakFlutter = isMoving ? Math.sin(animTime * 16 * speedRatio) * 4 : Math.sin(animTime * 3) * 1.5;
   ctx.fillStyle = '#090814';
   ctx.beginPath();
   ctx.moveTo(0, -10);

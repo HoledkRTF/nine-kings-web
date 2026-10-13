@@ -114,4 +114,57 @@ describe('CitadelEntity (Necromancer)', () => {
     necromancer.takeDamage(1000);
     expect(necromancer.hp).toBe(0);
   });
+
+  it('performs counter-steering braking when reversing direction', () => {
+    const necromancer = new CitadelEntity(0, 0);
+    // Accelerate right
+    necromancer.update(0.1, { moveX: 1, moveY: 0 });
+    expect(necromancer.vx).toBeGreaterThan(100);
+
+    // Steer hard left (opposite direction)
+    necromancer.update(0.05, { moveX: -1, moveY: 0 });
+    // Counter-steer braking decels dramatically faster
+    expect(necromancer.vx).toBeLessThan(0);
+  });
+
+  it('performs standing dash towards targetAngle when no WASD is pressed', () => {
+    const necromancer = new CitadelEntity(0, 0);
+    necromancer.angle = 0; // Facing right
+
+    // Surge while standing still
+    necromancer.update(0.05, { moveX: 0, moveY: 0, surge: true, targetAngle: Math.PI / 2 }); // Aiming down
+    expect(necromancer.isInvulnerable()).toBe(true);
+    expect(necromancer.vy).toBeGreaterThan(400); // Burst speed down
+    expect(necromancer.y).toBeGreaterThan(0);
+  });
+
+  it('buffers dash input and fires immediately upon cooldown expiry', () => {
+    const necromancer = new CitadelEntity(0, 0);
+    // Put dash on 0.05s remaining cooldown
+    necromancer.shadowStepCooldown = 0.05;
+
+    // Press dash while cooldown still active
+    necromancer.update(0.02, { moveX: 1, moveY: 0, surge: true });
+    expect(necromancer.shadowStepCooldown).toBeCloseTo(0.03, 2);
+    expect(necromancer.isInvulnerable()).toBe(false);
+
+    // Advance past cooldown expiry
+    necromancer.update(0.04, { moveX: 1, moveY: 0 });
+    expect(necromancer.isInvulnerable()).toBe(true);
+    expect(necromancer.shadowStepCooldown).toBeGreaterThan(1.0);
+  });
+
+  it('snaps to a clean stop without residual sliding when input released', () => {
+    const necromancer = new CitadelEntity(0, 0);
+    necromancer.update(0.1, { moveX: 1, moveY: 0 });
+    expect(necromancer.vx).toBeGreaterThan(0);
+
+    // Release input for 0.25s
+    for (let i = 0; i < 5; i++) {
+      necromancer.update(0.05, { moveX: 0, moveY: 0 });
+    }
+    expect(necromancer.vx).toBe(0);
+    expect(necromancer.vy).toBe(0);
+    expect(necromancer.speed).toBe(0);
+  });
 });

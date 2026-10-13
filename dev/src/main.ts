@@ -126,6 +126,7 @@ function resetGame() {
   citadel.boneMass = 0;
   citadel.shadowStepCooldown = 0;
   citadel.shadowStepActiveTimer = 0;
+  citadel.dashBufferTimer = 0;
   citadel.shadowStepCooldownMax = Math.max(0.7, 1.8 * metaProgression.getDashCooldownMultiplier());
 
   corpses.corpses = [];
