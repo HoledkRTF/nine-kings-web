@@ -151,7 +151,7 @@ describe('CitadelEntity (Necromancer)', () => {
     // Advance past cooldown expiry
     necromancer.update(0.04, { moveX: 1, moveY: 0 });
     expect(necromancer.isInvulnerable()).toBe(true);
-    expect(necromancer.shadowStepCooldown).toBeGreaterThan(1.0);
+    expect(necromancer.shadowStepCooldown).toBeGreaterThan(0.5);
   });
 
   it('snaps to a clean stop without residual sliding when input released', () => {

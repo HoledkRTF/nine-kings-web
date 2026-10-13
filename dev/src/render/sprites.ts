@@ -22,9 +22,9 @@ export function drawCitadelSprite(
   const isDashing = citadel.isInvulnerable();
   const currentSpeed = Math.hypot(citadel.vx, citadel.vy);
   const isMoving = currentSpeed > 10;
-  const speedRatio = Math.min(2.5, Math.max(0.6, currentSpeed / 235));
-  const walkBob = isMoving ? Math.sin(animTime * 14 * speedRatio) * 2 : 0;
-  const walkSway = isMoving ? Math.cos(animTime * 14 * speedRatio) * 0.08 : 0;
+  const moveIntensity = Math.min(1.0, currentSpeed / 200);
+  const walkBob = isMoving ? Math.sin(animTime * 14) * 2 * moveIntensity : 0;
+  const walkSway = isMoving ? Math.cos(animTime * 14) * 0.08 * moveIntensity : 0;
 
   // --- 0. Shadow Step Ghost Afterimages ---
   if (isDashing) {
@@ -75,7 +75,7 @@ export function drawCitadelSprite(
   ctx.rotate(walkSway);
 
   // Billowing Cloak Tails (Trailing Behind Heading)
-  const cloakFlutter = isMoving ? Math.sin(animTime * 16 * speedRatio) * 4 : Math.sin(animTime * 3) * 1.5;
+  const cloakFlutter = isMoving ? Math.sin(animTime * 16) * (2 + 2 * moveIntensity) : Math.sin(animTime * 3) * 1.5;
   ctx.fillStyle = '#090814';
   ctx.beginPath();
   ctx.moveTo(0, -10);
