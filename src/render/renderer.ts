@@ -116,14 +116,31 @@ export class GameRenderer {
   ): void {
     const animTime = performance.now() / 1000;
 
-    // Smooth camera tracking
+    // Dynamic Camera Tracking with Velocity + Cursor Lookahead & Damping
+    const currentSpeed = Math.hypot(citadel.vx, citadel.vy);
+    let lookaheadX = 0;
+    let lookaheadY = 0;
+    if (currentSpeed > 16) {
+      // Dynamic velocity lookahead (leads viewport towards travel direction)
+      lookaheadX = citadel.vx * 0.28;
+      lookaheadY = citadel.vy * 0.28;
+    }
+    // Cursor aim lead bias
+    lookaheadX += Math.cos(citadel.angle) * 40;
+    lookaheadY += Math.sin(citadel.angle) * 40;
+
+    const targetCamX = (citadel.x + lookaheadX) - width / 2;
+    const targetCamY = (citadel.y + lookaheadY) - height / 2;
+
     if (!this.cameraInitialized) {
-      this.cameraX = citadel.x - width / 2;
-      this.cameraY = citadel.y - height / 2;
+      this.cameraX = targetCamX;
+      this.cameraY = targetCamY;
       this.cameraInitialized = true;
     } else {
-      this.cameraX += (citadel.x - width / 2 - this.cameraX) * 0.15;
-      this.cameraY += (citadel.y - height / 2 - this.cameraY) * 0.15;
+      // Frame-rate independent exponential smoothing
+      const blend = 1 - Math.exp(-9.0 * dt);
+      this.cameraX += (targetCamX - this.cameraX) * blend;
+      this.cameraY += (targetCamY - this.cameraY) * blend;
     }
 
     // Screen Shake
@@ -137,19 +154,20 @@ export class GameRenderer {
     }
 
     // Record Necromancer Shadow Mist Steps when moving
-    if (Math.abs(citadel.speed) > 10) {
-      this.lastTrackDist += Math.abs(citadel.speed) * dt;
+    if (currentSpeed > 10) {
+      this.lastTrackDist += currentSpeed * dt;
       if (this.lastTrackDist > 16) {
         this.lastTrackDist = 0;
         const footSide = (this.tracks.length % 2 === 0 ? 1 : -1);
-        const normAngle = citadel.angle + Math.PI / 2;
+        const moveAngle = Math.atan2(citadel.vy, citadel.vx);
+        const normAngle = moveAngle + Math.PI / 2;
         const footX = citadel.x + Math.cos(normAngle) * (footSide * 6);
         const footY = citadel.y + Math.sin(normAngle) * (footSide * 6);
 
         this.tracks.push({
           x: footX,
           y: footY,
-          angle: citadel.angle,
+          angle: moveAngle,
           alpha: 0.75
         });
 
