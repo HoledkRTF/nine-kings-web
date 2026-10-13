@@ -37,7 +37,7 @@ const citadel = new CitadelEntity(0, 0);
 citadel.bonusMaxHp = metaProgression.getBonusMaxHp();
 citadel.maxHp = 120 + citadel.bonusMaxHp;
 citadel.hp = citadel.maxHp;
-citadel.shadowStepCooldownMax = Math.max(0.7, 1.8 * metaProgression.getDashCooldownMultiplier());
+citadel.shadowStepCooldownMax = Math.max(0.35, 0.65 * metaProgression.getDashCooldownMultiplier());
 
 const corpses = new CorpseManager(250);
 corpses.addStock(metaProgression.getBonusStartingCorpses());
@@ -127,7 +127,7 @@ function resetGame() {
   citadel.shadowStepCooldown = 0;
   citadel.shadowStepActiveTimer = 0;
   citadel.dashBufferTimer = 0;
-  citadel.shadowStepCooldownMax = Math.max(0.7, 1.8 * metaProgression.getDashCooldownMultiplier());
+  citadel.shadowStepCooldownMax = Math.max(0.35, 0.65 * metaProgression.getDashCooldownMultiplier());
 
   corpses.corpses = [];
   corpses.totalStock = 14 + metaProgression.getBonusStartingCorpses();

@@ -116,29 +116,17 @@ export class GameRenderer {
   ): void {
     const animTime = performance.now() / 1000;
 
-    // Dynamic Camera Tracking with Velocity + Cursor Lookahead & Damping
-    const currentSpeed = Math.hypot(citadel.vx, citadel.vy);
-    let lookaheadX = 0;
-    let lookaheadY = 0;
-    if (currentSpeed > 16) {
-      // Dynamic velocity lookahead (leads viewport towards travel direction)
-      lookaheadX = citadel.vx * 0.28;
-      lookaheadY = citadel.vy * 0.28;
-    }
-    // Cursor aim lead bias
-    lookaheadX += Math.cos(citadel.angle) * 40;
-    lookaheadY += Math.sin(citadel.angle) * 40;
-
-    const targetCamX = (citadel.x + lookaheadX) - width / 2;
-    const targetCamY = (citadel.y + lookaheadY) - height / 2;
+    // Smooth, Jitter-Free Camera Tracking
+    const targetCamX = citadel.x - width / 2;
+    const targetCamY = citadel.y - height / 2;
 
     if (!this.cameraInitialized) {
       this.cameraX = targetCamX;
       this.cameraY = targetCamY;
       this.cameraInitialized = true;
     } else {
-      // Frame-rate independent exponential smoothing
-      const blend = 1 - Math.exp(-9.0 * dt);
+      // Butter-smooth frame-rate independent camera tracking
+      const blend = 1 - Math.exp(-10.0 * dt);
       this.cameraX += (targetCamX - this.cameraX) * blend;
       this.cameraY += (targetCamY - this.cameraY) * blend;
     }
@@ -212,7 +200,7 @@ export class GameRenderer {
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    ctx.translate(-this.cameraX + offsetX, -this.cameraY + offsetY);
+    ctx.translate(-Math.round(this.cameraX) + offsetX, -Math.round(this.cameraY) + offsetY);
 
     // 1. Dark Grimdark Gothic Battlefield Terrain
     this.drawGrimdarkTerrain(ctx, width, height, animTime);

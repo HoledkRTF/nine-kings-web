@@ -42,7 +42,7 @@ export class CitadelEntity {
   dashBufferTimer: number = 0; // 0.15s input buffer window
   dashDirX: number = 0;
   dashDirY: number = 0;
-  readonly shadowStepCooldownMax: number = 1.8;
+  readonly shadowStepCooldownMax: number = 0.65;
 
   // Movement constants
   readonly maxSpeedBase: number = 235;
