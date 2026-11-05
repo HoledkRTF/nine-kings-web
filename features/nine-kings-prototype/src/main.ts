@@ -610,22 +610,62 @@ export class NineKingsGame {
 
     for (const year of milestones) {
       const pip = document.createElement('div');
-      pip.className = `timeline-pip ${year === current ? 'current' : ''} ${year < current ? 'passed' : ''}`;
-      pip.style.cssText = `
-        padding: 3px 8px;
-        font-size: 11px;
-        font-weight: bold;
-        border-radius: 4px;
-        border: 1px solid ${year === current ? '#facc15' : year < current ? '#334155' : '#475569'};
-        background: ${year === current ? '#854d0e' : year < current ? '#0f172a' : '#1e293b'};
-        color: ${year === current ? '#fef08a' : year < current ? '#64748b' : '#cbd5e1'};
-      `;
+      const isCurrent = year === current;
+      const isPassed = year < current;
+      pip.className = `timeline-pip ${isCurrent ? 'current' : ''} ${isPassed ? 'passed' : ''}`;
 
+      let borderColor = '#475569';
+      let bgColor = '#181628';
+      let textColor = '#94a3b8';
       let label = `Y${year}`;
-      if (year === WAR_MILESTONE_YEAR) label = `Y8:War`;
-      else if (year === PEACE_MILESTONE_YEAR) label = `Y23:Peace`;
-      else if (MERCHANT_YEARS.includes(year)) label = `Y${year}:Shop`;
-      else if (year === FINAL_BOSS_YEAR) label = `Y30:Boss`;
+
+      if (year === WAR_MILESTONE_YEAR) {
+        label = `Y8: WAR ⚔️`;
+        borderColor = '#f43f5e';
+        bgColor = '#4c0519';
+        textColor = '#fecdd3';
+      } else if (year === PEACE_MILESTONE_YEAR) {
+        label = `Y23: PEACE 📜`;
+        borderColor = '#10b981';
+        bgColor = '#064e3b';
+        textColor = '#a7f3d0';
+      } else if (MERCHANT_YEARS.includes(year)) {
+        label = `Y${year}: SHOP 🪙`;
+        borderColor = '#f59e0b';
+        bgColor = '#451a03';
+        textColor = '#fde68a';
+      } else if (year === FINAL_BOSS_YEAR) {
+        label = `Y30: FINAL BOSS 👑`;
+        borderColor = '#c084fc';
+        bgColor = '#3b0764';
+        textColor = '#f5d0fe';
+      }
+
+      if (isCurrent) {
+        borderColor = '#facc15';
+        bgColor = '#854d0e';
+        textColor = '#fef08a';
+      } else if (isPassed) {
+        borderColor = '#334155';
+        bgColor = '#0f172a';
+        textColor = '#475569';
+      }
+
+      pip.style.cssText = `
+        padding: 5px 10px;
+        font-family: inherit;
+        font-size: 9px;
+        font-weight: 800;
+        border-radius: 4px;
+        border: 2px solid ${borderColor};
+        background: ${bgColor};
+        color: ${textColor};
+        white-space: nowrap;
+        letter-spacing: 0.5px;
+        box-shadow: ${isCurrent ? '0 0 12px rgba(250, 204, 21, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3)' : '0 2px 4px rgba(0,0,0,0.5)'};
+        transform: ${isCurrent ? 'scale(1.08)' : 'scale(1.0)'};
+        transition: all 0.2s ease;
+      `;
 
       pip.textContent = label;
       this.timelineTrackEl.appendChild(pip);

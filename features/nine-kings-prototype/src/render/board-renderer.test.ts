@@ -28,9 +28,13 @@ function createMockContext(): CanvasRenderingContext2D {
     save: vi.fn(),
     restore: vi.fn(),
     translate: vi.fn(),
+    scale: vi.fn(),
     rotate: vi.fn(),
     setLineDash: vi.fn(),
     createRadialGradient: vi.fn(() => ({
+      addColorStop: vi.fn(),
+    })),
+    createLinearGradient: vi.fn(() => ({
       addColorStop: vi.fn(),
     })),
   } as unknown as CanvasRenderingContext2D;
@@ -142,8 +146,8 @@ describe('BoardRenderer', () => {
 
       // Off-grid North spawn (-1.5 y)
       const pNorth = renderer.gridToPixel(0, -1.5, width, height);
-      expect(pNorth.x).toBe(481);
-      expect(pNorth.y).toBe(229.5);
+      expect(pNorth.x).toBe(550);
+      expect(pNorth.y).toBe(195);
     });
   });
 

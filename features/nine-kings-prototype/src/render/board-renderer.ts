@@ -35,10 +35,10 @@ export interface ProjectileVisual {
 }
 
 export class BoardRenderer {
-  // Isometric & 2.5D dimensions
-  readonly tileW: number = 108;
-  readonly tileH: number = 54;
-  readonly cliffDepth: number = 22;
+  // Isometric & 2.5D dimensions - scaled up to dominate 60% of viewport
+  readonly tileW: number = 200;
+  readonly tileH: number = 100;
+  readonly cliffDepth: number = 40;
 
   // Legacy bound tracking for testing compatibility
   readonly tileSize: number = 90;
@@ -316,8 +316,15 @@ export class BoardRenderer {
   private drawTileCliffFaces(ctx: CanvasRenderingContext2D, x: number, y: number, halfW: number, halfH: number): void {
     const depth = this.cliffDepth;
 
-    // Right Cliff Face (South-East)
-    ctx.fillStyle = '#1c1917';
+    // Right Cliff Face (South-East) - warm earthen stone gradient
+    if (typeof ctx.createLinearGradient === 'function') {
+      const rightGrad = ctx.createLinearGradient(x, y, x + halfW, y + depth);
+      rightGrad.addColorStop(0, '#2d241e');
+      rightGrad.addColorStop(1, '#17120e');
+      ctx.fillStyle = rightGrad;
+    } else {
+      ctx.fillStyle = '#1c1917';
+    }
     ctx.beginPath();
     ctx.moveTo(x, y + halfH);
     ctx.lineTo(x + halfW, y);
@@ -325,12 +332,19 @@ export class BoardRenderer {
     ctx.lineTo(x, y + halfH + depth);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#0c0a09';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#0e0b08';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Left Cliff Face (South-West)
-    ctx.fillStyle = '#292524';
+    // Left Cliff Face (South-West) - highlighted stone face
+    if (typeof ctx.createLinearGradient === 'function') {
+      const leftGrad = ctx.createLinearGradient(x - halfW, y, x, y + depth);
+      leftGrad.addColorStop(0, '#3d3229');
+      leftGrad.addColorStop(1, '#221b15');
+      ctx.fillStyle = leftGrad;
+    } else {
+      ctx.fillStyle = '#292524';
+    }
     ctx.beginPath();
     ctx.moveTo(x - halfW, y);
     ctx.lineTo(x, y + halfH);
@@ -340,12 +354,20 @@ export class BoardRenderer {
     ctx.fill();
     ctx.stroke();
 
-    // Rock Strata detailing
-    ctx.strokeStyle = 'rgba(120, 113, 108, 0.25)';
+    // Geological Rock Strata layering
+    ctx.strokeStyle = 'rgba(180, 150, 120, 0.2)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(x - halfW * 0.8, y + depth * 0.45);
-    ctx.lineTo(x, y + halfH + depth * 0.45);
-    ctx.lineTo(x + halfW * 0.8, y + depth * 0.45);
+    ctx.moveTo(x - halfW * 0.85, y + depth * 0.4);
+    ctx.lineTo(x, y + halfH + depth * 0.4);
+    ctx.lineTo(x + halfW * 0.85, y + depth * 0.4);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.moveTo(x - halfW * 0.75, y + depth * 0.72);
+    ctx.lineTo(x, y + halfH + depth * 0.72);
+    ctx.lineTo(x + halfW * 0.75, y + depth * 0.72);
     ctx.stroke();
   }
 
@@ -367,37 +389,85 @@ export class BoardRenderer {
     ctx.closePath();
 
     if (tile.isDestroyed) {
-      ctx.fillStyle = '#0a0a0f';
+      // Smoking Scorched Ruin
+      ctx.fillStyle = '#120f17';
       ctx.fill();
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      ctx.strokeStyle = '#dc2626';
-      ctx.lineWidth = 1.2;
+      // Glowing molten ember cracks
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.moveTo(x - 18, y - 6);
-      ctx.lineTo(x, y + 4);
-      ctx.lineTo(x + 16, y - 8);
+      ctx.moveTo(x - 30, y - 10);
+      ctx.lineTo(x, y + 8);
+      ctx.lineTo(x + 28, y - 12);
       ctx.stroke();
     } else {
       const isDamaged = tile.health < tile.maxHealth * 0.5;
-      ctx.fillStyle = isDamaged ? '#36241b' : '#1e382b';
+
+      // 1. Lush medieval meadow grass gradient (Sad Socket aesthetic)
+      if (typeof ctx.createLinearGradient === 'function') {
+        const grassGrad = ctx.createLinearGradient(x - halfW, y - halfH, x + halfW, y + halfH);
+        if (isDamaged) {
+          grassGrad.addColorStop(0, '#543d2b');
+          grassGrad.addColorStop(0.5, '#3d2b1e');
+          grassGrad.addColorStop(1, '#271a12');
+        } else {
+          grassGrad.addColorStop(0, '#388e3c');
+          grassGrad.addColorStop(0.4, '#2e7d32');
+          grassGrad.addColorStop(1, '#1b5e20');
+        }
+        ctx.fillStyle = grassGrad;
+      } else {
+        ctx.fillStyle = isDamaged ? '#3d2b1e' : '#2e7d32';
+      }
       ctx.fill();
 
-      ctx.strokeStyle = isDamaged ? '#78350f' : '#334e3e';
-      ctx.lineWidth = 2;
+      // 2. Chiseled dark stone perimeter border
+      ctx.strokeStyle = isDamaged ? '#78350f' : '#143818';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
+      // 3. Sunlit inner bevel highlight on North-West and North-East edges
+      ctx.strokeStyle = isDamaged ? 'rgba(234, 179, 8, 0.25)' : 'rgba(134, 239, 172, 0.35)';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(x, y - halfH + 8);
-      ctx.lineTo(x + halfW - 14, y);
-      ctx.lineTo(x, y + halfH - 8);
-      ctx.lineTo(x - halfW + 14, y);
-      ctx.closePath();
+      ctx.moveTo(x - halfW + 8, y);
+      ctx.lineTo(x, y - halfH + 5);
+      ctx.lineTo(x + halfW - 8, y);
       ctx.stroke();
+
+      // 4. Textured grass tufts (subtle pixel dither marks)
+      ctx.fillStyle = isDamaged ? '#713f12' : '#4ade80';
+      ctx.fillRect(x - 24, y - 10, 3, 2);
+      ctx.fillRect(x - 22, y - 12, 2, 3);
+      ctx.fillRect(x + 20, y + 8, 3, 2);
+      ctx.fillRect(x + 22, y + 6, 2, 3);
+      ctx.fillRect(x + 6, y - 18, 2, 2);
+
+      // Dark shadow grass blades
+      ctx.fillStyle = isDamaged ? '#1c1917' : '#0f3817';
+      ctx.fillRect(x - 26, y - 9, 2, 2);
+      ctx.fillRect(x + 18, y + 9, 2, 2);
+      ctx.fillRect(x - 8, y + 16, 3, 2);
+
+      // 5. Carved stone corner brackets with rivets
+      const corners = [
+        { cx: x, cy: y - halfH },
+        { cx: x + halfW, cy: y },
+        { cx: x, cy: y + halfH },
+        { cx: x - halfW, cy: y }
+      ];
+      ctx.fillStyle = '#475569';
+      for (const c of corners) {
+        ctx.beginPath();
+        ctx.arc(c.cx, c.cy, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(c.cx - 1, c.cy - 1, 2, 2);
+      }
     }
     ctx.restore();
   }
@@ -414,7 +484,8 @@ export class BoardRenderer {
     const heightElevation = (stackLevel - 1) * 8;
 
     ctx.save();
-    ctx.translate(x, y - 6 - heightElevation);
+    ctx.translate(x, y - 10 - heightElevation);
+    if (typeof ctx.scale === 'function') ctx.scale(1.4, 1.4);
 
     // Runic Enchantment Aura Rings
     for (const st of tile.stack) {
@@ -641,10 +712,10 @@ export class BoardRenderer {
     if (tile.isDestroyed) return;
 
     const hpRatio = Math.max(0, tile.health / tile.maxHealth);
-    const barW = 38;
-    const barH = 4;
+    const barW = 52;
+    const barH = 5;
     const barX = x - barW / 2;
-    const barY = y - 36;
+    const barY = y - 52;
 
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(barX, barY, barW, barH);
@@ -653,15 +724,15 @@ export class BoardRenderer {
     ctx.fillRect(barX, barY, barW * hpRatio, barH);
 
     ctx.strokeStyle = '#020617';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.strokeRect(barX, barY, barW, barH);
 
     const stackLevel = 1 + tile.stack.length;
     if (stackLevel > 1) {
-      ctx.font = '8px monospace';
+      ctx.font = 'bold 9px monospace';
       ctx.fillStyle = '#fbbf24';
       ctx.textAlign = 'center';
-      ctx.fillText(`L${stackLevel}`, x, barY - 3);
+      ctx.fillText(`L${stackLevel}`, x, barY - 4);
     }
   }
 
@@ -731,6 +802,7 @@ export class BoardRenderer {
 
       ctx.save();
       ctx.translate(isoX, isoY + walkBob);
+      if (typeof ctx.scale === 'function') ctx.scale(1.4, 1.4);
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.beginPath();

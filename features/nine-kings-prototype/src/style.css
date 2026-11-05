@@ -199,10 +199,10 @@ canvas {
    MEDIEVAL CARD HAND TRAY & TAROT CARDS
    ========================================================================== */
 #hand-tray-footer {
-  height: 220px;
-  background: linear-gradient(180deg, #161424 0%, #0c0b14 100%);
-  border-top: 4px solid #2a253d;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.8), inset 0 2px 0 rgba(255, 215, 0, 0.15);
+  height: 250px;
+  background: linear-gradient(180deg, #181528 0%, #0c0a14 100%);
+  border-top: 4px solid #382f4d;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.85), inset 0 2px 0 rgba(255, 215, 0, 0.2);
   display: flex;
   flex-direction: column;
   padding: 10px 20px;
@@ -273,53 +273,52 @@ canvas {
 .card-hand-flex {
   flex: 1;
   display: flex;
-  gap: 14px;
+  gap: 16px;
   justify-content: center;
   align-items: center;
   overflow-x: auto;
   perspective: 1000px;
-  padding: 6px 0;
+  padding: 8px 0;
 }
 
 /* Authentic Tarot-Style Fantasy Card */
 .card-item {
-  width: 120px;
-  height: 155px;
-  background: linear-gradient(180deg, #2a2538 0%, #171524 100%);
-  border: 3px solid #856b3e;
+  width: 136px;
+  height: 185px;
+  background: linear-gradient(180deg, #242038 0%, #12101e 100%);
+  border: 3px solid #b45309;
   border-radius: 8px;
-  padding: 6px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   cursor: grab;
   position: relative;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.7), inset 0 0 6px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.75), inset 0 0 10px rgba(0, 0, 0, 0.9);
   transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.15s, box-shadow 0.15s;
   image-rendering: pixelated;
+  transform-style: preserve-3d;
 }
 
 .card-item::before {
   content: '';
   position: absolute;
-  top: 2px; left: 2px; right: 2px; bottom: 2px;
+  top: 3px; left: 3px; right: 3px; bottom: 3px;
   border: 1px solid rgba(250, 204, 21, 0.25);
   border-radius: 5px;
   pointer-events: none;
 }
 
 .card-item:hover {
-  transform: translateY(-14px) scale(1.06) rotateZ(-1deg);
   border-color: #facc15;
-  box-shadow: 0 12px 24px rgba(250, 204, 21, 0.3), inset 0 0 8px rgba(250, 204, 21, 0.2);
   z-index: 10;
 }
 
 .card-item.selected {
   border-color: #38bdf8;
-  transform: translateY(-16px) scale(1.08);
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.6);
-  z-index: 15;
+  transform: translateY(-22px) scale(1.08) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.7), inset 0 0 10px rgba(56, 189, 248, 0.3) !important;
+  z-index: 25;
 }
 
 .card-item.dragging {
@@ -332,15 +331,15 @@ canvas {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid #3d3550;
-  padding-bottom: 2px;
+  padding-bottom: 4px;
 }
 
 .card-type-tag {
-  font-size: 7px;
+  font-size: 7.5px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  padding: 2px 4px;
-  border-radius: 2px;
+  padding: 2px 5px;
+  border-radius: 3px;
   text-transform: uppercase;
 }
 
@@ -350,22 +349,25 @@ canvas {
 .tag-economy { background: #713f12; color: #fde047; }
 
 .card-cost-gem {
-  font-size: 8px;
+  font-size: 8.5px;
   font-weight: 800;
   color: #fde047;
-  text-shadow: 0 0 4px rgba(253, 224, 71, 0.6);
+  text-shadow: 0 0 6px rgba(253, 224, 71, 0.7);
+  background: rgba(180, 83, 9, 0.35);
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
 /* Card Portrait / Illustration Frame */
 .card-art-box {
-  height: 52px;
-  background: #110f1a;
-  border: 1px solid #443c5b;
-  border-radius: 3px;
+  height: 68px;
+  background: #0d0b14;
+  border: 2px solid #3c3252;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
   position: relative;
   overflow: hidden;
 }
@@ -375,26 +377,36 @@ canvas {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.5) 100%);
+  pointer-events: none;
+}
+
+.pixel-art-svg {
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
 }
 
 .card-title {
-  font-size: 8px;
-  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 900;
   text-align: center;
   line-height: 1.2;
-  color: #f8fafc;
-  margin: 2px 0;
-  letter-spacing: 0.4px;
+  color: #fef08a;
+  margin: 3px 0;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px #000;
 }
 
 .card-desc {
-  font-size: 6.5px;
-  color: #cbd5e1;
+  font-size: 7.5px;
+  color: #e2e8f0;
   text-align: center;
-  line-height: 1.25;
-  background: rgba(10, 9, 16, 0.6);
-  padding: 3px 2px;
-  border-radius: 2px;
+  line-height: 1.35;
+  background: rgba(10, 9, 16, 0.7);
+  padding: 4px 3px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* ==========================================================================
