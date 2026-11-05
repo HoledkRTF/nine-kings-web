@@ -108,28 +108,28 @@ canvas {
 }
 
 .relic-btn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: #111827;
-  border: 2px solid #38bdf8;
+  background: transparent;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 0 6px rgba(56, 189, 248, 0.3);
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
+  transition: transform 0.15s, filter 0.15s;
+  padding: 0;
 }
 
 .relic-btn:hover:not(:disabled) {
-  transform: scale(1.12);
-  border-color: #7dd3fc;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.8);
+  transform: scale(1.18);
+  filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.9));
 }
 
 .relic-btn.active {
-  border-color: #facc15;
-  box-shadow: 0 0 14px rgba(250, 204, 21, 0.7);
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.9));
 }
 
 .relic-btn:disabled {
@@ -138,8 +138,11 @@ canvas {
   cursor: not-allowed;
 }
 
-.relic-icon {
-  font-size: 16px;
+.relic-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
 }
 
 /* ==========================================================================
@@ -338,45 +341,68 @@ canvas {
 /* Authentic Tarot-Style Fantasy Card (Matching Official 9 Kings Steam Art) */
 .card-item {
   width: 140px;
-  height: 195px;
-  background: linear-gradient(180deg, #1b3842 0%, #0e2026 100%);
-  border: 3px solid #0891b2;
+  height: 220px;
+  background: transparent;
+  border: none;
   border-radius: 8px;
-  padding: 8px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
+  align-items: center;
   cursor: grab;
   position: relative;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0, 0, 0, 0.9);
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.15s, box-shadow 0.15s;
-  image-rendering: pixelated;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.18s ease;
   transform-style: preserve-3d;
 }
 
 .card-item::before {
-  content: '';
-  position: absolute;
-  top: 3px; left: 3px; right: 3px; bottom: 3px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 5px;
-  pointer-events: none;
+  display: none;
 }
 
 .card-item:hover {
-  border-color: #38bdf8;
+  filter: drop-shadow(0 0 12px #38bdf8);
   z-index: 10;
 }
 
 .card-item.selected {
-  border-color: #facc15 !important;
-  transform: translateY(-26px) scale(1.08) !important;
-  box-shadow: 0 0 24px rgba(250, 204, 21, 0.8), inset 0 0 10px rgba(250, 204, 21, 0.3) !important;
+  filter: drop-shadow(0 0 16px #facc15) drop-shadow(0 0 6px #f59e0b) !important;
+  transform: translateY(-28px) scale(1.1) !important;
   z-index: 25;
 }
 
 .card-item.dragging {
-  opacity: 0.4;
+  opacity: 0.45;
+}
+
+.authentic-card-graphic {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.75));
+  pointer-events: none;
+  border-radius: 6px;
+}
+
+.card-cost-gem-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid #f59e0b;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fde047;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+.card-tooltip-desc {
+  display: none;
 }
 
 /* Card Header */

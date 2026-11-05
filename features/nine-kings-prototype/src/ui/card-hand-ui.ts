@@ -274,8 +274,31 @@ export class CardHandUI {
     `;
   }
 
+  private getCardImagePath(card: Card): string {
+    const base = (import.meta as any).env?.BASE_URL || './';
+    const cleanBase = base.endsWith('/') ? base : base + '/';
+
+    const id = card.id.toLowerCase();
+    if (id.includes('archer')) return `${cleanBase}assets/cards/archer.png`;
+    if (id.includes('footman') || id.includes('soldier') || id.includes('veteran') || id.includes('knight') || id.includes('mercenary')) {
+      return `${cleanBase}assets/cards/soldier.png`;
+    }
+    if (id.includes('farm') || id.includes('mill')) return `${cleanBase}assets/cards/farm.png`;
+    if (id.includes('dispenser') || id.includes('blacksmith')) return `${cleanBase}assets/cards/dispenser.png`;
+    if (id.includes('barricade') || id.includes('bastion')) return `${cleanBase}assets/cards/trebuchet.png`;
+    if (id.includes('tower') || id.includes('guard')) return `${cleanBase}assets/cards/scout_tower.png`;
+    if (id.includes('trebuchet')) return `${cleanBase}assets/cards/trebuchet.png`;
+    if (id.includes('shrine') || id.includes('tax') || id.includes('gold_mine')) return `${cleanBase}assets/cards/shrine.png`;
+    if (id.includes('mangler')) return `${cleanBase}assets/cards/mangler.png`;
+    if (id.includes('static') || id.includes('midas')) return `${cleanBase}assets/cards/midas_touch.png`;
+    if (id.includes('imp')) return `${cleanBase}assets/cards/imp.png`;
+    if (id.includes('sacrifice') || id.includes('combustion')) return `${cleanBase}assets/cards/sacrifice.png`;
+    if (id.includes('altar')) return `${cleanBase}assets/cards/demons_altar.png`;
+    return `${cleanBase}assets/cards/soldier.png`;
+  }
+
   /**
-   * Renders authentic Tarot-styled fantasy cards with 3D hover physics.
+   * Renders authentic 9 Kings Tarot Cards with 3D hover physics.
    */
   public renderHand(cards: Card[], deckManager: DeckManager): void {
     if (!this.handContainer) return;
@@ -287,21 +310,12 @@ export class CardHandUI {
       cardEl.draggable = true;
       cardEl.dataset.cardId = card.id;
 
-      let typeClass = 'tag-unit';
-      if (card.type === 'building') typeClass = 'tag-building';
-      if (card.type === 'enchantment') typeClass = 'tag-enchantment';
-      if (card.type === 'economy') typeClass = 'tag-economy';
-
-      const artSvg = this.getCardSvgArt(card);
+      const imgPath = this.getCardImagePath(card);
 
       cardEl.innerHTML = `
-        <div class="card-header-row">
-          <span class="card-cost-gem">${card.cost > 0 ? `💎 ${card.cost}g` : 'FREE'}</span>
-          <span class="card-type-tag ${typeClass}">${card.type}</span>
-        </div>
-        <div class="card-art-box">${artSvg}</div>
-        <div class="card-title">${card.name}</div>
-        <div class="card-desc">${card.description}</div>
+        <img src="${imgPath}" alt="${card.name}" class="authentic-card-graphic" draggable="false" />
+        <div class="card-cost-gem-overlay">${card.cost > 0 ? `💎 ${card.cost}g` : 'FREE'}</div>
+        <div class="card-tooltip-desc">${card.name}: ${card.description}</div>
       `;
 
       // 3D Hover Tilt Physics (from deckbuilder-ui skill)
@@ -313,14 +327,12 @@ export class CardHandUI {
         const centerY = rect.height / 2;
         const rotateX = ((y - centerY) / centerY) * -12;
         const rotateY = ((x - centerX) / centerX) * 12;
-        cardEl.style.transform = `perspective(600px) translateY(-20px) scale(1.08) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-        cardEl.style.boxShadow = '0 16px 28px rgba(0, 0, 0, 0.8), 0 0 16px rgba(250, 204, 21, 0.45)';
+        cardEl.style.transform = `perspective(600px) translateY(-24px) scale(1.1) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
         cardEl.style.zIndex = '50';
       });
 
       cardEl.addEventListener('mouseleave', () => {
         cardEl.style.transform = '';
-        cardEl.style.boxShadow = '';
         cardEl.style.zIndex = '';
       });
 

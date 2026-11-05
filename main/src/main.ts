@@ -1,938 +1,746 @@
-import { CitadelEntity } from './entities/citadel';
-import { CorpseManager } from './managers/corpse-manager';
-import { WeaponModule, createWeapon } from './weapons/weapon-module';
-import { Projectile } from './weapons/projectile';
-import { MinionSwarmManager } from './minions/minion-swarm';
-import { MinionKind } from './minions/minion-types';
-import { SpellController } from './spells/spell-controller';
-import { CrusadeDirector } from './world/crusade-director';
-import { WorldEnemy } from './world/world-entities';
-import { ShrineManager, BreachReward, RelicUpgradeType } from './world/shrine-entity';
-import { ProgressionManager } from './managers/progression-manager';
-import { MetaProgressionManager } from './managers/meta-progression';
-import { InputManager } from './engine/input';
-import { GameRenderer } from './render/renderer';
-import { GameHUD } from './ui/hud';
-import { SoundEffects } from './audio/sound-effects';
-import { dist } from './engine/math';
+import { Card, KingDef, KingId, TimelineYear } from './types';
+import { KingdomGrid } from './engine/grid';
+import {
+  DeckManager,
+  KING_DEFINITIONS,
+  ALL_CARDS,
+  createStarterDeck,
+  generateMerchantStock,
+} from './cards/deck';
+import { CombatEngine } from './battle/combat-engine';
+import { TimelineManager, MERCHANT_YEARS, WAR_MILESTONE_YEAR, PEACE_MILESTONE_YEAR, FINAL_BOSS_YEAR } from './battle/timeline';
+import { BoardRenderer } from './render/board-renderer';
+import { CardHandUI } from './ui/card-hand-ui';
+import { MerchantUI } from './ui/merchant-ui';
+import { sound } from './sound/sound-effects';
 
-const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d')!;
+export type GameState =
+  | 'KING_SELECT'
+  | 'PLANNING'
+  | 'MERCHANT'
+  | 'BATTLE'
+  | 'DRAFT'
+  | 'DIPLOMACY'
+  | 'VICTORY'
+  | 'GAME_OVER';
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resize);
-resize();
+export class NineKingsGame {
+  public state: GameState = 'PLANNING';
+  public playerKing: KingDef = KING_DEFINITIONS.king_of_nothing;
+  public gold: number = 25;
+  public grid: KingdomGrid;
+  public deck: DeckManager;
+  public combat: CombatEngine;
+  public timeline: TimelineManager;
+  public renderer: BoardRenderer;
+  public handUI: CardHandUI;
+  public merchantUI: MerchantUI;
 
-canvas.setAttribute('tabindex', '0');
-canvas.focus();
-window.addEventListener('click', () => {
-  canvas.focus();
-});
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private yearCounterEl: HTMLElement | null;
+  private goldCounterEl: HTMLElement | null;
+  private breachCounterEl: HTMLElement | null;
+  private timelineTrackEl: HTMLElement | null;
 
-const metaProgression = new MetaProgressionManager();
-const citadel = new CitadelEntity(0, 0);
-citadel.bonusMaxHp = metaProgression.getBonusMaxHp();
-citadel.maxHp = 120 + citadel.bonusMaxHp;
-citadel.hp = citadel.maxHp;
-citadel.shadowStepCooldownMax = Math.max(0.35, 0.65 * metaProgression.getDashCooldownMultiplier());
+  private spellCooldownTimer: number = 0;
+  private activeSpellEffect: { type: string; timer: number } | undefined;
+  private lastFrameTime: number = 0;
+  private animFrameId: number = 0;
 
-const corpses = new CorpseManager(250);
-corpses.addStock(metaProgression.getBonusStartingCorpses());
-
-const swarm = new MinionSwarmManager(100);
-const spells = new SpellController();
-const crusade = new CrusadeDirector();
-const shrines = new ShrineManager();
-const progression = new ProgressionManager();
-const input = new InputManager();
-const renderer = new GameRenderer();
-const hud = new GameHUD();
-const audio = new SoundEffects();
-
-let hitStopTimer = 0;
-let soulAshAwarded = false;
-
-let workshopOpen = false;
-let gameOver = false;
-let projectiles: Projectile[] = [];
-let enemies: WorldEnemy[] = [];
-const equippedModules: (WeaponModule | null)[] = [
-  createWeapon('bone_ballista'),
-  createWeapon('plague_mortar'),
-  null, null, null, null, null, null
-];
-
-// Spawn 5 initial Holy Relic Shrines surrounded by defensive garrisons
-const shrineTypes: RelicUpgradeType[] = [
-  'unlock_socket',
-  'expand_swarm',
-  'ironbone_plating',
-  'zealot_haste',
-  'soul_amplification'
-];
-
-function seedWorldEnemies() {
-  shrines.shrines = [];
-  enemies = [];
-  shrineTypes.forEach((type, idx) => {
-    const angle = (idx * Math.PI * 2) / shrineTypes.length + 0.35;
-    const distFromCenter = 720 + (idx % 2) * 450;
-    const sx = Math.cos(angle) * distFromCenter;
-    const sy = Math.sin(angle) * distFromCenter;
-    const shrine = shrines.spawnShrine(sx, sy, type);
-
-    // Generate fortified garrison defending this shrine
-    const garrison = crusade.generateGarrison(sx, sy, shrine.id);
-    shrine.garrisonEnemyIds = garrison.map(g => g.id);
-    enemies.push(...garrison);
-  });
-
-  // Seed additional ambient patrol troops around the wasteland
-  for (let i = 0; i < 18; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const d = 400 + Math.random() * 850;
-    const eType = i % 2 === 0 ? 'silver_cavalry' : 'peasant_caravan';
-    enemies.push(crusade.createEnemy(eType, Math.cos(angle) * d, Math.sin(angle) * d));
-  }
-}
-
-seedWorldEnemies();
-
-function handleBreachReward(reward: BreachReward) {
-  if (reward.upgradeType === 'expand_swarm') {
-    swarm.expandMaxMinions(20);
-  } else {
-    citadel.applyRelicBuff(reward.upgradeType);
-  }
-  progression.addExp(100);
-  hud.showUpgradeBanner(reward.title, reward.description);
-  audio.playFire('soul');
-  renderer.addShake(18, 0.45);
-  renderer.addParticle(reward.shrine.x, reward.shrine.y, '#facc15', 36, 280, 5);
-}
-
-function resetGame() {
-  citadel.x = 0;
-  citadel.y = 0;
-  citadel.bonusMaxHp = metaProgression.getBonusMaxHp();
-  citadel.maxHp = 120 + citadel.bonusMaxHp;
-  citadel.hp = citadel.maxHp;
-  citadel.speed = 0;
-  citadel.vx = 0;
-  citadel.vy = 0;
-  citadel.boneMass = 0;
-  citadel.shadowStepCooldown = 0;
-  citadel.shadowStepActiveTimer = 0;
-  citadel.dashBufferTimer = 0;
-  citadel.shadowStepCooldownMax = Math.max(0.35, 0.65 * metaProgression.getDashCooldownMultiplier());
-
-  corpses.corpses = [];
-  corpses.totalStock = 14 + metaProgression.getBonusStartingCorpses();
-  swarm.minions = [];
-  crusade.wrath = 0;
-  crusade.waveCounter = 1;
-  crusade.waveTimer = 30;
-  progression.currentExp = 0;
-  progression.level = 1;
-  progression.maxExp = 100;
-  progression.unlockedMinions = new Set(['skeleton_grunt']);
-  progression.hasPestilenceTome = false;
-  progression.hasLegionTome = false;
-  progression.hasVelocityTome = false;
-  progression.hasSiphonTome = false;
-  progression.pendingChoices = null;
-  progression.autoSelectTimer = progression.AUTO_SELECT_DURATION;
-  projectiles = [];
-  workshopOpen = false;
-  gameOver = false;
-  soulAshAwarded = false;
-  hitStopTimer = 0;
-
-  seedWorldEnemies();
-}
-
-let lastTime = performance.now();
-
-function gameLoop(now: number) {
-  const dt = Math.min(0.1, (now - lastTime) / 1000);
-  lastTime = now;
-
-  // 0. GAME OVER STATE & CRYPT RELIQUARY (Hades-style Hub)
-  if (gameOver) {
-    if (!soulAshAwarded) {
-      const earned = Math.max(5, Math.floor(crusade.waveCounter * 8 + progression.level * 4 + corpses.getTotalStock() * 0.4));
-      metaProgression.addSoulAsh(earned);
-      soulAshAwarded = true;
+  constructor() {
+    this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+    const context = this.canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Could not get 2D context from canvas');
     }
+    this.ctx = context;
 
-    const clicked = input.consumeClick();
-    const goW = Math.min(680, canvas.width * 0.92);
-    const goH = 460;
-    const goX = (canvas.width - goW) / 2;
-    const goY = (canvas.height - goH) / 2;
+    this.yearCounterEl = document.getElementById('year-counter');
+    this.goldCounterEl = document.getElementById('gold-counter');
+    this.breachCounterEl = document.getElementById('breach-counter');
+    this.timelineTrackEl = document.getElementById('timeline-track');
 
-    // Check Crypt Upgrade purchases (Keys 1-4 or clicking)
-    const upgradeKeys = ['unholyReserves', 'mistWalker', 'vitalVessel', 'soulMagnet'];
-    const cardW = (goW - 50) / 2;
-    const cardH = 92;
+    // Default to King of Nothing
+    this.playerKing = KING_DEFINITIONS.king_of_nothing;
+    this.gold = this.playerKing.startingGold;
 
-    for (let i = 0; i < upgradeKeys.length; i++) {
-      const keyStr = String(i + 1);
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const cx = goX + 20 + col * (cardW + 10);
-      const cy = goY + 135 + row * (cardH + 10);
-      const isHovered = input.mouseX >= cx && input.mouseX <= cx + cardW &&
-                        input.mouseY >= cy && input.mouseY <= cy + cardH;
+    this.grid = new KingdomGrid();
+    this.deck = new DeckManager(createStarterDeck(this.playerKing.id));
+    this.combat = new CombatEngine();
+    this.timeline = new TimelineManager(1, ['king_of_greed']);
+    this.renderer = new BoardRenderer();
 
-      if (input.isDown(keyStr) || (clicked && isHovered)) {
-        input.keys.delete(keyStr);
-        const bought = metaProgression.purchaseUpgrade(upgradeKeys[i]);
-        if (bought) {
-          audio.playUpgrade();
-          renderer.addShake(4, 0.15);
-        }
-        break;
+    // Initialize Card Hand UI
+    this.handUI = new CardHandUI({
+      canvasId: 'game-canvas',
+      getTileAtPixel: (px, py, width, height) => this.renderer.getTileAtPixel(px, py, width, height),
+      onPlaceCard: (cardId, targetX, targetY) => this.handlePlaceCard(cardId, targetX, targetY),
+      onEndYear: () => this.handleEndYear(),
+      onCastSpell: () => this.handleCastSpell(),
+    });
+
+    // Initialize Merchant UI
+    this.merchantUI = new MerchantUI({
+      onBuyCard: (card) => this.handleBuyMerchantCard(card),
+      onTrashCard: (cardId) => this.handleTrashCard(cardId),
+      onContinue: () => this.handleMerchantContinue(),
+    });
+
+    this.initCanvasResize();
+    this.initMouseTracking();
+    this.startNewGame(this.playerKing.id);
+    this.startAnimationLoop();
+  }
+
+  /**
+   * Resets and starts a fresh campaign with the chosen King.
+   */
+  public startNewGame(kingId: KingId): void {
+    this.playerKing = KING_DEFINITIONS[kingId] || KING_DEFINITIONS.king_of_nothing;
+    this.gold = this.playerKing.startingGold;
+    this.state = 'PLANNING';
+    this.spellCooldownTimer = 0;
+    this.activeSpellEffect = undefined;
+
+    this.grid.reset();
+    this.deck = new DeckManager(createStarterDeck(this.playerKing.id));
+    this.combat.reset();
+    this.timeline = new TimelineManager(1, ['king_of_greed']);
+    this.renderer.reset();
+
+    // Draw initial 5-card hand for Year 1
+    this.deck.drawYearHand(5);
+
+    this.updateHeaderStats();
+    this.renderTimelineTrack();
+    this.handUI.renderHand(this.deck.hand, this.deck);
+    this.handUI.updateSpellButton(this.playerKing.spell, this.gold, false, 0);
+  }
+
+  private initCanvasResize(): void {
+    const resize = () => {
+      const wrapper = document.getElementById('canvas-wrapper');
+      if (wrapper && this.canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        const width = wrapper.clientWidth;
+        const height = wrapper.clientHeight;
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+        this.canvas.style.width = `${width}px`;
+        this.canvas.style.height = `${height}px`;
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.scale(dpr, dpr);
       }
-    }
-
-    // Resurrect CTA check
-    const btnY = goY + goH - 62;
-    const btnHover = input.mouseX >= goX + 50 && input.mouseX <= goX + goW - 50 &&
-                     input.mouseY >= btnY && input.mouseY <= btnY + 44;
-
-    if (input.isDown('r') || input.isDown(' ') || input.isDown('enter') || (clicked && btnHover)) {
-      input.keys.clear();
-      resetGame();
-    }
-
-    hud.update(dt);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    renderer.render(
-      ctx,
-      canvas.width,
-      canvas.height,
-      citadel,
-      corpses.getAll(),
-      swarm.getAll(),
-      enemies,
-      projectiles,
-      equippedModules,
-      dt,
-      shrines.getAll()
-    );
-    hud.render(
-      ctx,
-      canvas.width,
-      canvas.height,
-      citadel,
-      corpses,
-      crusade,
-      spells,
-      swarm,
-      equippedModules,
-      workshopOpen,
-      progression,
-      input.mouseX,
-      input.mouseY,
-      true,
-      metaProgression
-    );
-    requestAnimationFrame(gameLoop);
-    return;
-  }
-
-  // 0.2 HIT-STOP MICRO-FREEZE (Megabonk Juice on heavy impacts)
-  if (hitStopTimer > 0) {
-    hitStopTimer -= dt;
-    hud.update(dt);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    renderer.render(
-      ctx,
-      canvas.width,
-      canvas.height,
-      citadel,
-      corpses.getAll(),
-      swarm.getAll(),
-      enemies,
-      projectiles,
-      equippedModules,
-      dt,
-      shrines.getAll()
-    );
-    hud.render(
-      ctx,
-      canvas.width,
-      canvas.height,
-      citadel,
-      corpses,
-      crusade,
-      spells,
-      swarm,
-      equippedModules,
-      workshopOpen,
-      progression,
-      input.mouseX,
-      input.mouseY,
-      false,
-      metaProgression
-    );
-    requestAnimationFrame(gameLoop);
-    return;
-  }
-
-  // 0.5 LEVEL-UP DRAFT MODAL SELECTION & CORPSE REROLL
-  if (progression.pendingChoices && progression.pendingChoices.length > 0) {
-    const modalW = Math.min(700, canvas.width * 0.9);
-    const modalH = 310;
-    const modalX = (canvas.width - modalW) / 2;
-    const modalY = (canvas.height - modalH) / 2;
-    const cardW = (modalW - 60) / progression.pendingChoices.length;
-    const cardY = modalY + 78;
-    const cardH = modalH - 138;
-
-    // Check Reroll button [R]
-    const rerollW = 320;
-    const rerollH = 26;
-    const rerollX = (canvas.width - rerollW) / 2;
-    const rerollY = modalY + modalH - 34;
-    const isRerollHovered = input.mouseX >= rerollX && input.mouseX <= rerollX + rerollW &&
-                            input.mouseY >= rerollY && input.mouseY <= rerollY + rerollH;
-
-    const clicked = input.consumeClick();
-    if (input.isDown('r') || (clicked && isRerollHovered)) {
-      input.keys.delete('r');
-      if (progression.rerollChoices(corpses)) {
-        audio.playReroll();
-        renderer.addShake(6, 0.18);
-      }
-    } else {
-      // Auto-select first choice if no upgrade chosen within 5 seconds
-      const autoChosen = progression.updateTimer(dt, citadel, swarm);
-      if (autoChosen) {
-        audio.playFire('soul');
-        hud.showUpgradeBanner(`[AUTO] ${autoChosen.title}`, autoChosen.description);
-      } else {
-        for (let i = 0; i < progression.pendingChoices.length; i++) {
-          const cardX = modalX + 20 + i * (cardW + 10);
-          const isHovered = input.mouseX >= cardX && input.mouseX <= cardX + cardW &&
-                            input.mouseY >= cardY && input.mouseY <= cardY + cardH;
-          const key = String(i + 1);
-
-          if (input.isDown(key) || (clicked && isHovered)) {
-            input.keys.clear();
-            const chosen = progression.selectChoice(i, citadel, swarm);
-            if (chosen) {
-              audio.playFire('soul');
-              hud.showUpgradeBanner(chosen.title, chosen.description);
-            }
-            break;
-          }
-        }
-      }
-    }
-  } else if (input.isDown('r') || input.isDown('tab')) {
-    // Toggle Workshop with [R] or [Tab]
-    workshopOpen = !workshopOpen;
-    input.keys.delete('r');
-    input.keys.delete('tab');
-  } else if (input.isDown('escape') && workshopOpen) {
-    workshopOpen = false;
-    input.keys.delete('escape');
-  } else if (workshopOpen) {
-    // Quick grafting in workshop
-    const mapKeys: Record<string, string> = {
-      '1': 'bone_ballista',
-      '2': 'plague_mortar',
-      '3': 'soul_siphon',
-      '4': 'spine_flail',
-      '5': 'putrid_smog_vent',
-      '6': 'grave_lightning'
     };
-    for (const [k, wId] of Object.entries(mapKeys)) {
-      if (input.isDown(k)) {
-        input.keys.delete(k);
-        const emptyIdx = equippedModules.findIndex((m, idx) => m === null && idx < citadel.socketCount);
-        if (emptyIdx !== -1) {
-          try {
-            const w = createWeapon(wId);
-            if (corpses.spendCorpses(w.def.corpseCost)) {
-              equippedModules[emptyIdx] = w;
-              audio.playCrunch();
-            }
-          } catch (e) {
-            console.error(e);
-          }
-        }
-      }
-    }
-  } else {
-    // 1. Necromancer 8-Directional WASD Movement & Shadow Step (Space/Shift)
-    const moveX = (input.isDown('d') || input.isDown('arrowright') ? 1 : 0) - (input.isDown('a') || input.isDown('arrowleft') ? 1 : 0);
-    const moveY = (input.isDown('s') || input.isDown('arrowdown') ? 1 : 0) - (input.isDown('w') || input.isDown('arrowup') ? 1 : 0);
-    const surge = input.isDown(' ') || input.isDown('shift');
 
-    // Aim scythe and spells towards world coordinates of cursor
-    const worldMouseX = renderer.cameraX + input.mouseX;
-    const worldMouseY = renderer.cameraY + input.mouseY;
-    const targetAngle = Math.atan2(worldMouseY - citadel.y, worldMouseX - citadel.x);
+    window.addEventListener('resize', resize);
+    // Initial call
+    resize();
+  }
 
-    const wasDashing = citadel.isInvulnerable();
-    citadel.update(dt, { moveX, moveY, surge, targetAngle });
+  private initMouseTracking(): void {
+    this.canvas.addEventListener('mousemove', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const tile = this.renderer.getTileAtPixel(px, py, rect.width, rect.height);
+      this.renderer.setHoverTile(tile);
+    });
 
-    if (!wasDashing && citadel.isInvulnerable()) {
-      audio.playFire('soul');
-      renderer.addShake(7, 0.2);
-      renderer.addParticle(citadel.x, citadel.y, '#c084fc', 18, 220, 3.5);
+    this.canvas.addEventListener('mouseleave', () => {
+      this.renderer.setHoverTile(null);
+    });
+  }
+
+  /**
+   * Places a selected card on target 3x3 grid tile.
+   */
+  private handlePlaceCard(cardId: string, targetX: number, targetY: number): boolean {
+    if (this.state !== 'PLANNING') {
+      return false;
     }
 
-    corpses.update(dt, citadel.x, citadel.y, citadel.radius + 60);
-
-    // 2. Minion Summoning on Keys [1] through [6]
-    const minionHotkeys: { key: string; kind: MinionKind }[] = [
-      { key: '1', kind: 'skeleton_grunt' },
-      { key: '2', kind: 'bone_phalanx' },
-      { key: '3', kind: 'bloated_husk' },
-      { key: '4', kind: 'carrion_specter' },
-      { key: '5', kind: 'stitched_abomination' },
-      { key: '6', kind: 'tomb_acolyte' }
-    ];
-
-    for (const mk of minionHotkeys) {
-      if (input.isDown(mk.key)) {
-        input.keys.delete(mk.key);
-        if (progression.isMinionUnlocked(mk.kind)) {
-          const raised = swarm.raiseMinion(mk.kind, citadel.x, citadel.y, corpses, citadel.radius, citadel.angle);
-          if (raised) audio.playCrunch();
-        }
-      }
+    const card = this.deck.hand.find((c) => c.id === cardId);
+    if (!card) {
+      return false;
     }
 
-    // 3. Active Necromancy Spells on Keys [Q, E, F, C]
-    spells.update(dt);
-    if (input.isDown('q')) {
-      input.keys.delete('q');
-      const res = spells.triggerCorpseExplosion(citadel.x, citadel.y, corpses);
-      if (res.explodedCount > 0) {
-        audio.playFire('physical');
-        renderer.addShake(12, 0.35);
-        renderer.addParticle(citadel.x, citadel.y, '#84cc16', 24, 220, 4);
-      }
-    }
-    if (input.isDown('e')) {
-      input.keys.delete('e');
-      spells.triggerUnholyRally();
-      swarm.rejuvenateMinions(8);
-      renderer.addParticle(citadel.x, citadel.y, '#38bdf8', 12, 100, 3);
-    }
-    if (input.isDown('f')) {
-      input.keys.delete('f');
-      const healed = spells.triggerCannibalHarvest(citadel, swarm);
-      if (healed > 0) {
-        audio.playCrunch();
-        renderer.addParticle(citadel.x, citadel.y, '#10b981', 16, 120, 3);
-      }
-    }
-    if (input.isDown('c')) {
-      input.keys.delete('c');
-      const triggered = spells.triggerReapersWake();
-      if (triggered) {
-        audio.playFire('soul');
-        renderer.addParticle(citadel.x, citadel.y, '#a855f7', 20, 160, 4);
-      }
+    const success = this.grid.placeCard(targetX, targetY, card);
+    if (success) {
+      sound.playCardPlace();
+      this.renderer.addShake(4, 0.15);
+      this.deck.playCard(cardId);
+      this.handUI.renderHand(this.deck.hand, this.deck);
+      return true;
     }
 
-    // 4. Crusade Wave Director (Scales with player minion swarm count)
-    const wave = crusade.update(dt, citadel.x, citadel.y, swarm.getMinionCount());
-    if (wave.spawnedEnemies.length > 0) {
-      enemies.push(...wave.spawnedEnemies);
-      renderer.addShake(8, 0.25);
+    return false;
+  }
+
+  /**
+   * Locks in the player's choices and transitions to the Year event.
+   */
+  private handleEndYear(): void {
+    if (this.state !== 'PLANNING') {
+      return;
     }
 
-    // Maintain dense enemy population (~35+ active enemies)
-    if (enemies.length < 34) {
-      const angle = Math.random() * Math.PI * 2;
-      const d = 520 + Math.random() * 800;
-      const spawnX = citadel.x + Math.cos(angle) * d;
-      const spawnY = citadel.y + Math.sin(angle) * d;
-      const pick = Math.random() > 0.4 ? 'silver_cavalry' : 'peasant_caravan';
-      enemies.push(crusade.createEnemy(pick, spawnX, spawnY));
+    if (!this.deck.canEndTurn(this.deck.hand)) {
+      return;
     }
 
-    // 5. Update Autonomous Minion Swarm with Corpse Scavenging
-    const minionEvents = swarm.update(
-      dt,
-      citadel.x,
-      citadel.y,
-      citadel.radius,
-      citadel.angle,
-      spells.rallyActiveTimer > 0,
-      enemies,
-      corpses.getAll(),
-      progression.scavengeRadius,
-      progression.scavengeSpeedMultiplier
-    );
+    // Strict "Leave Two": the 2 cards left in hand carry over / remain in hand
+    this.handUI.clearSelection();
 
-    // Process Minion Combat & Scavenging Events
-    for (const ev of minionEvents) {
-      if (ev.type === 'husk_detonate') {
-        audio.playCrunch();
-        renderer.addShake(10, 0.3);
-        renderer.addParticle(ev.x, ev.y, '#84cc16', 22, 180, 4);
-        const aoeRad = ev.aoeRadius || 100;
-        for (const e of enemies) {
-          if (dist(ev, e) <= aoeRad + e.radius) {
-            e.hp -= ev.damage * progression.minionDamageMultiplier;
-            renderer.addParticle(e.x, e.y, '#22c55e', 5, 80, 2);
-          }
-        }
-      } else if (ev.type === 'hit' && ev.targetId) {
-        const target = enemies.find(e => e.id === ev.targetId);
-        if (target) {
-          target.hp -= ev.damage * progression.minionDamageMultiplier;
-          renderer.addParticle(target.x, target.y, '#f8fafc', 3, 60, 2);
-        }
-      } else if (ev.type === 'scavenge_corpse' && ev.corpseId && ev.corpseValue) {
-        corpses.removeCorpseById(ev.corpseId);
-        corpses.addStock(ev.corpseValue);
-        progression.addExp(ev.corpseValue * 6);
-        renderer.addParticle(ev.x, ev.y, '#c084fc', 3, 70, 2);
-      }
-    }
+    const currentYear = this.timeline.currentYear;
+    const yearEvent = this.timeline.getYearEvent(currentYear);
 
-    // 6. Auto-fire orbiting arcane relics in 360 degrees
-    const buff = swarm.getBuffMultiplier();
-    const sockets = citadel.getSockets();
-    const orbitSpeed = 1.1;
-    const animTime = performance.now() / 1000;
-
-    for (let i = 0; i < sockets.length; i++) {
-      const mod = equippedModules[i];
-      if (mod) {
-        mod.update(dt);
-        const s = sockets[i];
-        const orbitAngle = animTime * orbitSpeed + s.angleOffset;
-        const orbitDist = 28 + (citadel.radius * 0.9);
-        const sx = citadel.x + Math.cos(orbitAngle) * orbitDist;
-        const sy = citadel.y + Math.sin(orbitAngle) * orbitDist;
-
-        const shot = mod.tryFire(sx, sy, orbitAngle, enemies, buff);
-        if (shot) {
-          projectiles.push(shot);
-          audio.playFire(mod.type);
-        }
-      }
-    }
-
-    // 7. Update Projectiles (Player & Enemy Holy Bolts)
-    const nextProj: Projectile[] = [];
-    for (const p of projectiles) {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.rangeRemaining -= Math.hypot(p.vx, p.vy) * dt;
-
-      let hit = false;
-
-      if (p.isEnemy) {
-        if (p.isAoE && p.aoeRadius) {
-          const hitNecro = dist(p, citadel) <= p.radius + citadel.radius;
-          const hitMinion = swarm.getAll().some(m => dist(p, m) <= p.radius + m.radius);
-
-          if (hitNecro || hitMinion || p.rangeRemaining <= Math.hypot(p.vx, p.vy) * dt) {
-            hit = true;
-            renderer.addShake(11, 0.32);
-            renderer.addParticle(p.x, p.y, '#ea580c', 22, 190, 4);
-            renderer.addParticle(p.x, p.y, '#facc15', 16, 130, 3);
-            audio.playCrunch();
-
-            if (dist(p, citadel) <= p.aoeRadius) {
-              citadel.takeDamage(p.damage);
-            }
-
-            for (const m of swarm.getAll()) {
-              if (dist(p, m) <= p.aoeRadius) {
-                m.hp -= p.damage;
-                renderer.addParticle(m.x, m.y, '#ea580c', 4, 60, 2);
-              }
-            }
-          }
-        } else {
-          // Single target Holy Smite bolt can be blocked by minions
-          for (const m of swarm.getAll()) {
-            if (dist(p, m) <= p.radius + m.radius) {
-              m.hp -= p.damage;
-              hit = true;
-              renderer.addParticle(p.x, p.y, '#facc15', 6, 80, 2);
-              break;
-            }
-          }
-
-          if (!hit && dist(p, citadel) <= p.radius + citadel.radius) {
-            citadel.takeDamage(p.damage);
-            hit = true;
-            renderer.addShake(8, 0.25);
-            renderer.addParticle(p.x, p.y, '#ef4444', 10, 120, 3);
-            audio.playCrunch();
-          }
-        }
-      } else {
-        // Player projectiles check against enemies
-        for (const e of enemies) {
-          if (dist(p, e) <= p.radius + e.radius) {
-            e.hp -= p.damage;
-            hit = true;
-            renderer.addFloatingText(e.x, e.y, `${Math.ceil(p.damage)}`, p.type === 'blight' ? '#4ade80' : p.type === 'soul' ? '#c084fc' : '#f8fafc');
-            renderer.addParticle(p.x, p.y, p.type === 'blight' ? '#4ade80' : p.type === 'soul' ? '#c084fc' : '#f8fafc', 4, 80, 2);
-            break;
-          }
-        }
-
-        // Check hits on unbreached holy shrines
-        if (!hit) {
-          for (const s of shrines.getAll()) {
-            if (!s.isBreached && dist(p, s) <= p.radius + s.radius) {
-              const reward = shrines.damageShrine(s.id, p.damage);
-              hit = true;
-              renderer.addParticle(p.x, p.y, '#fef08a', 5, 90, 2);
-              if (reward) handleBreachReward(reward);
-              break;
-            }
-          }
-        }
-      }
-
-      if (!hit && p.rangeRemaining > 0) nextProj.push(p);
-    }
-    projectiles = nextProj;
-
-    // 8. Shrine Siege & Tactical Hardcore Enemy AI
-    shrines.update(dt);
-
-    for (const s of shrines.getAll()) {
-      if (s.isBreached) continue;
-
-      // Contact against Shrine Ward
-      const dCitadel = dist(citadel, s);
-      if (dCitadel <= citadel.radius + s.radius) {
-        const crush = citadel.calculateCrushDamage(s.radius);
-        const reward = shrines.damageShrine(s.id, crush * dt * 3);
-        renderer.addShake(6, 0.15);
-        renderer.addParticle(s.x, s.y, '#fde047', 2, 90, 2.5);
-        if (reward) handleBreachReward(reward);
-      }
-
-      // Minion clashes against Shrine
-      for (const m of swarm.getAll()) {
-        if (dist(m, s) <= m.radius + s.radius + 15) {
-          const reward = shrines.damageShrine(s.id, m.damage * dt);
-          if (reward) {
-            handleBreachReward(reward);
-            break;
-          }
-        }
-      }
-    }
-
-    const livingEnemies: WorldEnemy[] = [];
-    for (const e of enemies) {
-      const d = dist(citadel, e);
-
-      // Close Contact: Spectral Scythe Reap & Enemy Contact Hurt
-      if (d <= citadel.radius + e.radius) {
-        let reap = citadel.calculateCrushDamage(e.radius);
-        const isCrit = progression.hasLegionTome && swarm.getMinionCount() >= 4;
-        if (progression.hasLegionTome) {
-          reap *= (1.0 + swarm.getMinionCount() * 0.04);
-        }
-        e.hp -= reap;
-        if (!citadel.isInvulnerable() && e.isHostile) {
-          citadel.takeDamage(e.damage * 0.4 * dt * 60);
-        }
-        if (isCrit) {
-          audio.playCrit();
-          hitStopTimer = 0.035;
-          renderer.addFloatingText(e.x, e.y, `${Math.ceil(reap)}!`, '#facc15', true);
-        } else {
-          audio.playCrunch();
-          renderer.addFloatingText(e.x, e.y, `${Math.ceil(reap)}`, '#cbd5e1', false);
-        }
-        renderer.addShake(5, 0.15);
-        renderer.addParticle(e.x, e.y, isCrit ? '#facc15' : '#991b1b', 4, 100, 2.5);
-      }
-
-      // Minion clashes (Enemies fight back fiercely against swarms)
-      for (const m of swarm.getAll()) {
-        if (dist(m, e) <= m.radius + e.radius) {
-          let minionDps = m.damage * 0.45 * progression.minionDamageMultiplier;
-          if (progression.hasVelocityTome) {
-            minionDps *= 1.3;
-          }
-          e.hp -= minionDps * dt;
-          m.hp -= (e.damage || 15) * 1.8 * dt;
-        }
-      }
-
-      if (e.hp <= 0) {
-        corpses.spawnCorpse(e.x, e.y, e.corpseYield);
-        citadel.addBoneMass(e.boneMassYield);
-        crusade.addWrath(e.isHostile ? 12 : 25);
-        progression.addExp(e.isHostile ? 12 : 20);
-        renderer.addParticle(e.x, e.y, '#f8fafc', 8, 90, 2.5);
-
-        // Megabonk hit-stop crunch on kill
-        hitStopTimer = 0.025;
-
-        // Tome of Siphoning synergy: chance to leech HP or drop bonus corpse
-        if (progression.hasSiphonTome && Math.random() < 0.25) {
-          citadel.hp = Math.min(citadel.maxHp, citadel.hp + 4);
-          renderer.addFloatingText(citadel.x, citadel.y - 12, '+4 HP', '#4ade80', false);
-          corpses.spawnCorpse(e.x + (Math.random() - 0.5) * 20, e.y + (Math.random() - 0.5) * 20, 1);
-        }
-
-        // Tome of Pestilence synergy: poisonous smog burst
-        if (progression.hasPestilenceTome) {
-          renderer.addParticle(e.x, e.y, '#22c55e', 12, 110, 4);
-        }
-        continue;
-      }
-
-      // --- Hardcore Anti-Swarm Tactical Enemy Behaviors ---
-      // 1. Silver Cavalry: Gallop Lance Charge & Swarm Trample
-      if (e.type === 'silver_cavalry' && e.isHostile) {
-        e.chargeTimer = (e.chargeTimer || 0) + dt;
-        if (d < 360 && e.chargeTimer > 2.6) {
-          e.speed = 285; // Gallop sprint!
-          renderer.addParticle(e.x, e.y, '#cbd5e1', 1, 35, 1.8);
-
-          // Trample through any minions in charge path
-          for (const m of swarm.getAll()) {
-            if (dist(e, m) <= e.radius + m.radius + 12) {
-              m.hp -= 34; // Heavy trample damage!
-              const dx = m.x - e.x;
-              const dy = m.y - e.y;
-              const dLen = Math.hypot(dx, dy) || 1;
-              m.x += (dx / dLen) * 26;
-              m.y += (dy / dLen) * 26;
-              renderer.addParticle(m.x, m.y, '#cbd5e1', 2, 40, 2);
-            }
-          }
-
-          if (d <= citadel.radius + e.radius + 8) {
-            citadel.takeDamage(26);
-            e.chargeTimer = 0;
-            renderer.addShake(9, 0.28);
-            audio.playCrunch();
-          }
-        } else if (e.chargeTimer <= 2.6) {
-          e.speed = 170;
-        }
-      }
-
-      // 2. Paladin Phalanx: Consecrated Greatsword Cleave (Sweeps through minion swarms)
-      if (e.type === 'paladin_phalanx' && e.isHostile) {
-        e.cleaveCooldown = (e.cleaveCooldown === undefined ? 0.6 : e.cleaveCooldown) - dt;
-        if (e.cleaveCooldown <= 0) {
-          let cleavedCount = 0;
-          for (const m of swarm.getAll()) {
-            if (dist(e, m) <= 72) {
-              m.hp -= 34; // Heavy AoE holy cleave!
-              cleavedCount++;
-              renderer.addParticle(m.x, m.y, '#facc15', 3, 60, 2);
-            }
-          }
-          if (cleavedCount > 0) {
-            e.cleaveCooldown = 1.0;
-            renderer.addShake(4, 0.15);
-            audio.playCrunch();
-          }
-        }
-      }
-
-      // 3. High Inquisitor: Radiant Sunburst (Purging Nova against swarms)
-      if (e.type === 'high_inquisitor' && e.isHostile) {
-        e.purgeCooldown = (e.purgeCooldown === undefined ? 2.0 : e.purgeCooldown) - dt;
-        if (e.purgeCooldown <= 0) {
-          const closeMinions = swarm.getAll().filter(m => dist(e, m) <= 140);
-          if (closeMinions.length >= 2) {
-            e.purgeCooldown = 3.6;
-            for (const m of closeMinions) {
-              m.hp -= 42; // Purges nearby skeletons with holy flame!
-              const dx = m.x - e.x;
-              const dy = m.y - e.y;
-              const dLen = Math.hypot(dx, dy) || 1;
-              m.x += (dx / dLen) * 45;
-              m.y += (dy / dLen) * 45;
-            }
-            renderer.addShake(8, 0.25);
-            renderer.addParticle(e.x, e.y, '#fde047', 22, 220, 4);
-            renderer.addParticle(e.x, e.y, '#ea580c', 14, 160, 3);
-            audio.playFire('soul');
-          }
-        }
-      }
-
-      // High Inquisitor: Ranged Holy Smite Bolts
-      if (e.type === 'high_inquisitor' && e.isHostile) {
-        e.rangedCooldown = (e.rangedCooldown === undefined ? 1.5 + Math.random() : e.rangedCooldown) - dt;
-        if (d < 460 && e.rangedCooldown <= 0) {
-          e.rangedCooldown = 2.8;
-          const aimAngle = Math.atan2(citadel.y - e.y, citadel.x - e.x);
-          projectiles.push({
-            id: `holy_${Date.now()}_${Math.random()}`,
-            x: e.x + Math.cos(aimAngle) * (e.radius + 8),
-            y: e.y + Math.sin(aimAngle) * (e.radius + 8),
-            vx: Math.cos(aimAngle) * 230,
-            vy: Math.sin(aimAngle) * 230,
-            damage: 22,
-            type: 'soul',
-            rangeRemaining: 500,
-            radius: 7,
-            isAoE: false,
-            isEnemy: true
-          });
-          renderer.addParticle(e.x, e.y, '#facc15', 6, 90, 2.5);
-        }
-      }
-
-      // Holy Trebuchet: Consecration Firebombs
-      if (e.type === 'holy_trebuchet' && e.isHostile) {
-        e.rangedCooldown = (e.rangedCooldown === undefined ? 2.0 : e.rangedCooldown) - dt;
-        if (d < 620 && e.rangedCooldown <= 0) {
-          e.rangedCooldown = 4.2;
-          const aimAngle = Math.atan2(citadel.y - e.y, citadel.x - e.x);
-          projectiles.push({
-            id: `bomb_${Date.now()}_${Math.random()}`,
-            x: e.x,
-            y: e.y,
-            vx: Math.cos(aimAngle) * 190,
-            vy: Math.sin(aimAngle) * 190,
-            damage: 32,
-            type: 'physical',
-            rangeRemaining: 650,
-            radius: 10,
-            isAoE: true,
-            aoeRadius: 85,
-            isEnemy: true
-          });
-          renderer.addParticle(e.x, e.y, '#ea580c', 8, 100, 3);
-        }
-      }
-
-      // Navigation & Perimeter Defense
-      if (e.assignedShrineId) {
-        const s = shrines.shrines.find(sh => sh.id === e.assignedShrineId);
-        if (s && !s.isBreached) {
-          const distToCitadel = dist(citadel, e);
-          const distShrineToCitadel = dist(citadel, s);
-
-          if (distShrineToCitadel < 480 || distToCitadel < 380) {
-            const dir = { x: citadel.x - e.x, y: citadel.y - e.y };
-            const len = Math.hypot(dir.x, dir.y);
-            if (len > 0) {
-              e.x += (dir.x / len) * e.speed * dt;
-              e.y += (dir.y / len) * e.speed * dt;
-            }
-          } else {
-            e.guardAngle = ((e.guardAngle || 0) + dt * 0.7) % (Math.PI * 2);
-            const targetX = s.x + Math.cos(e.guardAngle) * (e.guardRadius || 90);
-            const targetY = s.y + Math.sin(e.guardAngle) * (e.guardRadius || 90);
-            const gDir = { x: targetX - e.x, y: targetY - e.y };
-            const gLen = Math.hypot(gDir.x, gDir.y);
-            if (gLen > 6) {
-              const spd = Math.min(e.speed, gLen * 3);
-              e.x += (gDir.x / gLen) * spd * dt;
-              e.y += (gDir.y / gLen) * spd * dt;
-            }
-          }
-        } else {
-          const dir = { x: citadel.x - e.x, y: citadel.y - e.y };
-          const len = Math.hypot(dir.x, dir.y);
-          if (len > 0) {
-            e.x += (dir.x / len) * e.speed * dt;
-            e.y += (dir.y / len) * e.speed * dt;
-          }
-        }
-      } else if (e.isHostile) {
-        const dir = { x: citadel.x - e.x, y: citadel.y - e.y };
-        const len = Math.hypot(dir.x, dir.y);
-        if (len > 0) {
-          e.x += (dir.x / len) * e.speed * dt;
-          e.y += (dir.y / len) * e.speed * dt;
-        }
-      } else {
-        const nearestShrine = shrines.getNearestShrine(e.x, e.y);
-        if (nearestShrine && !nearestShrine.isBreached) {
-          const sDir = { x: nearestShrine.x - e.x, y: nearestShrine.y - e.y };
-          const sLen = Math.hypot(sDir.x, sDir.y);
-          if (sLen > 90) {
-            e.x += (sDir.x / sLen) * e.speed * dt;
-            e.y += (sDir.y / sLen) * e.speed * dt;
-          }
-        }
-      }
-
-      // Melee attack against Necromancer if in strike distance
-      if (d <= citadel.radius + e.radius + 8) {
-        e.attackCooldown -= dt;
-        if (e.attackCooldown <= 0) {
-          citadel.takeDamage(e.damage || 15);
-          e.attackCooldown = 0.85;
-          renderer.addShake(6, 0.2);
-          renderer.addParticle(citadel.x, citadel.y, '#ef4444', 8, 110, 2.5);
-          audio.playCrunch();
-        }
-      }
-
-      livingEnemies.push(e);
-    }
-    enemies = livingEnemies;
-
-    // Check player death / game over
-    if (citadel.hp <= 0) {
-      gameOver = true;
-      audio.playCrunch();
-      renderer.addShake(16, 0.5);
+    if (yearEvent.eventType === 'merchant') {
+      this.startMerchantPhase();
+    } else if (yearEvent.eventType === 'diplomacy_war') {
+      this.startDiplomacyWarPhase();
+    } else if (yearEvent.eventType === 'diplomacy_peace') {
+      this.startDiplomacyPeacePhase();
+    } else {
+      this.startBattlePhase();
     }
   }
 
-  // 9. Render Frame
-  hud.update(dt);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  renderer.render(
-    ctx,
-    canvas.width,
-    canvas.height,
-    citadel,
-    corpses.getAll(),
-    swarm.getAll(),
-    enemies,
-    projectiles,
-    equippedModules,
-    dt,
-    shrines.getAll()
-  );
-  hud.render(
-    ctx,
-    canvas.width,
-    canvas.height,
-    citadel,
-    corpses,
-    crusade,
-    spells,
-    swarm,
-    equippedModules,
-    workshopOpen,
-    progression,
-    input.mouseX,
-    input.mouseY,
-    gameOver,
-    metaProgression
-  );
+  /**
+   * Merchant Stop: Opens merchant shop modal.
+   */
+  private startMerchantPhase(): void {
+    this.state = 'MERCHANT';
+    const primaryRival = this.timeline.warringRivals[0] || 'king_of_greed';
+    const stock = generateMerchantStock(this.playerKing.id, primaryRival);
+    this.merchantUI.open(stock, this.deck.hand, this.gold);
+  }
 
-  requestAnimationFrame(gameLoop);
+  private handleBuyMerchantCard(card: Card): boolean {
+    const result = this.deck.spendGold(card.cost, this.gold);
+    if (result.success) {
+      this.gold = result.newGold;
+      this.deck.addCardToHand(card);
+      this.updateHeaderStats();
+      this.handUI.renderHand(this.deck.hand, this.deck);
+      this.merchantUI.updateState(this.deck.hand, this.gold);
+      return true;
+    }
+    return false;
+  }
+
+  private handleTrashCard(cardId: string): boolean {
+    const result = this.deck.trashCard(cardId, 5, this.gold);
+    if (result.success) {
+      this.gold = result.newGold;
+      this.updateHeaderStats();
+      this.handUI.renderHand(this.deck.hand, this.deck);
+      this.merchantUI.updateState(this.deck.hand, this.gold);
+      return true;
+    }
+    return false;
+  }
+
+  private handleMerchantContinue(): void {
+    this.merchantUI.close();
+    // After merchant shopping, proceed to battle phase for the year
+    this.startBattlePhase();
+  }
+
+  /**
+   * Year 8 Diplomacy: Add Rival King Modal.
+   */
+  private startDiplomacyWarPhase(): void {
+    this.state = 'DIPLOMACY';
+
+    // Eligible monarchs to declare war on
+    const eligibleMonarchs = (Object.keys(KING_DEFINITIONS) as KingId[]).filter(
+      (id) => id !== this.playerKing.id && !this.timeline.warringRivals.includes(id)
+    );
+
+    if (eligibleMonarchs.length === 0) {
+      this.startBattlePhase();
+      return;
+    }
+
+    this.showDiplomacyWarModal(eligibleMonarchs, (chosenKingId) => {
+      this.timeline.declareWar(chosenKingId);
+      this.startBattlePhase();
+    });
+  }
+
+  private showDiplomacyWarModal(rivals: KingId[], onSelect: (king: KingId) => void): void {
+    let modal = document.getElementById('diplomacy-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'diplomacy-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.className = 'modal-overlay';
+
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Year 8: A New Rival Escalates the Conflict!</h2>
+        </div>
+        <p class="modal-description">
+          The realm descends deeper into war. Choose which rival monarch challenges your sovereign borders.
+          Their signature elite units and cards will enter future invasions and shared loot pools.
+        </p>
+        <div class="modal-cards">
+          ${rivals
+            .map((id) => {
+              const king = KING_DEFINITIONS[id];
+              return `
+                <div class="diplomacy-option" data-king="${id}">
+                  <h3 style="color:${king.color}; font-size:16px;">${king.name}</h3>
+                  <div style="font-size:12px; color:#94a3b8; font-style:italic;">${king.title}</div>
+                  <div style="font-size:11px; margin-top:8px;">Spell: <strong style="color:#facc15">${king.spell.name}</strong></div>
+                  <button class="primary-btn" style="margin-top:12px;">Declare War</button>
+                </div>
+              `;
+            })
+            .join('')}
+        </div>
+      </div>
+    `;
+
+    modal.querySelectorAll('.diplomacy-option').forEach((el) => {
+      el.addEventListener('click', () => {
+        const kingId = (el as HTMLElement).dataset.king as KingId;
+        modal?.classList.add('hidden');
+        onSelect(kingId);
+      });
+    });
+  }
+
+  /**
+   * Year 23 Diplomacy: Sign Peace Treaty Modal.
+   */
+  private startDiplomacyPeacePhase(): void {
+    this.state = 'DIPLOMACY';
+
+    if (this.timeline.warringRivals.length === 0) {
+      this.startBattlePhase();
+      return;
+    }
+
+    this.showDiplomacyPeaceModal(this.timeline.warringRivals, (peaceKingId) => {
+      this.timeline.signPeaceTreaty(peaceKingId);
+      this.startBattlePhase();
+    });
+  }
+
+  private showDiplomacyPeaceModal(rivals: KingId[], onSelect: (king: KingId) => void): void {
+    let modal = document.getElementById('diplomacy-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'diplomacy-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.className = 'modal-overlay';
+
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Year 23: Peace Accord Negotiations</h2>
+        </div>
+        <p class="modal-description">
+          A diplomatic window opens. Select one rival monarch to sign a non-aggression peace treaty with.
+          Their invasion legions will cease assaulting your realm.
+        </p>
+        <div class="modal-cards">
+          ${rivals
+            .map((id) => {
+              const king = KING_DEFINITIONS[id];
+              return `
+                <div class="diplomacy-option" data-king="${id}">
+                  <h3 style="color:${king.color}; font-size:16px;">${king.name}</h3>
+                  <div style="font-size:12px; color:#94a3b8; font-style:italic;">${king.title}</div>
+                  <button class="primary-btn" style="background:#10b981; margin-top:12px;">Sign Treaty</button>
+                </div>
+              `;
+            })
+            .join('')}
+        </div>
+      </div>
+    `;
+
+    modal.querySelectorAll('.diplomacy-option').forEach((el) => {
+      el.addEventListener('click', () => {
+        const kingId = (el as HTMLElement).dataset.king as KingId;
+        modal?.classList.add('hidden');
+        onSelect(kingId);
+      });
+    });
+  }
+
+  /**
+   * Starts invasion battle for current year.
+   */
+  private startBattlePhase(): void {
+    this.state = 'BATTLE';
+    const currentYear = this.timeline.currentYear;
+
+    // Pick active rival
+    const rivals = this.timeline.warringRivals;
+    const rival = rivals.length > 0 ? rivals[Math.floor(Math.random() * rivals.length)] : 'king_of_greed';
+
+    this.combat.startInvasion(currentYear, rival);
+    this.handUI.updateSpellButton(this.playerKing.spell, this.gold, true, this.spellCooldownTimer);
+  }
+
+  /**
+   * Casts King active spell during battle.
+   */
+  private handleCastSpell(): void {
+    if (this.state !== 'BATTLE' || this.spellCooldownTimer > 0) {
+      return;
+    }
+
+    const result = this.combat.castKingSpell(this.playerKing.spell.id, this.gold);
+    if (result.success) {
+      if (this.playerKing.spell.id === 'rally_horn') {
+        sound.playHorn();
+      } else {
+        sound.playCoin();
+      }
+      this.renderer.addShake(6, 0.25);
+      this.gold -= result.cost;
+      this.spellCooldownTimer = this.playerKing.spell.cooldownMax;
+      this.activeSpellEffect = {
+        type: this.playerKing.spell.id,
+        timer: 4.0,
+      };
+      this.updateHeaderStats();
+      this.handUI.updateSpellButton(this.playerKing.spell, this.gold, true, this.spellCooldownTimer);
+    }
+  }
+
+  /**
+   * Post-Battle Draft Modal: Offer 3 cross-king cards.
+   */
+  private startDraftPhase(): void {
+    this.state = 'DRAFT';
+    const lootCards = this.timeline.generateCrossKingLoot(this.playerKing.id, ALL_CARDS, 3);
+    this.showDraftModal(lootCards, (selectedCard) => {
+      this.deck.addCardToDeck(selectedCard);
+      this.advanceToNextYear();
+    });
+  }
+
+  private showDraftModal(cards: Card[], onChoose: (card: Card) => void): void {
+    let modal = document.getElementById('draft-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'draft-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.className = 'modal-overlay';
+
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Victory! Claim Royal Spoils</h2>
+        </div>
+        <p class="modal-description">
+          Choose 1 card to draft into your royal arsenal from the spoils of war.
+        </p>
+        <div class="modal-cards">
+          ${cards
+            .map(
+              (card) => `
+              <div class="draft-card-item" data-id="${card.id}">
+                <div style="display:flex; justify-content:space-between;">
+                  <span class="text-gold" style="font-weight:bold;">${card.cost > 0 ? `${card.cost}g` : 'Free'}</span>
+                  <span class="card-type-tag type-${card.type}" style="font-size:9px; text-transform:uppercase;">${card.type}</span>
+                </div>
+                <div style="font-weight:bold; font-size:13px; text-align:center; margin:8px 0;">${card.name}</div>
+                <div style="font-size:11px; color:#94a3b8; line-height:1.2; flex:1;">${card.description}</div>
+                <button class="primary-btn" style="margin-top:10px;">Draft Card</button>
+              </div>
+            `
+            )
+            .join('')}
+        </div>
+      </div>
+    `;
+
+    modal.querySelectorAll('.draft-card-item').forEach((el, index) => {
+      el.addEventListener('click', () => {
+        const card = cards[index];
+        modal?.classList.add('hidden');
+        onChoose(card);
+      });
+    });
+  }
+
+  /**
+   * Advances timeline after battle victory and draft.
+   */
+  private advanceToNextYear(): void {
+    // 1. Calculate tile income and adjacency gold bonus
+    let annualIncome = 5;
+    for (const tile of this.grid.getAllTiles()) {
+      if (!tile.isDestroyed && tile.baseCard) {
+        const bonus = this.grid.getAdjacencyBonus(tile.x, tile.y);
+        annualIncome += bonus.goldBonus;
+      }
+    }
+    this.gold += annualIncome;
+
+    // 2. Advance timeline year
+    this.timeline.advanceYear();
+
+    // 3. Draw fresh cards for new planning phase (draw up to 5 total cards)
+    const needed = Math.max(0, 5 - this.deck.hand.length);
+    this.deck.drawYearHand(needed);
+
+    // 4. Reset spell cooldown & combat engine for new year
+    this.spellCooldownTimer = 0;
+    this.activeSpellEffect = undefined;
+    this.combat.reset();
+    this.renderer.reset();
+
+    // 5. Transition back to PLANNING
+    this.state = 'PLANNING';
+    this.updateHeaderStats();
+    this.renderTimelineTrack();
+    this.handUI.renderHand(this.deck.hand, this.deck);
+    this.handUI.updateSpellButton(this.playerKing.spell, this.gold, false, 0);
+  }
+
+  /**
+   * Game Over (Defeat) Modal
+   */
+  private showGameOverModal(): void {
+    let modal = document.getElementById('game-over-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'game-over-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.className = 'modal-overlay';
+
+    modal.innerHTML = `
+      <div class="modal-content" style="text-align:center;">
+        <h1 class="text-crimson" style="font-size:32px; font-weight:800; margin-bottom:8px;">KINGDOM BREACHED</h1>
+        <p class="modal-description" style="font-size:15px; margin-bottom:16px;">
+          Your defenses collapsed under relentless invasion forces after 3 breaches.
+        </p>
+        <div style="font-family:monospace; font-size:16px; margin-bottom:20px;">
+          Years Survived: <span class="text-gold">${this.timeline.currentYear}</span> / 30
+        </div>
+        <button id="restart-game-btn" class="primary-btn" style="padding:12px 28px; font-size:16px; background:#e11d48;">
+          Play Again
+        </button>
+      </div>
+    `;
+
+    document.getElementById('restart-game-btn')?.addEventListener('click', () => {
+      modal?.classList.add('hidden');
+      this.startNewGame(this.playerKing.id);
+    });
+  }
+
+  /**
+   * Victory Modal (Survived 30 Years)
+   */
+  private showVictoryModal(): void {
+    let modal = document.getElementById('victory-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'victory-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.className = 'modal-overlay';
+
+    modal.innerHTML = `
+      <div class="modal-content" style="text-align:center;">
+        <h1 class="text-gold" style="font-size:32px; font-weight:800; margin-bottom:8px;">KINGDOM ASCENDANT</h1>
+        <p class="modal-description" style="font-size:15px; margin-bottom:16px;">
+          All 30 years survived! The supreme monarch stands triumphant across the 9 Kings realm.
+        </p>
+        <div style="font-family:monospace; font-size:16px; margin-bottom:20px;">
+          Treasury: <span class="text-gold">${this.gold}g</span> | Breaches Suffered: <span class="text-crimson">${this.combat.getBreachLosses()} / 3</span>
+        </div>
+        <button id="victory-restart-btn" class="primary-btn" style="padding:12px 28px; font-size:16px; background:#10b981;">
+          Play Again
+        </button>
+      </div>
+    `;
+
+    document.getElementById('victory-restart-btn')?.addEventListener('click', () => {
+      modal?.classList.add('hidden');
+      this.startNewGame(this.playerKing.id);
+    });
+  }
+
+  /**
+   * Updates top header statistics (Year, Gold, Breaches).
+   */
+  private updateHeaderStats(): void {
+    if (this.yearCounterEl) {
+      this.yearCounterEl.textContent = this.timeline.currentYear.toString();
+    }
+    if (this.goldCounterEl) {
+      this.goldCounterEl.textContent = this.gold.toString();
+    }
+    if (this.breachCounterEl) {
+      this.breachCounterEl.textContent = `${this.combat.getBreachLosses()} / 3`;
+    }
+  }
+
+  /**
+   * Renders the mini timeline track with year markers.
+   */
+  private renderTimelineTrack(): void {
+    if (!this.timelineTrackEl) return;
+    this.timelineTrackEl.innerHTML = '';
+
+    const current = this.timeline.currentYear;
+    const milestones = [1, 3, 6, 8, 12, 18, 23, 30];
+
+    for (const year of milestones) {
+      const pip = document.createElement('div');
+      const isCurrent = year === current;
+      const isPassed = year < current;
+      pip.className = `timeline-pip ${isCurrent ? 'current' : ''} ${isPassed ? 'passed' : ''}`;
+
+      let borderColor = '#64748b';
+      let bgColor = '#1e293b';
+      let textColor = '#cbd5e1';
+      let icon = `${year}`;
+
+      if (year === WAR_MILESTONE_YEAR) {
+        icon = '⚔️';
+        borderColor = '#f43f5e';
+        bgColor = '#4c0519';
+        textColor = '#fecdd3';
+      } else if (year === PEACE_MILESTONE_YEAR) {
+        icon = '📜';
+        borderColor = '#10b981';
+        bgColor = '#064e3b';
+        textColor = '#a7f3d0';
+      } else if (MERCHANT_YEARS.includes(year)) {
+        icon = '🪙';
+        borderColor = '#f59e0b';
+        bgColor = '#451a03';
+        textColor = '#fde68a';
+      } else if (year === FINAL_BOSS_YEAR) {
+        icon = '💀';
+        borderColor = '#c084fc';
+        bgColor = '#3b0764';
+        textColor = '#f5d0fe';
+      }
+
+      if (isCurrent) {
+        borderColor = '#facc15';
+        bgColor = '#854d0e';
+        textColor = '#fef08a';
+      } else if (isPassed) {
+        borderColor = '#334155';
+        bgColor = '#0f172a';
+        textColor = '#475569';
+      }
+
+      pip.style.cssText = `
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: inherit;
+        font-size: ${icon.length > 2 ? '10px' : '9px'};
+        font-weight: 800;
+        border: 2px solid ${borderColor};
+        background: ${bgColor};
+        color: ${textColor};
+        box-shadow: ${isCurrent ? '0 0 12px rgba(250, 204, 21, 0.8), inset 0 0 4px rgba(250, 204, 21, 0.4)' : '0 2px 4px rgba(0,0,0,0.6)'};
+        transform: ${isCurrent ? 'scale(1.25)' : 'scale(1.0)'};
+        transition: all 0.2s ease;
+        cursor: default;
+      `;
+
+      pip.textContent = icon;
+      pip.title = `Year ${year}`;
+      this.timelineTrackEl.appendChild(pip);
+    }
+  }
+
+  /**
+   * Core requestAnimationFrame game loop.
+   */
+  private startAnimationLoop(): void {
+    const loop = (timestamp: number) => {
+      if (this.lastFrameTime === 0) {
+        this.lastFrameTime = timestamp;
+      }
+      const dt = Math.min(0.1, (timestamp - this.lastFrameTime) / 1000);
+      this.lastFrameTime = timestamp;
+
+      // 1. Advance combat simulation when in BATTLE state
+      if (this.state === 'BATTLE') {
+        this.combat.update(dt, this.grid);
+        this.updateHeaderStats();
+
+        // Advance spell cooldown
+        if (this.spellCooldownTimer > 0) {
+          this.spellCooldownTimer = Math.max(0, this.spellCooldownTimer - dt);
+        }
+        if (this.activeSpellEffect) {
+          this.activeSpellEffect.timer = Math.max(0, this.activeSpellEffect.timer - dt);
+          if (this.activeSpellEffect.timer <= 0) {
+            this.activeSpellEffect = undefined;
+          }
+        }
+        this.handUI.updateSpellButton(this.playerKing.spell, this.gold, true, this.spellCooldownTimer);
+
+        // Check Defeat
+        if (this.combat.isDefeated()) {
+          this.state = 'GAME_OVER';
+          this.showGameOverModal();
+        } else if (this.combat.isWaveCleared()) {
+          // Check Victory
+          if (this.timeline.currentYear >= FINAL_BOSS_YEAR) {
+            this.state = 'VICTORY';
+            this.showVictoryModal();
+          } else {
+            this.startDraftPhase();
+          }
+        }
+      }
+
+      // 2. Render Canvas Viewport
+      const wrapper = document.getElementById('canvas-wrapper');
+      const width = wrapper?.clientWidth || 800;
+      const height = wrapper?.clientHeight || 600;
+
+      this.renderer.render(
+        this.ctx,
+        width,
+        height,
+        this.grid,
+        this.state === 'BATTLE' ? this.combat : null,
+        timestamp / 1000,
+        this.activeSpellEffect
+      );
+
+      this.animFrameId = requestAnimationFrame(loop);
+    };
+
+    this.animFrameId = requestAnimationFrame(loop);
+  }
 }
 
-requestAnimationFrame(gameLoop);
+// Instantiate game when DOM is loaded
+window.addEventListener('DOMContentLoaded', () => {
+  new NineKingsGame();
+});
