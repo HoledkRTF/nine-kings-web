@@ -142,6 +142,7 @@ export class GameRenderer {
     }
 
     // Record Necromancer Shadow Mist Steps when moving
+    const currentSpeed = Math.hypot(citadel.vx, citadel.vy);
     if (currentSpeed > 10) {
       this.lastTrackDist += currentSpeed * dt;
       if (this.lastTrackDist > 16) {
