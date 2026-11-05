@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite main",
+    "dev:9kings": "vite features/nine-kings-prototype",
     "build": "vite build main",
+    "build:9kings": "vite build features/nine-kings-prototype",
     "test": "vitest run"
   },
   "devDependencies": {

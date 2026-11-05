@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>9 Kings - Authentic Web Prototype</title>
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Timeline Header -->
+    <header id="timeline-header">
+      <div class="header-stat">
+        <span class="label">YEAR</span>
+        <span id="year-counter" class="value">1</span>
+      </div>
+      <div id="timeline-track-container">
+        <div id="timeline-track"></div>
+      </div>
+      <div class="header-stat">
+        <span class="label">GOLD</span>
+        <span id="gold-counter" class="value text-gold">25</span>
+      </div>
+      <div class="header-stat">
+        <span class="label">BREACHES</span>
+        <span id="breach-counter" class="value text-crimson">0 / 3</span>
+      </div>
+    </header>
+
+    <!-- Center Battlefield & Kingdom Arena -->
+    <main id="battle-container">
+      <div id="canvas-wrapper">
+        <canvas id="game-canvas"></canvas>
+      </div>
+
+      <!-- King Active Spell Bar -->
+      <div id="spell-bar">
+        <button id="cast-spell-btn" class="spell-btn">
+          <span class="spell-name">Rally Horn</span>
+          <span class="spell-cost">Cost: 0g</span>
+        </button>
+      </div>
+    </main>
+
+    <!-- Bottom Hand Tray & Leave Two Status -->
+    <footer id="hand-tray-footer">
+      <div id="hand-status-bar">
+        <span id="leave-two-status" class="status-badge warning">
+          Rule: Place cards until exactly 2 remain in hand!
+        </span>
+        <button id="end-year-btn" class="primary-btn" disabled>
+          Ready for Battle
+        </button>
+      </div>
+      <div id="card-hand" class="card-hand-flex"></div>
+    </footer>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
