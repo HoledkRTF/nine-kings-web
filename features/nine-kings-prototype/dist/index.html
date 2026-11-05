@@ -3,65 +3,85 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>9 Kings - Authentic 2.5D Isometric Web Recreation</title>
+  <title>9 Kings - Authentic Recreation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/nine-kings-web/assets/index-BbnmjkYk.js"></script>
-  <link rel="stylesheet" crossorigin href="/nine-kings-web/assets/index-D9M8sX1_.css">
+  <script type="module" crossorigin src="/nine-kings-web/assets/index-CxrYgzoP.js"></script>
+  <link rel="stylesheet" crossorigin href="/nine-kings-web/assets/index-BfsHHp5b.css">
 </head>
 <body>
   <div id="app">
-    <!-- Ornate Medieval Timeline & HUD Header -->
-    <header id="timeline-header">
-      <div class="header-crown-crest">👑</div>
-      <div class="header-stat">
-        <span class="label">YEAR</span>
-        <span id="year-counter" class="value text-gold">1</span>
+    <!-- Fullscreen Canvas Rendering Pine Forest, Wall, Pond, & Isometric Kingdom Grid -->
+    <div id="canvas-wrapper">
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- Top Left Currency (✦ 25 +5) -->
+    <div id="top-left-hud">
+      <div class="currency-display">
+        <span class="currency-gem">✦</span>
+        <span id="gold-counter" class="currency-value">25</span>
+        <span class="currency-income">+5</span>
       </div>
+      <div class="breach-display">
+        <span class="breach-label">BREACHES:</span>
+        <span id="breach-counter" class="breach-value">0 / 3</span>
+      </div>
+    </div>
+
+    <!-- Left Vertical Spell & Relic Medallions -->
+    <div id="left-relic-bar">
+      <button id="cast-spell-btn" class="relic-btn active" title="Rally Horn (King Active Spell)">
+        <span class="relic-icon">⚡</span>
+      </button>
+      <div class="relic-btn" title="Frost Ward">
+        <span class="relic-icon">❄️</span>
+      </div>
+      <div class="relic-btn" title="Gilded Taxes">
+        <span class="relic-icon">🪙</span>
+      </div>
+      <div class="relic-btn" title="War March">
+        <span class="relic-icon">🧭</span>
+      </div>
+    </div>
+
+    <!-- Top Center Timeline & Year Progression -->
+    <div id="top-timeline-bar">
       <div id="timeline-track-container">
         <div id="timeline-track"></div>
       </div>
-      <div class="header-stat">
-        <span class="label">TREASURY</span>
-        <span id="gold-counter" class="value text-gold">25g</span>
+      <div class="year-label">
+        YEAR <span id="year-counter">1</span>
       </div>
-      <div class="header-stat">
-        <span class="label">BREACHES</span>
-        <span id="breach-counter" class="value text-crimson">0 / 3</span>
-      </div>
-    </header>
+    </div>
 
-    <!-- Center 2.5D Isometric Battlefield & Floating Kingdom Diorama -->
-    <main id="battle-container">
-      <div id="canvas-wrapper">
-        <canvas id="game-canvas"></canvas>
-      </div>
+    <!-- Top Right Battle Controls (auto, pause, speed) -->
+    <div id="top-right-controls">
+      <button id="auto-btn" class="ctrl-pill-btn active">auto</button>
+      <button id="speed-btn" class="ctrl-pill-btn">▶▶</button>
+    </div>
 
-      <!-- King Active Spell Medallion -->
-      <div id="spell-bar">
-        <button id="cast-spell-btn" class="spell-btn">
-          <div class="spell-gem">⚡</div>
-          <div class="spell-info">
-            <span class="spell-name">RALLY HORN</span>
-            <span class="spell-cost">Cost: 0g</span>
-          </div>
-        </button>
-      </div>
-    </main>
+    <!-- Right Vertical Monarchs Roster -->
+    <div id="right-monarch-bar">
+      <div class="monarch-badge rival-blood" title="King of Blood">🩸</div>
+      <div class="monarch-badge rival-spells" title="King of Spells">🔮</div>
+      <div class="monarch-badge rival-time" title="King of Time">⏳</div>
+      <div class="monarch-badge rival-greed" title="King of Greed">💰</div>
+    </div>
 
-    <!-- Bottom Medieval Card Hand Tray & Leave Two Status -->
-    <footer id="hand-tray-footer">
-      <div id="hand-status-bar">
+    <!-- Bottom Turn Action Bar & Card Hand -->
+    <div id="bottom-ui-container">
+      <div id="hand-action-bar">
         <div id="leave-two-status" class="status-badge warning">
           RULE: LEAVE EXACTLY 2 CARDS IN HAND
         </div>
-        <button id="end-year-btn" class="primary-btn royal-gold-btn" disabled>
+        <button id="end-year-btn" class="primary-btn royal-btn" disabled>
           READY FOR BATTLE
         </button>
       </div>
       <div id="card-hand" class="card-hand-flex"></div>
-    </footer>
+    </div>
   </div>
 
 </body>

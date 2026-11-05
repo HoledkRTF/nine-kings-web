@@ -1,5 +1,5 @@
 /* ==========================================================================
-   9 KINGS AUTHENTIC RETRO MEDIEVAL STYLING
+   9 KINGS AUTHENTIC RETRO MEDIEVAL STYLING (MATCHING OFFICIAL STEAM ART)
    ========================================================================== */
 
 * {
@@ -12,7 +12,7 @@ body, html {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #08070d;
+  background-color: #4a7554;
   color: #f1f5f9;
   font-family: 'Silkscreen', 'Press Start 2P', monospace;
   user-select: none;
@@ -20,65 +20,146 @@ body, html {
 }
 
 #app {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   width: 100vw;
   height: 100vh;
-  background: radial-gradient(circle at 50% 40%, #151324 0%, #08070d 100%);
+  overflow: hidden;
+}
+
+/* Fullscreen Canvas Rendering Pine Forest, Wall, Pond & Isometric Grid */
+#canvas-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 /* ==========================================================================
-   ORNATE MEDIEVAL TIMELINE HEADER
+   TOP-LEFT HUD: CURRENCY (✦ 25 +5) & BREACHES
    ========================================================================== */
-#timeline-header {
-  height: 62px;
-  background: linear-gradient(180deg, #1f1d2e 0%, #13111f 100%);
-  border-bottom: 4px solid #2d2640;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 215, 0, 0.2);
+#top-left-hud {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.currency-display {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  gap: 18px;
-  z-index: 20;
+  gap: 6px;
+  font-size: 18px;
+  font-weight: 800;
+  text-shadow: 2px 2px 0 #000, 0 0 8px rgba(0, 0, 0, 0.8);
 }
 
-.header-crown-crest {
-  font-size: 24px;
-  filter: drop-shadow(0 2px 4px rgba(250, 204, 21, 0.5));
+.currency-gem {
+  color: #f59e0b;
+  font-size: 20px;
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8));
 }
 
-.header-stat {
+.currency-value {
+  color: #ffffff;
+}
+
+.currency-income {
+  color: #facc15;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.breach-display {
+  font-size: 9px;
+  color: #fca5a5;
+  text-shadow: 1px 1px 0 #000;
+  letter-spacing: 0.5px;
+}
+
+.breach-value {
+  color: #ef4444;
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   LEFT VERTICAL SPELL & RELIC MEDALLIONS
+   ========================================================================== */
+#left-relic-bar {
+  position: absolute;
+  top: 68px;
+  left: 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.relic-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #111827;
+  border: 2px solid #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 0 6px rgba(56, 189, 248, 0.3);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.relic-btn:hover:not(:disabled) {
+  transform: scale(1.12);
+  border-color: #7dd3fc;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.8);
+}
+
+.relic-btn.active {
+  border-color: #facc15;
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.7);
+}
+
+.relic-btn:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+}
+
+.relic-icon {
+  font-size: 16px;
+}
+
+/* ==========================================================================
+   TOP TIMELINE & YEAR PROGRESSION (OFFICIAL 9 KINGS STYLE)
+   ========================================================================== */
+#top-timeline-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 75px;
+  gap: 4px;
 }
-
-.header-stat .label {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  color: #94a3b8;
-  margin-bottom: 3px;
-  text-shadow: 1px 1px 0 #000;
-}
-
-.header-stat .value {
-  font-size: 13px;
-  font-weight: 800;
-  text-shadow: 1px 1px 2px #000;
-}
-
-.text-gold { color: #fbbf24; text-shadow: 0 0 6px rgba(251, 191, 36, 0.4); }
-.text-crimson { color: #f43f5e; text-shadow: 0 0 6px rgba(244, 63, 94, 0.4); }
 
 #timeline-track-container {
-  flex: 1;
-  overflow-x: auto;
   display: flex;
   align-items: center;
-  padding: 4px 0;
 }
 
 #timeline-track {
@@ -87,206 +168,179 @@ body, html {
   align-items: center;
 }
 
-.timeline-node {
-  padding: 4px 8px;
-  font-size: 8px;
-  background: #181628;
-  border: 1px solid #332d4a;
-  border-radius: 3px;
-  color: #64748b;
-  white-space: nowrap;
+.timeline-pip {
+  cursor: default;
 }
 
-.timeline-node.current {
-  background: #78350f;
-  border-color: #f59e0b;
-  color: #fef3c7;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
-}
-
-.timeline-node.boss {
-  border-color: #ef4444;
-  color: #fca5a5;
+.year-label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #000, 0 0 8px rgba(0, 0, 0, 0.8);
 }
 
 /* ==========================================================================
-   CENTER BATTLEFIELD & ISOMETRIC CANVAS
+   TOP-RIGHT BATTLE CONTROLS (AUTO, SPEED)
    ========================================================================== */
-#battle-container {
-  flex: 1;
-  position: relative;
+#top-right-controls {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+}
+
+.ctrl-pill-btn {
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: all 0.15s;
+}
+
+.ctrl-pill-btn:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+}
+
+.ctrl-pill-btn.active {
+  background: #facc15;
+  border-color: #ca8a04;
+  color: #000000;
+}
+
+/* ==========================================================================
+   RIGHT VERTICAL MONARCHS ROSTER
+   ========================================================================== */
+#right-monarch-bar {
+  position: absolute;
+  top: 68px;
+  right: 20px;
+  z-index: 10;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  gap: 10px;
 }
 
-#canvas-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
+.monarch-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #450a0a;
+  border: 2px solid #ef4444;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-canvas {
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.9));
-}
-
-/* King Active Spell Medallion */
-#spell-bar {
-  position: absolute;
-  top: 18px;
-  right: 22px;
-  z-index: 15;
-}
-
-.spell-btn {
-  background: linear-gradient(135deg, #4c1d95 0%, #2e1065 100%);
-  border: 3px solid #c084fc;
-  box-shadow: 0 6px 16px rgba(192, 132, 252, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  color: #fdf4ff;
-  border-radius: 8px;
-  padding: 8px 16px;
+  font-size: 14px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
   cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.monarch-badge:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+}
+
+/* ==========================================================================
+   BOTTOM TURN ACTION BAR & FLOATING TAROT CARDS
+   ========================================================================== */
+#bottom-ui-container {
+  position: absolute;
+  bottom: 14px;
+  left: 0;
+  width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 10px;
-  font-family: inherit;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.spell-btn:hover:not(:disabled) {
-  transform: translateY(-3px) scale(1.02);
-  border-color: #e9d5ff;
-  box-shadow: 0 8px 22px rgba(192, 132, 252, 0.6);
-}
-
-.spell-btn:disabled {
-  opacity: 0.45;
-  filter: grayscale(0.85);
-  cursor: not-allowed;
-  transform: none;
-}
-
-.spell-gem {
-  font-size: 20px;
-  text-shadow: 0 0 8px rgba(192, 132, 252, 0.8);
-}
-
-.spell-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.spell-name {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.spell-cost {
-  font-size: 8px;
-  color: #fde047;
-}
-
-/* ==========================================================================
-   MEDIEVAL CARD HAND TRAY & TAROT CARDS
-   ========================================================================== */
-#hand-tray-footer {
-  height: 250px;
-  background: linear-gradient(180deg, #181528 0%, #0c0a14 100%);
-  border-top: 4px solid #382f4d;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.85), inset 0 2px 0 rgba(255, 215, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  padding: 10px 20px;
   z-index: 20;
+  pointer-events: none;
 }
 
-#hand-status-bar {
+#hand-action-bar {
+  pointer-events: auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 16px;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
 }
 
 .status-badge {
   font-size: 9px;
   font-weight: 700;
-  padding: 6px 12px;
-  border-radius: 4px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
 .status-badge.warning {
-  background: rgba(180, 83, 9, 0.25);
   color: #fbbf24;
-  border: 1px solid #f59e0b;
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
 }
 
 .status-badge.ready {
-  background: rgba(22, 101, 52, 0.35);
   color: #4ade80;
-  border: 1px solid #22c55e;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
 }
 
-.royal-gold-btn {
+.royal-btn {
   background: linear-gradient(180deg, #d97706 0%, #92400e 100%);
   border: 2px solid #fde68a;
   color: #fffbeb;
   font-family: inherit;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 8px 20px;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 6px 14px;
   border-radius: 4px;
   cursor: pointer;
   letter-spacing: 0.8px;
-  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 10px rgba(180, 83, 9, 0.5);
   transition: all 0.15s ease;
 }
 
-.royal-gold-btn:hover:not(:disabled) {
+.royal-btn:hover:not(:disabled) {
   background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.7);
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.7);
 }
 
-.royal-gold-btn:disabled {
-  background: #1f2438;
-  border-color: #334155;
-  color: #475569;
+.royal-btn:disabled {
+  background: #334155;
+  border-color: #475569;
+  color: #94a3b8;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-/* Card Flex Container */
+/* Card Hand Flex Row */
 .card-hand-flex {
-  flex: 1;
+  pointer-events: auto;
   display: flex;
   gap: 16px;
   justify-content: center;
-  align-items: center;
-  overflow-x: auto;
+  align-items: flex-end;
   perspective: 1000px;
-  padding: 8px 0;
+  padding-bottom: 4px;
 }
 
-/* Authentic Tarot-Style Fantasy Card */
+/* Authentic Tarot-Style Fantasy Card (Matching Official 9 Kings Steam Art) */
 .card-item {
-  width: 136px;
-  height: 185px;
-  background: linear-gradient(180deg, #242038 0%, #12101e 100%);
-  border: 3px solid #b45309;
+  width: 140px;
+  height: 195px;
+  background: linear-gradient(180deg, #1b3842 0%, #0e2026 100%);
+  border: 3px solid #0891b2;
   border-radius: 8px;
   padding: 8px;
   display: flex;
@@ -294,7 +348,7 @@ canvas {
   justify-content: space-between;
   cursor: grab;
   position: relative;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.75), inset 0 0 10px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0, 0, 0, 0.9);
   transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.15s, box-shadow 0.15s;
   image-rendering: pixelated;
   transform-style: preserve-3d;
@@ -304,20 +358,20 @@ canvas {
   content: '';
   position: absolute;
   top: 3px; left: 3px; right: 3px; bottom: 3px;
-  border: 1px solid rgba(250, 204, 21, 0.25);
+  border: 1px solid rgba(56, 189, 248, 0.3);
   border-radius: 5px;
   pointer-events: none;
 }
 
 .card-item:hover {
-  border-color: #facc15;
+  border-color: #38bdf8;
   z-index: 10;
 }
 
 .card-item.selected {
-  border-color: #38bdf8;
-  transform: translateY(-22px) scale(1.08) !important;
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.7), inset 0 0 10px rgba(56, 189, 248, 0.3) !important;
+  border-color: #facc15 !important;
+  transform: translateY(-26px) scale(1.08) !important;
+  box-shadow: 0 0 24px rgba(250, 204, 21, 0.8), inset 0 0 10px rgba(250, 204, 21, 0.3) !important;
   z-index: 25;
 }
 
@@ -330,15 +384,26 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #3d3550;
+  border-bottom: 1px solid #164e63;
   padding-bottom: 4px;
+}
+
+.card-cost-gem {
+  font-size: 8.5px;
+  font-weight: 800;
+  color: #fde047;
+  text-shadow: 0 0 6px rgba(253, 224, 71, 0.7);
+  background: rgba(180, 83, 9, 0.45);
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(245, 158, 11, 0.5);
 }
 
 .card-type-tag {
   font-size: 7.5px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 3px;
   text-transform: uppercase;
 }
@@ -348,22 +413,11 @@ canvas {
 .tag-enchantment { background: #581c87; color: #e9d5ff; }
 .tag-economy { background: #713f12; color: #fde047; }
 
-.card-cost-gem {
-  font-size: 8.5px;
-  font-weight: 800;
-  color: #fde047;
-  text-shadow: 0 0 6px rgba(253, 224, 71, 0.7);
-  background: rgba(180, 83, 9, 0.35);
-  padding: 2px 5px;
-  border-radius: 3px;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-}
-
 /* Card Portrait / Illustration Frame */
 .card-art-box {
-  height: 68px;
-  background: #0d0b14;
-  border: 2px solid #3c3252;
+  height: 76px;
+  background: #09171c;
+  border: 2px solid #155e75;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -376,19 +430,19 @@ canvas {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.5) 100%);
+  background: radial-gradient(circle at center, transparent 35%, rgba(0, 0, 0, 0.6) 100%);
   pointer-events: none;
 }
 
 .pixel-art-svg {
-  width: 44px;
-  height: 44px;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.8));
 }
 
 .card-title {
   font-family: 'Cinzel', serif;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
   text-align: center;
   line-height: 1.2;
@@ -403,19 +457,22 @@ canvas {
   color: #e2e8f0;
   text-align: center;
   line-height: 1.35;
-  background: rgba(10, 9, 16, 0.7);
-  padding: 4px 3px;
+  background: rgba(8, 20, 26, 0.8);
+  padding: 4px;
   border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* ==========================================================================
-   MEDIEVAL OVERLAY MODALS (MERCHANT, DRAFT, DIPLOMACY)
+   MODALS (DRAFT, SHOP, DIPLOMACY)
    ========================================================================== */
-.modal-backdrop {
+.modal-overlay {
   position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(4, 3, 7, 0.85);
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(4, 8, 12, 0.88);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -423,54 +480,68 @@ canvas {
   z-index: 100;
 }
 
-.royal-modal {
+.modal-overlay.hidden {
+  display: none !important;
+}
+
+.modal-content {
   width: 90%;
-  max-width: 540px;
-  background: linear-gradient(180deg, #242033 0%, #141220 100%);
-  border: 4px solid #b45309;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.9), 0 0 24px rgba(245, 158, 11, 0.3), inset 0 0 10px rgba(0, 0, 0, 0.8);
+  max-width: 560px;
+  background: linear-gradient(180deg, #1c2b33 0%, #0d171d 100%);
+  border: 4px solid #0891b2;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.95), 0 0 24px rgba(8, 145, 178, 0.4);
   border-radius: 8px;
-  padding: 20px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
-.royal-modal-title {
-  font-size: 14px;
+.modal-header h2 {
+  font-size: 16px;
   color: #fde68a;
   text-align: center;
-  text-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
-  letter-spacing: 1px;
 }
 
-.royal-modal-subtitle {
-  font-size: 8px;
-  color: #94a3b8;
+.modal-description {
+  font-size: 9px;
+  color: #cbd5e1;
   text-align: center;
   line-height: 1.4;
 }
 
-.modal-cards-row {
+.modal-cards {
   display: flex;
   gap: 12px;
   justify-content: center;
   padding: 8px 0;
 }
 
-.modal-action-btn {
+.draft-card-item, .merchant-card-item, .diplomacy-option {
+  width: 130px;
+  background: #09171c;
+  border: 2px solid #155e75;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.draft-card-item:hover, .merchant-card-item:hover, .diplomacy-option:hover {
+  transform: translateY(-4px);
+  border-color: #38bdf8;
+}
+
+.primary-btn {
   background: linear-gradient(180deg, #d97706 0%, #92400e 100%);
   border: 2px solid #fde68a;
-  color: #fff;
+  color: #fffbeb;
   font-family: inherit;
   font-size: 9px;
   font-weight: 700;
-  padding: 10px;
+  padding: 8px;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s;
-}
-
-.modal-action-btn:hover {
-  background: #f59e0b;
 }

@@ -224,22 +224,357 @@ export class BoardRenderer {
   private drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
     ctx.clearRect(0, 0, width, height);
 
-    const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 80, width / 2, height / 2, width * 0.7);
-    bgGrad.addColorStop(0, '#161426');
-    bgGrad.addColorStop(0.6, '#0d0c17');
-    bgGrad.addColorStop(1, '#050508');
-    ctx.fillStyle = bgGrad;
+    // 1. Fullscreen Lush Sage Pasture (Official 9 Kings Steam Art #679873)
+    ctx.fillStyle = '#679873';
     ctx.fillRect(0, 0, width, height);
 
-    // Ambient floating arcane dust motes
-    ctx.fillStyle = 'rgba(250, 204, 21, 0.15)';
-    for (let i = 0; i < 20; i++) {
-      const mx = (Math.sin(animTime * 0.4 + i * 2.3) * 0.5 + 0.5) * width;
-      const my = (Math.cos(animTime * 0.3 + i * 1.8) * 0.5 + 0.5) * height;
-      ctx.beginPath();
-      ctx.arc(mx, my, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+    // Subtle meadow grass blades & tiny wildflowers (deterministic hash)
+    this.drawMeadowDetails(ctx, width, height);
+
+    // 2. Perimeter Cobblestone Wall across the upper region
+    this.drawPerimeterStoneWall(ctx, width, height);
+
+    // 3. Dense Evergreen Pine / Spruce Forest lining the wall and meadow edges
+    this.drawPineForest(ctx, width, height, animTime);
+
+    // 4. Curved Cyan Pond with Sandy Shoreline in lower-left
+    this.drawPond(ctx, width, height, animTime);
+
+    // 5. Circular Stone Wishing Well & Boulders
+    this.drawWishingWell(ctx, width, height);
+  }
+
+  private drawMeadowDetails(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    ctx.save();
+    const stepX = 40;
+    const stepY = 28;
+    for (let x = 12; x < width; x += stepX) {
+      for (let y = 12; y < height; y += stepY) {
+        const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        const seed = hash - Math.floor(hash);
+
+        if (seed > 0.5) {
+          ctx.fillStyle = seed > 0.75 ? '#588863' : '#77a881';
+          ctx.fillRect(x + (seed * 16 - 8), y, 2, 3);
+          ctx.fillRect(x + (seed * 16 - 8) + 2, y - 1, 2, 2);
+        } else if (seed < 0.07) {
+          ctx.fillStyle = seed < 0.035 ? '#fef08a' : '#ffffff';
+          ctx.fillRect(x, y, 2, 2);
+        }
+      }
     }
+    ctx.restore();
+  }
+
+  private drawPerimeterStoneWall(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    ctx.save();
+    const wallApexY = Math.max(20, height * 0.06);
+    const wallLeftY = height * 0.22;
+    const wallRightY = height * 0.16;
+    const apexX = width * 0.72;
+    const wallH = 28;
+
+    // Ground contact shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.beginPath();
+    ctx.moveTo(0, wallLeftY + wallH);
+    ctx.lineTo(apexX, wallApexY + wallH);
+    ctx.lineTo(width, wallRightY + wallH);
+    ctx.lineTo(width, wallRightY + wallH + 12);
+    ctx.lineTo(apexX, wallApexY + wallH + 16);
+    ctx.lineTo(0, wallLeftY + wallH + 14);
+    ctx.closePath();
+    ctx.fill();
+
+    // Wall main stone body (Left to Apex)
+    ctx.fillStyle = '#4b5563';
+    ctx.beginPath();
+    ctx.moveTo(0, wallLeftY);
+    ctx.lineTo(apexX, wallApexY);
+    ctx.lineTo(apexX, wallApexY + wallH);
+    ctx.lineTo(0, wallLeftY + wallH);
+    ctx.closePath();
+    ctx.fill();
+
+    // Wall stone body (Apex to Right)
+    ctx.fillStyle = '#374151';
+    ctx.beginPath();
+    ctx.moveTo(apexX, wallApexY);
+    ctx.lineTo(width, wallRightY);
+    ctx.lineTo(width, wallRightY + wallH);
+    ctx.lineTo(apexX, wallApexY + wallH);
+    ctx.closePath();
+    ctx.fill();
+
+    // Top capstone ridge
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, wallLeftY);
+    ctx.lineTo(apexX, wallApexY);
+    ctx.lineTo(width, wallRightY);
+    ctx.stroke();
+
+    // Cobblestone Brick details & Crenellations
+    ctx.fillStyle = '#64748b';
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+
+    // Crenellations along left flank
+    const countL = 16;
+    for (let i = 0; i < countL; i += 2) {
+      const t = i / countL;
+      const bx = t * apexX;
+      const by = wallLeftY + t * (wallApexY - wallLeftY) - 7;
+      ctx.fillRect(bx, by, 14, 8);
+      ctx.strokeRect(bx, by, 14, 8);
+    }
+
+    // Crenellations along right flank
+    const countR = 10;
+    for (let i = 0; i < countR; i += 2) {
+      const t = i / countR;
+      const bx = apexX + t * (width - apexX);
+      const by = wallApexY + t * (wallRightY - wallApexY) - 7;
+      ctx.fillRect(bx, by, 14, 8);
+      ctx.strokeRect(bx, by, 14, 8);
+    }
+    ctx.restore();
+  }
+
+  private drawSinglePineTree(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    scale: number,
+    animTime: number
+  ): void {
+    ctx.save();
+    const sway = Math.sin(animTime * 1.5 + x * 0.05) * (scale * 1.6);
+
+    // Soft tree shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(x + 4 * scale, y + 4 * scale, 12 * scale, 6 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tree Trunk
+    ctx.fillStyle = '#261911';
+    ctx.fillRect(x - 2.5 * scale, y - 6 * scale, 5 * scale, 10 * scale);
+
+    // 4 Stacked Conifer Evergreen Tiers
+    const tiers = [
+      { w: 26 * scale, h: 14 * scale, dy: -6 * scale },
+      { w: 22 * scale, h: 13 * scale, dy: -14 * scale },
+      { w: 16 * scale, h: 12 * scale, dy: -22 * scale },
+      { w: 10 * scale, h: 11 * scale, dy: -30 * scale }
+    ];
+
+    for (let i = 0; i < tiers.length; i++) {
+      const t = tiers[i];
+      const tierSway = (i / 3) * sway;
+
+      // Base deep needle green
+      ctx.fillStyle = i === 0 ? '#14271c' : i === 1 ? '#1c3827' : i === 2 ? '#254b35' : '#326346';
+      ctx.beginPath();
+      ctx.moveTo(x - t.w / 2, y + t.dy);
+      ctx.lineTo(x + tierSway, y + t.dy - t.h);
+      ctx.lineTo(x + t.w / 2, y + t.dy);
+      ctx.closePath();
+      ctx.fill();
+
+      // Right shaded half
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.beginPath();
+      ctx.moveTo(x + tierSway, y + t.dy - t.h);
+      ctx.lineTo(x + t.w / 2, y + t.dy);
+      ctx.lineTo(x + tierSway, y + t.dy);
+      ctx.closePath();
+      ctx.fill();
+
+      // Highlight needle edge
+      ctx.strokeStyle = '#43775b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x - t.w / 2, y + t.dy);
+      ctx.lineTo(x + tierSway, y + t.dy - t.h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawPineForest(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
+    // 1. Back row along the stone wall
+    const wallApexY = Math.max(20, height * 0.06);
+    const wallLeftY = height * 0.22;
+    const apexX = width * 0.72;
+
+    for (let i = -20; i <= width + 20; i += 45) {
+      let wy: number;
+      if (i < apexX) {
+        const t = Math.max(0, i / apexX);
+        wy = wallLeftY + t * (wallApexY - wallLeftY) - 18;
+      } else {
+        const t = (i - apexX) / (width - apexX);
+        wy = wallApexY + t * (height * 0.16 - wallApexY) - 18;
+      }
+      this.drawSinglePineTree(ctx, i, wy, 1.25, animTime);
+    }
+
+    // 2. Left Flank Pine Grove
+    const leftTrees = [
+      { x: 30, y: height * 0.32, s: 1.2 },
+      { x: 75, y: height * 0.38, s: 1.15 },
+      { x: 45, y: height * 0.46, s: 1.3 },
+      { x: 95, y: height * 0.52, s: 1.25 },
+      { x: 40, y: height * 0.62, s: 1.35 },
+      { x: 80, y: height * 0.72, s: 1.2 }
+    ];
+    for (const tr of leftTrees) {
+      this.drawSinglePineTree(ctx, tr.x, tr.y, tr.s, animTime);
+    }
+
+    // 3. Right Flank Pine Grove
+    const rightTrees = [
+      { x: width - 40, y: height * 0.28, s: 1.3 },
+      { x: width - 85, y: height * 0.36, s: 1.15 },
+      { x: width - 45, y: height * 0.48, s: 1.25 },
+      { x: width - 90, y: height * 0.58, s: 1.3 },
+      { x: width - 50, y: height * 0.70, s: 1.35 }
+    ];
+    for (const tr of rightTrees) {
+      this.drawSinglePineTree(ctx, tr.x, tr.y, tr.s, animTime);
+    }
+
+    // 4. Meadow Flank Pine Trees (framing the 3x3 grid)
+    const meadowTrees = [
+      { x: Math.max(160, width * 0.22), y: height * 0.40, s: 1.15 },
+      { x: Math.max(190, width * 0.25), y: height * 0.65, s: 1.2 },
+      { x: Math.min(width - 160, width * 0.78), y: height * 0.42, s: 1.15 },
+      { x: Math.min(width - 190, width * 0.75), y: height * 0.62, s: 1.2 }
+    ];
+    for (const tr of meadowTrees) {
+      this.drawSinglePineTree(ctx, tr.x, tr.y, tr.s, animTime);
+    }
+  }
+
+  private drawPond(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
+    ctx.save();
+    const px = Math.min(180, width * 0.16);
+    const py = Math.max(height - 130, height * 0.82);
+    const rx = 140;
+    const ry = 80;
+
+    // Sandy Shoreline Rim
+    ctx.fillStyle = '#8b7a58';
+    ctx.beginPath();
+    ctx.ellipse(px, py, rx + 12, ry + 10, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#a89571';
+    ctx.beginPath();
+    ctx.ellipse(px + 4, py + 2, rx + 6, ry + 5, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cyan Pond Water (matches 9 Kings Steam screenshot)
+    ctx.fillStyle = '#3b8496';
+    ctx.beginPath();
+    ctx.ellipse(px, py, rx, ry, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#56a6ba';
+    ctx.beginPath();
+    ctx.ellipse(px - 10, py - 6, rx * 0.78, ry * 0.75, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#7bc7d6';
+    ctx.beginPath();
+    ctx.ellipse(px - 20, py - 12, rx * 0.52, ry * 0.5, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Gentle animated wave ripple lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      const waveOffset = Math.sin(animTime * 2 + i * 1.8) * 6;
+      ctx.beginPath();
+      ctx.arc(px - 15 + i * 20 + waveOffset, py - 5 + i * 8, 14 + i * 8, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawWishingWell(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    ctx.save();
+    const wx = Math.min(230, width * 0.20);
+    const wy = Math.max(height - 240, height * 0.58);
+
+    // Well ground shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(wx, wy + 8, 26, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Circular stone well base
+    ctx.fillStyle = '#525c68';
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, 24, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#6b7886';
+    ctx.beginPath();
+    ctx.ellipse(wx, wy - 3, 24, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Dark water interior
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.ellipse(wx, wy - 4, 17, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(wx + 3, wy - 5, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Wooden timber roof posts
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(wx - 18, wy - 26, 4, 22);
+    ctx.fillRect(wx + 14, wy - 26, 4, 22);
+
+    // Well Roof
+    ctx.fillStyle = '#92400e';
+    ctx.beginPath();
+    ctx.moveTo(wx - 24, wy - 24);
+    ctx.lineTo(wx, wy - 36);
+    ctx.lineTo(wx + 24, wy - 24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#451a03';
+    ctx.stroke();
+
+    // Boulders nearby
+    const boulders = [
+      { bx: wx + 34, by: wy + 6, br: 11 },
+      { bx: wx + 48, by: wy + 10, br: 8 }
+    ];
+    for (const b of boulders) {
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.arc(b.bx, b.by, b.br, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#64748b';
+      ctx.beginPath();
+      ctx.arc(b.bx - 2, b.by - 2, b.br * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4d7c0f';
+      ctx.fillRect(b.bx - 3, b.by - b.br, 4, 2);
+    }
+    ctx.restore();
   }
 
   private drawIsometricDiorama(
@@ -252,15 +587,6 @@ export class BoardRenderer {
     const halfW = this.tileW / 2;
     const halfH = this.tileH / 2;
 
-    // Shadow cast under the entire floating island
-    const center = this.gridToPixel(1, 1, width, height);
-    ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-    ctx.beginPath();
-    ctx.ellipse(center.x, center.y + 70, halfW * 3.4, halfH * 3.2, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
     // Iterate tiles from back-to-front by isometric depth: (gx + gy) from 0 to 4
     for (let depth = 0; depth <= 4; depth++) {
       for (let gx = 0; gx < 3; gx++) {
@@ -272,17 +598,17 @@ export class BoardRenderer {
 
         const pos = this.gridToPixel(gx, gy, width, height);
 
-        // 3D Extruded Cliff Sides
-        if (gy === 2 || gx === 2 || tile.isDestroyed) {
+        // Sunken crater if destroyed
+        if (tile.isDestroyed) {
           this.drawTileCliffFaces(ctx, pos.x, pos.y, halfW, halfH);
         }
 
-        // Isometric Diamond Top Face
+        // Isometric Diamond Top Face with thin crisp white grid lines
         this.drawTileTopFace(ctx, pos.x, pos.y, halfW, halfH, tile, animTime);
 
-        // Hover highlight reticle
+        // Hover highlight reticle (glowing cyan / gold)
         if (this.hoverTile && this.hoverTile.x === gx && this.hoverTile.y === gy) {
-          ctx.strokeStyle = '#facc15';
+          ctx.strokeStyle = '#38bdf8';
           ctx.lineWidth = 2.5;
           ctx.beginPath();
           ctx.moveTo(pos.x, pos.y - halfH);
@@ -299,7 +625,10 @@ export class BoardRenderer {
           ctx.font = 'bold 9px monospace';
           ctx.fillStyle = '#f1f5f9';
           ctx.textAlign = 'center';
-          ctx.fillText(tile.baseCard.name, pos.x, pos.y - 28);
+          ctx.fillText(tile.baseCard.name, pos.x, pos.y - 30);
+        } else if (gx === 1 && gy === 1 && !tile.isDestroyed) {
+          // Starting Castle Keep on the center plot if empty
+          this.drawStartingKeep(ctx, pos.x, pos.y, animTime);
         } else if (tile.isDestroyed) {
           ctx.font = 'bold 9px monospace';
           ctx.fillStyle = '#ef4444';
@@ -371,6 +700,178 @@ export class BoardRenderer {
     ctx.stroke();
   }
 
+  private drawStartingKeep(ctx: CanvasRenderingContext2D, x: number, y: number, animTime: number): void {
+    ctx.save();
+    ctx.translate(x, y - 8);
+
+    // Ground contact shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 28, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Stone Castle Base
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(-22, -26, 44, 30);
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-22, -26, 44, 30);
+
+    // Stone courses & brick accents
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(-18, -22, 10, 4);
+    ctx.fillRect(8, -22, 10, 4);
+    ctx.fillRect(-8, -14, 16, 4);
+    ctx.fillRect(-18, -6, 12, 4);
+
+    // Arched Keep Entrance (Portcullis)
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(0, -6, 7, Math.PI, 0);
+    ctx.lineTo(7, 4);
+    ctx.lineTo(-7, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Iron gate bars
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-4, -6); ctx.lineTo(-4, 4);
+    ctx.moveTo(0, -12); ctx.lineTo(0, 4);
+    ctx.moveTo(4, -6); ctx.lineTo(4, 4);
+    ctx.moveTo(-6, -1); ctx.lineTo(6, -1);
+    ctx.stroke();
+
+    // Castle Battlements (Crenellations)
+    const merlons = [-22, -10, 2, 14];
+    ctx.fillStyle = '#64748b';
+    for (const mx of merlons) {
+      ctx.fillRect(mx, -34, 8, 8);
+      ctx.strokeRect(mx, -34, 8, 8);
+    }
+
+    // Royal Banner / Pennant Pole
+    const flap = Math.sin(animTime * 8) * 3;
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -34);
+    ctx.lineTo(0, -52);
+    ctx.stroke();
+
+    // Flying Royal Flag
+    ctx.fillStyle = '#2563eb';
+    ctx.beginPath();
+    ctx.moveTo(0, -52);
+    ctx.lineTo(16, -48 + flap);
+    ctx.lineTo(0, -44);
+    ctx.closePath();
+    ctx.fill();
+
+    // Gold Crown Emblem on Flag
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(4, -49 + flap * 0.5, 4, 3);
+
+    // Label
+    ctx.font = 'bold 9px monospace';
+    ctx.fillStyle = '#fef08a';
+    ctx.textAlign = 'center';
+    ctx.fillText('ROYAL KEEP', 0, -40);
+
+    ctx.restore();
+  }
+
+  private drawTroopBattalion(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    tile: TilePlot,
+    animTime: number
+  ): void {
+    const card = tile.baseCard!;
+    const stackLevel = 1 + tile.stack.length;
+
+    // Formation: 4 rows x 4 cols = 16 mini troops
+    const isArcher = card.id.includes('archer');
+    const isKnight = card.id.includes('knight') || card.id.includes('mercenary');
+
+    const halfW = this.tileW / 2;
+    const halfH = this.tileH / 2;
+
+    // Render 16 mini soldiers in isometric tile grid
+    for (let row = -1.5; row <= 1.5; row += 1) {
+      for (let col = -1.5; col <= 1.5; col += 1) {
+        // Isometric offset within tile diamond
+        const ox = (col - row) * (halfW * 0.22);
+        const oy = (col + row) * (halfH * 0.22) - 4;
+
+        const bob = Math.sin(animTime * 8 + (row + 2) * 1.5 + (col + 2) * 0.8) * 1.5;
+
+        ctx.save();
+        ctx.translate(x + ox, y + oy + bob);
+
+        // Mini troop ground shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, 2, 4, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (isArcher) {
+          // Mini Archer (Green Cloak, Wooden Bow)
+          ctx.fillStyle = '#15803d';
+          ctx.fillRect(-2, -7, 4, 6);
+          ctx.fillStyle = '#166534';
+          ctx.fillRect(-3, -10, 6, 4); // Hood
+          ctx.strokeStyle = '#ca8a04';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(3, -5, 3.5, -Math.PI / 2, Math.PI / 2); // Mini Bow
+          ctx.stroke();
+        } else if (isKnight) {
+          // Mini Knight (Plate Armor, Yellow Plume, Lance)
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(-3, -8, 6, 7);
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(-3, -11, 6, 4); // Helmet
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(0, -13, 2, 3); // Plume
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(3, 0); ctx.lineTo(5, -12); // Lance
+          ctx.stroke();
+        } else {
+          // Mini Footman / Soldier (Blue Tunic, Shield, Sword)
+          ctx.fillStyle = '#1d4ed8';
+          ctx.fillRect(-2.5, -7, 5, 6);
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(-2.5, -10, 5, 3.5); // Helmet
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(-4.5, -6, 2.5, 4.5); // Shield
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(2.5, -8, 1.5, 6); // Sword
+        }
+
+        ctx.restore();
+      }
+    }
+
+    // THE ICONIC 9 KINGS BOLD CENTRAL TROOP COUNT BADGE
+    const baseCount = isArcher ? 58 : isKnight ? 78 : 24;
+    const troopCount = baseCount * stackLevel + (tile.x * 12 + tile.y * 16);
+
+    ctx.save();
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3.8;
+    ctx.strokeText(String(troopCount), x, y - 6);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(String(troopCount), x, y - 6);
+    ctx.restore();
+  }
+
   private drawTileTopFace(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -415,32 +916,32 @@ export class BoardRenderer {
           grassGrad.addColorStop(0.5, '#3d2b1e');
           grassGrad.addColorStop(1, '#271a12');
         } else {
-          grassGrad.addColorStop(0, '#388e3c');
-          grassGrad.addColorStop(0.4, '#2e7d32');
-          grassGrad.addColorStop(1, '#1b5e20');
+          grassGrad.addColorStop(0, '#437c4d');
+          grassGrad.addColorStop(0.4, '#396b42');
+          grassGrad.addColorStop(1, '#2c5433');
         }
         ctx.fillStyle = grassGrad;
       } else {
-        ctx.fillStyle = isDamaged ? '#3d2b1e' : '#2e7d32';
+        ctx.fillStyle = isDamaged ? '#3d2b1e' : '#396b42';
       }
       ctx.fill();
 
-      // 2. Chiseled dark stone perimeter border
-      ctx.strokeStyle = isDamaged ? '#78350f' : '#143818';
-      ctx.lineWidth = 2.5;
+      // 2. Crisp White Diamond Grid Line (Official 9 Kings Steam Art)
+      ctx.strokeStyle = isDamaged ? '#78350f' : 'rgba(255, 255, 255, 0.75)';
+      ctx.lineWidth = 1.6;
       ctx.stroke();
 
       // 3. Sunlit inner bevel highlight on North-West and North-East edges
-      ctx.strokeStyle = isDamaged ? 'rgba(234, 179, 8, 0.25)' : 'rgba(134, 239, 172, 0.35)';
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = isDamaged ? 'rgba(234, 179, 8, 0.25)' : 'rgba(255, 255, 255, 0.25)';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.moveTo(x - halfW + 8, y);
-      ctx.lineTo(x, y - halfH + 5);
-      ctx.lineTo(x + halfW - 8, y);
+      ctx.moveTo(x - halfW + 6, y);
+      ctx.lineTo(x, y - halfH + 4);
+      ctx.lineTo(x + halfW - 6, y);
       ctx.stroke();
 
       // 4. Textured grass tufts (subtle pixel dither marks)
-      ctx.fillStyle = isDamaged ? '#713f12' : '#4ade80';
+      ctx.fillStyle = isDamaged ? '#713f12' : '#5ba869';
       ctx.fillRect(x - 24, y - 10, 3, 2);
       ctx.fillRect(x - 22, y - 12, 2, 3);
       ctx.fillRect(x + 20, y + 8, 3, 2);
@@ -448,25 +949,27 @@ export class BoardRenderer {
       ctx.fillRect(x + 6, y - 18, 2, 2);
 
       // Dark shadow grass blades
-      ctx.fillStyle = isDamaged ? '#1c1917' : '#0f3817';
+      ctx.fillStyle = isDamaged ? '#1c1917' : '#1f3d24';
       ctx.fillRect(x - 26, y - 9, 2, 2);
       ctx.fillRect(x + 18, y + 9, 2, 2);
       ctx.fillRect(x - 8, y + 16, 3, 2);
 
-      // 5. Carved stone corner brackets with rivets
+      // 5. White Diamond Corner Pips
       const corners = [
         { cx: x, cy: y - halfH },
         { cx: x + halfW, cy: y },
         { cx: x, cy: y + halfH },
         { cx: x - halfW, cy: y }
       ];
-      ctx.fillStyle = '#475569';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       for (const c of corners) {
         ctx.beginPath();
-        ctx.arc(c.cx, c.cy, 3.5, 0, Math.PI * 2);
+        ctx.moveTo(c.cx, c.cy - 2.5);
+        ctx.lineTo(c.cx + 2.5, c.cy);
+        ctx.lineTo(c.cx, c.cy + 2.5);
+        ctx.lineTo(c.cx - 2.5, c.cy);
+        ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(c.cx - 1, c.cy - 1, 2, 2);
       }
     }
     ctx.restore();
@@ -515,16 +1018,23 @@ export class BoardRenderer {
     }
 
     // 16-Bit Pixel Architectural Buildings & Units
-    if (card.id.includes('archer')) {
-      this.drawArcherSprite(ctx, animTime);
+    if (card.type === 'unit') {
+      this.drawTroopBattalion(ctx, 0, 8, tile, animTime);
+      if (card.id.includes('archer')) {
+        this.drawArcherSprite(ctx, animTime);
+      } else if (card.id.includes('knight') || card.id.includes('mercenary')) {
+        this.drawKnightSprite(ctx, animTime);
+      } else {
+        this.drawFootmanSprite(ctx, animTime);
+      }
     } else if (card.id.includes('blacksmith')) {
       this.drawBlacksmithSprite(ctx, animTime);
     } else if (card.id.includes('gold_mine') || card.id.includes('tax')) {
       this.drawGoldMineSprite(ctx, animTime);
     } else if (card.id.includes('barricade') || card.id.includes('bastion')) {
       this.drawBarricadeSprite(ctx, animTime);
-    } else if (card.id.includes('knight') || card.id.includes('mercenary')) {
-      this.drawKnightSprite(ctx, animTime);
+    } else if (card.id.includes('mill') || card.id.includes('farm') || card.id.includes('wind')) {
+      this.drawWindmillSprite(ctx, animTime);
     } else {
       this.drawFootmanSprite(ctx, animTime);
     }
@@ -571,6 +1081,60 @@ export class BoardRenderer {
     ctx.fillRect(-18, -4 + bob, 6, 9);
     ctx.fillStyle = '#fde047';
     ctx.fillRect(-10, -8 + bob, 3, 10);
+  }
+
+  private drawWindmillSprite(ctx: CanvasRenderingContext2D, animTime: number): void {
+    // Stone cylindrical base
+    ctx.fillStyle = '#475569';
+    ctx.beginPath();
+    ctx.moveTo(-10, 4);
+    ctx.lineTo(-7, -18);
+    ctx.lineTo(7, -18);
+    ctx.lineTo(10, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Thatched Conical Roof
+    ctx.fillStyle = '#78350f';
+    ctx.beginPath();
+    ctx.moveTo(-9, -18);
+    ctx.lineTo(0, -28);
+    ctx.lineTo(9, -18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#451a03';
+    ctx.stroke();
+
+    // Rotating 4-Blade Wooden Sails
+    const rot = animTime * 3;
+    ctx.save();
+    ctx.translate(0, -18);
+    ctx.rotate(rot);
+
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -18);
+      ctx.stroke();
+
+      // Canvas Sail Cloth
+      ctx.fillStyle = '#fef3c7';
+      ctx.fillRect(1, -16, 5, 12);
+
+      ctx.rotate(Math.PI / 2);
+    }
+
+    // Center Axle Hub
+    ctx.fillStyle = '#451a03';
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   private drawArcherSprite(ctx: CanvasRenderingContext2D, animTime: number): void {
@@ -709,7 +1273,7 @@ export class BoardRenderer {
     y: number,
     tile: TilePlot
   ): void {
-    if (tile.isDestroyed) return;
+    if (tile.isDestroyed || !tile.baseCard) return;
 
     const hpRatio = Math.max(0, tile.health / tile.maxHealth);
     const barW = 52;
