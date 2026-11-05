@@ -12,6 +12,7 @@ import { TimelineManager, MERCHANT_YEARS, WAR_MILESTONE_YEAR, PEACE_MILESTONE_YE
 import { BoardRenderer } from './render/board-renderer';
 import { CardHandUI } from './ui/card-hand-ui';
 import { MerchantUI } from './ui/merchant-ui';
+import { sound } from './sound/sound-effects';
 
 export type GameState =
   | 'KING_SELECT'
@@ -167,6 +168,8 @@ export class NineKingsGame {
 
     const success = this.grid.placeCard(targetX, targetY, card);
     if (success) {
+      sound.playCardPlace();
+      this.renderer.addShake(4, 0.15);
       this.deck.playCard(cardId);
       this.handUI.renderHand(this.deck.hand, this.deck);
       return true;
@@ -400,6 +403,12 @@ export class NineKingsGame {
 
     const result = this.combat.castKingSpell(this.playerKing.spell.id, this.gold);
     if (result.success) {
+      if (this.playerKing.spell.id === 'rally_horn') {
+        sound.playHorn();
+      } else {
+        sound.playCoin();
+      }
+      this.renderer.addShake(6, 0.25);
       this.gold -= result.cost;
       this.spellCooldownTimer = this.playerKing.spell.cooldownMax;
       this.activeSpellEffect = {
@@ -677,7 +686,7 @@ export class NineKingsGame {
         height,
         this.grid,
         this.state === 'BATTLE' ? this.combat : null,
-        timestamp,
+        timestamp / 1000,
         this.activeSpellEffect
       );
 

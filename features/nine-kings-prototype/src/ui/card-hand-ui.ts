@@ -71,12 +71,10 @@ export class CardHandUI {
     if (!this.selectedCardId || !this.canvas) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    const px = (event.clientX - rect.left) * scaleX;
-    const py = (event.clientY - rect.top) * scaleY;
+    const px = event.clientX - rect.left;
+    const py = event.clientY - rect.top;
 
-    const tile = this.getTileAtPixel(px, py, this.canvas.width, this.canvas.height);
+    const tile = this.getTileAtPixel(px, py, rect.width, rect.height);
     if (tile && this.onPlaceCard) {
       const success = this.onPlaceCard(this.selectedCardId, tile.x, tile.y);
       if (success) {
@@ -98,12 +96,10 @@ export class CardHandUI {
     if (!cardId || !this.canvas) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    const px = (event.clientX - rect.left) * scaleX;
-    const py = (event.clientY - rect.top) * scaleY;
+    const px = event.clientX - rect.left;
+    const py = event.clientY - rect.top;
 
-    const tile = this.getTileAtPixel(px, py, this.canvas.width, this.canvas.height);
+    const tile = this.getTileAtPixel(px, py, rect.width, rect.height);
     if (tile && this.onPlaceCard) {
       const success = this.onPlaceCard(cardId, tile.x, tile.y);
       if (success && this.selectedCardId === cardId) {
@@ -125,22 +121,22 @@ export class CardHandUI {
     if (baseline < 2) {
       if (hand.length === 0) {
         this.leaveTwoBadge.className = 'status-badge ready';
-        this.leaveTwoBadge.textContent = 'Ready for battle! Hand empty.';
+        this.leaveTwoBadge.textContent = 'READY FOR BATTLE (HAND EMPTY)';
       } else {
         this.leaveTwoBadge.className = 'status-badge warning';
-        this.leaveTwoBadge.textContent = `Play ${hand.length} more card${hand.length > 1 ? 's' : ''} (Rule: Empty hand)`;
+        this.leaveTwoBadge.textContent = `PLAY ${hand.length} MORE CARD${hand.length > 1 ? 'S' : ''} (EMPTY HAND)`;
       }
     } else {
       if (hand.length === 2) {
         this.leaveTwoBadge.className = 'status-badge ready';
-        this.leaveTwoBadge.textContent = 'Ready for battle! Exactly 2 cards remaining.';
+        this.leaveTwoBadge.textContent = 'READY FOR BATTLE (EXACTLY 2 CARDS LEFT)';
       } else if (hand.length > 2) {
         const remainingToPlay = hand.length - 2;
         this.leaveTwoBadge.className = 'status-badge warning';
-        this.leaveTwoBadge.textContent = `Play ${remainingToPlay} more card${remainingToPlay > 1 ? 's' : ''} (Rule: Leave exactly 2 in hand)`;
+        this.leaveTwoBadge.textContent = `PLAY ${remainingToPlay} MORE CARD${remainingToPlay > 1 ? 'S' : ''} (LEAVE 2 IN HAND)`;
       } else {
         this.leaveTwoBadge.className = 'status-badge warning';
-        this.leaveTwoBadge.textContent = `Too few cards (${hand.length} remaining). Rule: Leave exactly 2 in hand!`;
+        this.leaveTwoBadge.textContent = `TOO FEW CARDS (${hand.length}). RULE: LEAVE EXACTLY 2!`;
       }
     }
 
@@ -164,10 +160,10 @@ export class CardHandUI {
     const spellCostEl = this.spellBtn.querySelector('.spell-cost');
 
     if (spellNameEl) {
-      spellNameEl.textContent = spell.name;
+      spellNameEl.textContent = spell.name.toUpperCase();
     }
     if (spellCostEl) {
-      spellCostEl.textContent = spell.goldCost > 0 ? `Cost: ${spell.goldCost}g` : 'Free';
+      spellCostEl.textContent = spell.goldCost > 0 ? `Cost: ${spell.goldCost}g` : 'FREE';
     }
 
     if (!isCombat) {
@@ -185,8 +181,20 @@ export class CardHandUI {
     }
   }
 
+  private getCardIcon(card: Card): string {
+    if (card.id.includes('archer')) return '🏹';
+    if (card.id.includes('barricade') || card.id.includes('bastion')) return '🛡️';
+    if (card.id.includes('blacksmith')) return '⚒️';
+    if (card.id.includes('gold_mine') || card.id.includes('tax')) return '💰';
+    if (card.id.includes('knight') || card.id.includes('mercenary')) return '⚔️';
+    if (card.enchantmentEffect === 'static') return '⚡';
+    if (card.enchantmentEffect === 'combustion') return '🔥';
+    if (card.enchantmentEffect === 'steel_coat') return '✨';
+    return '🏰';
+  }
+
   /**
-   * Renders the cards in hand into the DOM.
+   * Renders the authentic Tarot-styled cards in hand into the DOM.
    */
   public renderHand(cards: Card[], deckManager: DeckManager): void {
     if (!this.handContainer) return;
@@ -198,27 +206,21 @@ export class CardHandUI {
       cardEl.draggable = true;
       cardEl.dataset.cardId = card.id;
 
-      let statText = '';
-      if (card.healthBonus && card.attackBonus) {
-        statText = `<div class="card-stats"><span>HP +${card.healthBonus}</span> <span>ATK +${card.attackBonus}</span></div>`;
-      } else if (card.healthBonus) {
-        statText = `<div class="card-stats"><span>HP +${card.healthBonus}</span></div>`;
-      } else if (card.attackBonus) {
-        statText = `<div class="card-stats"><span>ATK +${card.attackBonus}</span></div>`;
-      } else if (card.adjacencyBuff?.goldPerYear) {
-        statText = `<div class="card-stats text-gold">+${card.adjacencyBuff.goldPerYear}g/yr</div>`;
-      } else if (card.enchantmentEffect) {
-        statText = `<div class="card-stats text-enchant">${card.enchantmentEffect.toUpperCase()}</div>`;
-      }
+      let typeClass = 'tag-unit';
+      if (card.type === 'building') typeClass = 'tag-building';
+      if (card.type === 'enchantment') typeClass = 'tag-enchantment';
+      if (card.type === 'economy') typeClass = 'tag-economy';
+
+      const icon = this.getCardIcon(card);
 
       cardEl.innerHTML = `
-        <div class="card-top-row" style="display:flex; justify-content:space-between; align-items:center;">
-          <span class="card-cost">${card.cost > 0 ? `${card.cost}g` : 'Free'}</span>
-          <span class="card-type-tag type-${card.type}" style="font-size:9px; text-transform:uppercase; opacity:0.8;">${card.type}</span>
+        <div class="card-header-row">
+          <span class="card-type-tag ${typeClass}">${card.type}</span>
+          <span class="card-cost-gem">${card.cost > 0 ? `${card.cost}g` : 'FREE'}</span>
         </div>
+        <div class="card-art-box">${icon}</div>
         <div class="card-title">${card.name}</div>
         <div class="card-desc">${card.description}</div>
-        ${statText}
       `;
 
       cardEl.addEventListener('click', (e) => {

@@ -107,47 +107,43 @@ describe('BoardRenderer', () => {
     });
 
     it('identifies tile coordinate from pixel position correctly', () => {
-      const bounds = renderer.getGridBounds(width, height);
-
       // Center of (0, 0)
-      const tile00 = renderer.getTileAtPixel(bounds.startX + 20, bounds.startY + 20, width, height);
+      const p00 = renderer.gridToPixel(0, 0, width, height);
+      const tile00 = renderer.getTileAtPixel(p00.x, p00.y, width, height);
       expect(tile00).toEqual({ x: 0, y: 0 });
 
       // Center of (1, 1)
-      const step = 90 + 8;
-      const tile11 = renderer.getTileAtPixel(bounds.startX + step + 20, bounds.startY + step + 20, width, height);
+      const p11 = renderer.gridToPixel(1, 1, width, height);
+      const tile11 = renderer.getTileAtPixel(p11.x, p11.y, width, height);
       expect(tile11).toEqual({ x: 1, y: 1 });
 
       // Center of (2, 2)
-      const tile22 = renderer.getTileAtPixel(bounds.startX + step * 2 + 50, bounds.startY + step * 2 + 50, width, height);
+      const p22 = renderer.gridToPixel(2, 2, width, height);
+      const tile22 = renderer.getTileAtPixel(p22.x, p22.y, width, height);
       expect(tile22).toEqual({ x: 2, y: 2 });
     });
 
     it('returns null when clicking in tile gaps or outside bounds', () => {
-      const bounds = renderer.getGridBounds(width, height);
+      // Click far outside to the left/top
+      expect(renderer.getTileAtPixel(20, 20, width, height)).toBeNull();
 
-      // Click in the horizontal gap between col 0 and col 1 (startX + 90 + 3)
-      const inGap = renderer.getTileAtPixel(bounds.startX + 93, bounds.startY + 20, width, height);
-      expect(inGap).toBeNull();
+      // Click far outside to the right
+      expect(renderer.getTileAtPixel(width - 20, 20, width, height)).toBeNull();
 
-      // Click outside to the left
-      expect(renderer.getTileAtPixel(bounds.startX - 10, bounds.startY + 20, width, height)).toBeNull();
-
-      // Click outside below
-      expect(renderer.getTileAtPixel(bounds.startX + 20, bounds.startY + bounds.totalHeight + 10, width, height)).toBeNull();
+      // Click far below
+      expect(renderer.getTileAtPixel(width / 2, height - 20, width, height)).toBeNull();
     });
 
     it('converts world grid coordinates to canvas pixel space accurately', () => {
-      const bounds = renderer.getGridBounds(width, height);
-
-      // (0, 0) center
+      // (0, 0) center in isometric projection
       const p00 = renderer.gridToPixel(0, 0, width, height);
-      expect(p00.x).toBe(bounds.startX + 45);
-      expect(p00.y).toBe(bounds.startY + 45);
+      expect(p00.x).toBe(width / 2);
+      expect(p00.y).toBe(height / 2 - 30);
 
       // Off-grid North spawn (-1.5 y)
       const pNorth = renderer.gridToPixel(0, -1.5, width, height);
-      expect(pNorth.y).toBe(bounds.startY + 45 - 1.5 * 98);
+      expect(pNorth.x).toBe(481);
+      expect(pNorth.y).toBe(229.5);
     });
   });
 
