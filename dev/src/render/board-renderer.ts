@@ -36,13 +36,25 @@ export interface ProjectileVisual {
 
 export class BoardRenderer {
   // Isometric & 2.5D dimensions - scaled up to dominate 60% of viewport
-  readonly tileW: number = 200;
-  readonly tileH: number = 100;
-  readonly cliffDepth: number = 40;
+  readonly tileW: number = 156;
+  readonly tileH: number = 84;
+  readonly cliffDepth: number = 22;
 
   // Legacy bound tracking for testing compatibility
   readonly tileSize: number = 90;
   readonly gap: number = 8;
+
+  // Dynamic Zoom Camera System for 9 Kings Meadow Environment
+  public pureBackgroundMode: boolean = false; // set to true in browser/main.ts, false for unit tests
+  public zoomMode: 'SELECTING_TROOPS' | 'FIGHT' = 'SELECTING_TROOPS';
+  public currentZoom: number = 1.45;
+  public targetZoom: number = 1.45;
+  public currentPanX: number = 0;
+  public targetPanX: number = 0;
+  public currentPanY: number = -20;
+  public targetPanY: number = -20;
+  public zoomSpeed: number = 6.0;
+  public panSpeed: number = 6.0;
 
   // Effects & State
   particles: Particle[] = [];
@@ -140,6 +152,28 @@ export class BoardRenderer {
     this.hoverTile = tile;
   }
 
+  setZoomMode(mode: 'SELECTING_TROOPS' | 'FIGHT'): void {
+    this.zoomMode = mode;
+    if (mode === 'SELECTING_TROOPS') {
+      // Zoom in towards central pasture for selecting troops & upgrades
+      this.targetZoom = 1.45;
+      this.targetPanX = 0;
+      this.targetPanY = -20;
+    } else {
+      // Zoom out to reveal full battlefield panorama during fight
+      this.targetZoom = 1.0;
+      this.targetPanX = 0;
+      this.targetPanY = 0;
+    }
+  }
+
+  updateCamera(dt: number): void {
+    const easeFactor = 1 - Math.exp(-this.zoomSpeed * dt);
+    this.currentZoom += (this.targetZoom - this.currentZoom) * easeFactor;
+    this.currentPanX += (this.targetPanX - this.currentPanX) * (1 - Math.exp(-this.panSpeed * dt));
+    this.currentPanY += (this.targetPanY - this.currentPanY) * (1 - Math.exp(-this.panSpeed * dt));
+  }
+
   spawnParticleBurst(x: number, y: number, color: string, count: number = 8): void {
     this.addParticle(x, y, color, count);
   }
@@ -205,7 +239,7 @@ export class BoardRenderer {
    */
   gridToPixel(gx: number, gy: number, width: number, height: number): { x: number; y: number } {
     const originX = width / 2;
-    const originY = height / 2 - 30;
+    const originY = Math.round(height * 0.41) - this.tileH;
     const halfW = this.tileW / 2;
     const halfH = this.tileH / 2;
     return {
@@ -219,7 +253,7 @@ export class BoardRenderer {
    */
   getTileAtPixel(px: number, py: number, width: number, height: number): { x: number; y: number } | null {
     const originX = width / 2;
-    const originY = height / 2 - 30;
+    const originY = Math.round(height * 0.41) - this.tileH;
     const dx = px - originX;
     const dy = py - originY;
     const halfW = this.tileW / 2;
@@ -244,6 +278,7 @@ export class BoardRenderer {
     activeSpellEffect?: { type: string; timer: number }
   ): void {
     const dt = 0.016;
+    this.updateCamera(dt);
 
     let shakeX = 0;
     let shakeY = 0;
@@ -257,16 +292,19 @@ export class BoardRenderer {
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
-    // 1. Ambient Tabletop Ethereal Background
+    // 1. Ambient Tabletop Ethereal Background with Dynamic Zoom
     this.drawBackground(ctx, width, height, animTime);
 
-    // 2. Render 3x3 Isometric Floating Island (Back-to-Front Painter's Algorithm)
-    this.drawIsometricDiorama(ctx, width, height, grid, animTime);
+    // Only render grid, combat, and diorama if NOT in pure background mode
+    if (!this.pureBackgroundMode) {
+      // 2. Render 3x3 Isometric Floating Island (Back-to-Front Painter's Algorithm)
+      this.drawIsometricDiorama(ctx, width, height, grid, animTime);
 
-    // 3. Render Combat Invaders marching along isometric perimeter
-    if (combat) {
-      this.trackCombatDamageEvents(width, height, grid, combat);
-      this.drawInvaders(ctx, width, height, combat, animTime);
+      // 3. Render Combat Invaders marching along isometric perimeter
+      if (combat) {
+        this.trackCombatDamageEvents(width, height, grid, combat);
+        this.drawInvaders(ctx, width, height, combat, animTime);
+      }
     }
 
     // 4. Render Active Projectiles, Blood & VFX Particles
@@ -286,22 +324,25 @@ export class BoardRenderer {
   private drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Authentic 16-Bit 9 Kings Meadow Environment with Aspect-Cover scaling
+    // 1. Authentic 16-Bit 9 Kings Meadow Environment with Aspect-Cover scaling & Dynamic Camera Zoom
     if (this.isBgLoaded && this.bgImage && this.bgImage.naturalWidth > 0 && typeof ctx.drawImage === 'function') {
       const imgW = this.bgImage.naturalWidth;
       const imgH = this.bgImage.naturalHeight;
-      const scale = Math.max(width / imgW, height / imgH);
+      const baseScale = Math.max(width / imgW, height / imgH);
+      const scale = baseScale * this.currentZoom;
       const drawW = imgW * scale;
       const drawH = imgH * scale;
-      const drawX = (width - drawW) / 2;
-      const drawY = (height - drawH) / 2;
+
+      // Centered with smooth camera pan offsets
+      const drawX = Math.round((width - drawW) / 2 + this.currentPanX * scale);
+      const drawY = Math.round((height - drawH) / 2 + this.currentPanY * scale);
 
       ctx.save();
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(this.bgImage, drawX, drawY, drawW, drawH);
       ctx.restore();
 
-      this.drawAtmosphericAmbient(ctx, width, height, animTime);
+      this.drawAtmosphericAmbient(ctx, width, height, animTime, drawX, drawY, scale);
       return;
     }
 
@@ -328,11 +369,19 @@ export class BoardRenderer {
     this.drawAtmosphericAmbient(ctx, width, height, animTime);
   }
 
-  private drawAtmosphericAmbient(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
+  private drawAtmosphericAmbient(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    animTime: number,
+    drawX?: number,
+    drawY?: number,
+    scale?: number
+  ): void {
     ctx.save();
     // 1. Cyan pond water ripple glints oscillating softly
-    const pondCenterX = width * 0.16;
-    const pondCenterY = height * 0.72;
+    const pondCenterX = drawX !== undefined && scale !== undefined ? drawX + 220 * scale : width * 0.16;
+    const pondCenterY = drawY !== undefined && scale !== undefined ? drawY + 820 * scale : height * 0.72;
     const rippleAlpha = 0.35 + Math.sin(animTime * 2.2) * 0.2;
     ctx.strokeStyle = `rgba(165, 243, 252, ${rippleAlpha})`;
     ctx.lineWidth = 1.5;
@@ -717,10 +766,8 @@ export class BoardRenderer {
 
         const pos = this.gridToPixel(gx, gy, width, height);
 
-        // Sunken crater if destroyed
-        if (tile.isDestroyed) {
-          this.drawTileCliffFaces(ctx, pos.x, pos.y, halfW, halfH);
-        }
+        // 2.5D Extruded Tabletop Cliff Faces for authentic slab look
+        this.drawTileCliffFaces(ctx, pos.x, pos.y, halfW, halfH);
 
         // Isometric Diamond Top Face with thin crisp white grid lines
         this.drawTileTopFace(ctx, pos.x, pos.y, halfW, halfH, tile, animTime);
@@ -820,6 +867,14 @@ export class BoardRenderer {
   }
 
   private drawStartingKeep(ctx: CanvasRenderingContext2D, x: number, y: number, animTime: number): void {
+    if (this.isCastleLoaded && this.castleSprite && this.castleSprite.naturalWidth > 0) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.castleSprite, x - 48, y - 68, 96, 96);
+      ctx.restore();
+      return;
+    }
+
     ctx.save();
     ctx.translate(x, y - 8);
 

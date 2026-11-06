@@ -70,6 +70,7 @@ export class NineKingsGame {
     this.combat = new CombatEngine();
     this.timeline = new TimelineManager(1, ['king_of_greed']);
     this.renderer = new BoardRenderer();
+    this.renderer.pureBackgroundMode = true; // Display pure living environment background without cards or grid
 
     // Initialize Card Hand UI
     this.handUI = new CardHandUI({
@@ -89,6 +90,7 @@ export class NineKingsGame {
 
     this.initCanvasResize();
     this.initMouseTracking();
+    this.initCameraControls();
     this.startNewGame(this.playerKing.id);
     this.startAnimationLoop();
   }
@@ -137,6 +139,97 @@ export class NineKingsGame {
     window.addEventListener('resize', resize);
     // Initial call
     resize();
+  }
+
+  private initCameraControls(): void {
+    const btnPlanning = document.getElementById('btn-zoom-planning');
+    const btnBattle = document.getElementById('btn-zoom-battle');
+    const modeLabel = document.getElementById('current-mode-label');
+
+    const updateUI = () => {
+      if (this.renderer.zoomMode === 'SELECTING_TROOPS') {
+        btnPlanning?.classList.add('active');
+        btnBattle?.classList.remove('active');
+        if (modeLabel) modeLabel.textContent = 'SELECTING TROOPS & UPGRADES';
+      } else {
+        btnBattle?.classList.add('active');
+        btnPlanning?.classList.remove('active');
+        if (modeLabel) modeLabel.textContent = 'FIGHT IN PROGRESS';
+      }
+    };
+
+    btnPlanning?.addEventListener('click', () => {
+      sound.playCardSelect();
+      this.renderer.setZoomMode('SELECTING_TROOPS');
+      updateUI();
+    });
+
+    btnBattle?.addEventListener('click', () => {
+      sound.playHorn();
+      this.renderer.setZoomMode('FIGHT');
+      updateUI();
+    });
+
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        const next = this.renderer.zoomMode === 'SELECTING_TROOPS' ? 'FIGHT' : 'SELECTING_TROOPS';
+        if (next === 'FIGHT') sound.playHorn(); else sound.playCardSelect();
+        this.renderer.setZoomMode(next);
+        updateUI();
+      } else if (e.key === '1' || e.code === 'KeyP') {
+        sound.playCardSelect();
+        this.renderer.setZoomMode('SELECTING_TROOPS');
+        updateUI();
+      } else if (e.key === '2' || e.code === 'KeyB') {
+        sound.playHorn();
+        this.renderer.setZoomMode('FIGHT');
+        updateUI();
+      }
+    });
+
+    // Mouse wheel zoom
+    if (this.canvas) {
+      this.canvas.addEventListener('wheel', (e: WheelEvent) => {
+        e.preventDefault();
+        const delta = e.deltaY * -0.0015;
+        this.renderer.targetZoom = Math.min(2.4, Math.max(0.9, this.renderer.targetZoom + delta));
+        if (this.renderer.targetZoom > 1.2) {
+          this.renderer.zoomMode = 'SELECTING_TROOPS';
+        } else {
+          this.renderer.zoomMode = 'FIGHT';
+        }
+        updateUI();
+      }, { passive: false });
+
+      // Interactive drag-pan
+      let isDragging = false;
+      let startX = 0;
+      let startY = 0;
+
+      this.canvas.addEventListener('mousedown', (e: MouseEvent) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+      });
+
+      window.addEventListener('mousemove', (e: MouseEvent) => {
+        if (!isDragging) return;
+        const dx = (e.clientX - startX) * 0.5;
+        const dy = (e.clientY - startY) * 0.5;
+        startX = e.clientX;
+        startY = e.clientY;
+        this.renderer.targetPanX += dx / this.renderer.currentZoom;
+        this.renderer.targetPanY += dy / this.renderer.currentZoom;
+      });
+
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+    }
+
+    // Set initial UI state
+    updateUI();
   }
 
   private initMouseTracking(): void {

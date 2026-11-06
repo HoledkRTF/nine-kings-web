@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>9 Kings - Authentic Living Background</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Fullscreen Canvas Rendering Pure 9 Kings Meadow, Perimeter Wall, Pine Forest & Pond -->
+    <div id="canvas-wrapper">
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- Dynamic Zoom & Camera Mode Controller -->
+    <div id="camera-controller-hud">
+      <div class="camera-hud-title">
+        <span class="hud-crown">👑</span> 9 KINGS &bull; CAMERA CONTROLLER <span class="hud-crown">👑</span>
+      </div>
+      <div class="camera-mode-buttons">
+        <button id="btn-zoom-planning" class="camera-btn active" title="Press [1] or [P] to zoom in for troop selection">
+          <span class="mode-icon">⚔️</span>
+          <span class="mode-name">SELECTING TROOPS & UPGRADES</span>
+          <span class="mode-zoom">1.45&times; ZOOM</span>
+        </button>
+        <button id="btn-zoom-battle" class="camera-btn" title="Press [2] or [B] to zoom out for full combat panorama">
+          <span class="mode-icon">🛡️</span>
+          <span class="mode-name">FIGHT IN PROGRESS</span>
+          <span class="mode-zoom">1.0&times; ZOOM</span>
+        </button>
+      </div>
+      <div class="camera-hint-bar">
+        <span class="hint-pill"><kbd>SPACE</kbd> Toggle</span>
+        <span class="hint-pill"><kbd>1</kbd> / <kbd>2</kbd> Mode</span>
+        <span class="hint-pill"><kbd>Scroll</kbd> Zoom</span>
+        <span class="hint-pill"><kbd>Drag</kbd> Pan</span>
+        <div class="mode-status-container">
+          STATUS: <span id="current-mode-label" class="mode-status-highlight">SELECTING TROOPS & UPGRADES</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden Gameplay Hooks (Preserves full codebase interface compatibility) -->
+    <div id="gameplay-dom-hooks" style="display: none;" aria-hidden="true">
+      <span id="gold-counter">25</span>
+      <span id="breach-counter">0 / 3</span>
+      <span id="year-counter">1</span>
+      <div id="timeline-track"></div>
+      <button id="cast-spell-btn"></button>
+      <div id="bottom-ui-container">
+        <div id="leave-two-status"></div>
+        <button id="end-year-btn"></button>
+        <div id="card-hand"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

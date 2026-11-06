@@ -144,12 +144,12 @@ describe('BoardRenderer', () => {
       // (0, 0) center in isometric projection
       const p00 = renderer.gridToPixel(0, 0, width, height);
       expect(p00.x).toBe(width / 2);
-      expect(p00.y).toBe(height / 2 - 30);
+      expect(p00.y).toBe(Math.round(height * 0.41) - renderer.tileH);
 
       // Off-grid North spawn (-1.5 y)
       const pNorth = renderer.gridToPixel(0, -1.5, width, height);
-      expect(pNorth.x).toBe(550);
-      expect(pNorth.y).toBe(195);
+      expect(pNorth.x).toBe(400 + 1.5 * (renderer.tileW / 2));
+      expect(pNorth.y).toBe(Math.round(height * 0.41) - renderer.tileH - 1.5 * (renderer.tileH / 2));
     });
   });
 
@@ -285,6 +285,42 @@ describe('BoardRenderer', () => {
         expect.any(Number)
       );
       expect(mockCtx.imageSmoothingEnabled).toBe(false);
+    });
+
+    it('toggles camera zoom between selecting troops mode (1.45x) and fight mode (1.0x)', () => {
+      renderer.setZoomMode('SELECTING_TROOPS');
+      expect(renderer.zoomMode).toBe('SELECTING_TROOPS');
+      expect(renderer.targetZoom).toBe(1.45);
+      expect(renderer.targetPanY).toBe(-20);
+
+      renderer.setZoomMode('FIGHT');
+      expect(renderer.zoomMode).toBe('FIGHT');
+      expect(renderer.targetZoom).toBe(1.0);
+      expect(renderer.targetPanY).toBe(0);
+    });
+
+    it('interpolates camera zoom smoothly with delta-time easing', () => {
+      renderer.currentZoom = 1.0;
+      renderer.targetZoom = 1.45;
+      renderer.updateCamera(0.1);
+
+      expect(renderer.currentZoom).toBeGreaterThan(1.0);
+      expect(renderer.currentZoom).toBeLessThan(1.45);
+
+      // Multiple frames converge to target
+      for (let i = 0; i < 60; i++) {
+        renderer.updateCamera(0.016);
+      }
+      expect(renderer.currentZoom).toBeCloseTo(1.45, 1);
+    });
+
+    it('skips grid and platform drawing when pureBackgroundMode is enabled', () => {
+      renderer.pureBackgroundMode = true;
+      grid.placeCard(0, 0, TEST_UNIT_CARD);
+
+      renderer.render(mockCtx, width, height, grid, null, 1.0);
+      // Footman text should NOT be rendered in pure background mode
+      expect(mockCtx.fillText).not.toHaveBeenCalledWith(expect.stringContaining('Footman'), expect.any(Number), expect.any(Number));
     });
   });
 });

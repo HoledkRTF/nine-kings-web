@@ -6,3 +6,8 @@ test_*.png
 crop_*.png
 patch_*.png
 zoom_grass.png
+thumb_*.png
+inspect_*.png
+browser_preview_*.png
+full_top_strip.png
+tree_sample_*.png

@@ -571,3 +571,134 @@ canvas {
   border-radius: 4px;
   cursor: pointer;
 }
+
+
+/* ==========================================================================
+   CAMERA CONTROLLER HUD (DYNAMIC ZOOM FOR TROOP SELECTION & FIGHT MODES)
+   ========================================================================== */
+#camera-controller-hud {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 2px solid #b45309;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.85), 0 0 16px rgba(245, 158, 11, 0.3);
+  border-radius: 12px;
+  padding: 10px 20px;
+  backdrop-filter: blur(6px);
+  user-select: none;
+}
+
+.camera-hud-title {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 900;
+  color: #fde68a;
+  letter-spacing: 1.5px;
+  text-shadow: 1px 1px 0 #000, 0 0 8px rgba(245, 158, 11, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-crown {
+  font-size: 14px;
+}
+
+.camera-mode-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.camera-btn {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid #475569;
+  color: #94a3b8;
+  font-family: 'Silkscreen', 'Press Start 2P', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.camera-btn:hover {
+  border-color: #f59e0b;
+  color: #f1f5f9;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.4);
+}
+
+.camera-btn.active {
+  background: linear-gradient(180deg, #b45309 0%, #78350f 100%);
+  border-color: #fde68a;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.mode-icon {
+  font-size: 13px;
+}
+
+.mode-name {
+  letter-spacing: 0.5px;
+}
+
+.mode-zoom {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 9px;
+  color: #fde68a;
+}
+
+.camera-hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 8px;
+  color: #94a3b8;
+}
+
+.hint-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hint-pill kbd {
+  background: #334155;
+  border: 1px solid #64748b;
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: #f8fafc;
+  font-size: 8px;
+  font-weight: 700;
+  box-shadow: 0 2px 0 #1e293b;
+}
+
+.mode-status-container {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid #475569;
+  color: #cbd5e1;
+}
+
+.mode-status-highlight {
+  color: #4ade80;
+  font-weight: 700;
+}
