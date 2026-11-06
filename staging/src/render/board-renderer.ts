@@ -764,17 +764,6 @@ export class BoardRenderer {
   }
 
   private drawStartingKeep(ctx: CanvasRenderingContext2D, x: number, y: number, animTime: number): void {
-    if (this.isCastleLoaded && this.castleSprite && typeof ctx.drawImage === 'function') {
-      ctx.save();
-      ctx.drawImage(this.castleSprite, x - 70, y - 90, 140, 125);
-      ctx.font = 'bold 9px monospace';
-      ctx.fillStyle = '#fef08a';
-      ctx.textAlign = 'center';
-      ctx.fillText('ROYAL KEEP', x, y - 82);
-      ctx.restore();
-      return;
-    }
-
     ctx.save();
     ctx.translate(x, y - 8);
 
@@ -873,84 +862,61 @@ export class BoardRenderer {
     const halfW = this.tileW / 2;
     const halfH = this.tileH / 2;
 
-    // Draw authentic 16-bit battalion sprite if available
-    let drawnSprite = false;
-    if (typeof ctx.drawImage === 'function') {
-      if (isArcher && this.isArchersLoaded && this.batArchersSprite) {
+    // Render 16 mini soldiers in isometric tile grid
+    for (let row = -1.5; row <= 1.5; row += 1) {
+      for (let col = -1.5; col <= 1.5; col += 1) {
+        // Isometric offset within tile diamond
+        const ox = (col - row) * (halfW * 0.22);
+        const oy = (col + row) * (halfH * 0.22) - 4;
+
+        const bob = Math.sin(animTime * 8 + (row + 2) * 1.5 + (col + 2) * 0.8) * 1.5;
+
         ctx.save();
-        ctx.drawImage(this.batArchersSprite, x - 70, y - 75, 140, 125);
-        ctx.restore();
-        drawnSprite = true;
-      } else if (isKnight && this.isPhalanxLoaded && this.batPhalanxSprite) {
-        ctx.save();
-        ctx.drawImage(this.batPhalanxSprite, x - 85, y - 85, 170, 150);
-        ctx.restore();
-        drawnSprite = true;
-      } else if (this.isInfantryLoaded && this.batInfantrySprite) {
-        ctx.save();
-        ctx.drawImage(this.batInfantrySprite, x - 70, y - 75, 140, 125);
-        ctx.restore();
-        drawnSprite = true;
-      }
-    }
+        ctx.translate(x + ox, y + oy + bob);
 
-    if (!drawnSprite) {
-      // Render 16 mini soldiers in isometric tile grid
-      for (let row = -1.5; row <= 1.5; row += 1) {
-        for (let col = -1.5; col <= 1.5; col += 1) {
-          // Isometric offset within tile diamond
-          const ox = (col - row) * (halfW * 0.22);
-          const oy = (col + row) * (halfH * 0.22) - 4;
+        // Mini troop ground shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, 2, 4, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
 
-          const bob = Math.sin(animTime * 8 + (row + 2) * 1.5 + (col + 2) * 0.8) * 1.5;
-
-          ctx.save();
-          ctx.translate(x + ox, y + oy + bob);
-
-          // Mini troop ground shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        if (isArcher) {
+          // Mini Archer (Green Cloak, Wooden Bow)
+          ctx.fillStyle = '#15803d';
+          ctx.fillRect(-2, -7, 4, 6);
+          ctx.fillStyle = '#166534';
+          ctx.fillRect(-3, -10, 6, 4); // Hood
+          ctx.strokeStyle = '#ca8a04';
+          ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.ellipse(0, 2, 4, 2, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          if (isArcher) {
-            // Mini Archer (Green Cloak, Wooden Bow)
-            ctx.fillStyle = '#15803d';
-            ctx.fillRect(-2, -7, 4, 6);
-            ctx.fillStyle = '#166534';
-            ctx.fillRect(-3, -10, 6, 4); // Hood
-            ctx.strokeStyle = '#ca8a04';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(3, -5, 3.5, -Math.PI / 2, Math.PI / 2); // Mini Bow
-            ctx.stroke();
-          } else if (isKnight) {
-            // Mini Knight (Plate Armor, Yellow Plume, Lance)
-            ctx.fillStyle = '#94a3b8';
-            ctx.fillRect(-3, -8, 6, 7);
-            ctx.fillStyle = '#cbd5e1';
-            ctx.fillRect(-3, -11, 6, 4); // Helmet
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(0, -13, 2, 3); // Plume
-            ctx.strokeStyle = '#e2e8f0';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(3, 0); ctx.lineTo(5, -12); // Lance
-            ctx.stroke();
-          } else {
-            // Mini Footman / Soldier (Blue Tunic, Shield, Sword)
-            ctx.fillStyle = '#1d4ed8';
-            ctx.fillRect(-2.5, -7, 5, 6);
-            ctx.fillStyle = '#94a3b8';
-            ctx.fillRect(-2.5, -10, 5, 3.5); // Helmet
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(-4.5, -6, 2.5, 4.5); // Shield
-            ctx.fillStyle = '#cbd5e1';
-            ctx.fillRect(2.5, -8, 1.5, 6); // Sword
-          }
-
-          ctx.restore();
+          ctx.arc(3, -5, 3.5, -Math.PI / 2, Math.PI / 2); // Mini Bow
+          ctx.stroke();
+        } else if (isKnight) {
+          // Mini Knight (Plate Armor, Yellow Plume, Lance)
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(-3, -8, 6, 7);
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(-3, -11, 6, 4); // Helmet
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(0, -13, 2, 3); // Plume
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(3, 0); ctx.lineTo(5, -12); // Lance
+          ctx.stroke();
+        } else {
+          // Mini Footman / Soldier (Blue Tunic, Shield, Sword)
+          ctx.fillStyle = '#1d4ed8';
+          ctx.fillRect(-2.5, -7, 5, 6);
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(-2.5, -10, 5, 3.5); // Helmet
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(-4.5, -6, 2.5, 4.5); // Shield
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(2.5, -8, 1.5, 6); // Sword
         }
+
+        ctx.restore();
       }
     }
 
@@ -1118,27 +1084,13 @@ export class BoardRenderer {
     if (card.type === 'unit') {
       this.drawTroopBattalion(ctx, 0, 8, tile, animTime);
     } else if (card.id.includes('blacksmith') || card.id.includes('dispenser') || card.id.includes('shrine')) {
-      if (this.isShrineLoaded && this.shrineSprite && typeof ctx.drawImage === 'function') {
-        ctx.drawImage(this.shrineSprite, -60, -50, 120, 70);
-      } else {
-        this.drawBlacksmithSprite(ctx, animTime);
-      }
+      this.drawBlacksmithSprite(ctx, animTime);
     } else if (card.id.includes('gold_mine') || card.id.includes('tax')) {
       this.drawGoldMineSprite(ctx, animTime);
     } else if (card.id.includes('barricade') || card.id.includes('bastion')) {
       this.drawBarricadeSprite(ctx, animTime);
     } else if (card.id.includes('mill') || card.id.includes('farm') || card.id.includes('wind')) {
-      if (this.isWindmillLoaded && this.windmillSprite && typeof ctx.drawImage === 'function') {
-        ctx.drawImage(this.windmillSprite, -38, -60, 76, 88);
-      } else {
-        this.drawWindmillSprite(ctx, animTime);
-      }
-    } else if (card.id.includes('altar') || card.id.includes('temple')) {
-      if (this.isTempleLoaded && this.templeSprite && typeof ctx.drawImage === 'function') {
-        ctx.drawImage(this.templeSprite, -50, -60, 100, 104);
-      } else {
-        this.drawFootmanSprite(ctx, animTime);
-      }
+      this.drawWindmillSprite(ctx, animTime);
     } else {
       this.drawFootmanSprite(ctx, animTime);
     }
