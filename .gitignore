@@ -1,3 +1,8 @@
 node_modules/
 *.zip
 .vite/
+check_*.png
+test_*.png
+crop_*.png
+patch_*.png
+zoom_grass.png

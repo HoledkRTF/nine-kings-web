@@ -78,8 +78,13 @@ export class BoardRenderer {
       const cleanBase = base.endsWith('/') ? base : base + '/';
 
       this.bgImage = new Image();
-      this.bgImage.src = `${cleanBase}assets/env/meadow_clean_backdrop.jpg`;
+      this.bgImage.src = `${cleanBase}assets/env/meadow_clean_backdrop.png`;
       this.bgImage.onload = () => { this.isBgLoaded = true; };
+      this.bgImage.onerror = () => {
+        if (this.bgImage && !this.bgImage.src.endsWith('.jpg')) {
+          this.bgImage.src = `${cleanBase}assets/env/meadow_clean_backdrop.jpg`;
+        }
+      };
 
       this.castleSprite = new Image();
       this.castleSprite.src = `${cleanBase}assets/sprites/castle.png`;
@@ -281,9 +286,22 @@ export class BoardRenderer {
   private drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Authentic 16-Bit 9 Kings Meadow Environment
+    // 1. Authentic 16-Bit 9 Kings Meadow Environment with Aspect-Cover scaling
     if (this.isBgLoaded && this.bgImage && this.bgImage.naturalWidth > 0 && typeof ctx.drawImage === 'function') {
-      ctx.drawImage(this.bgImage, 0, 0, width, height);
+      const imgW = this.bgImage.naturalWidth;
+      const imgH = this.bgImage.naturalHeight;
+      const scale = Math.max(width / imgW, height / imgH);
+      const drawW = imgW * scale;
+      const drawH = imgH * scale;
+      const drawX = (width - drawW) / 2;
+      const drawY = (height - drawH) / 2;
+
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.bgImage, drawX, drawY, drawW, drawH);
+      ctx.restore();
+
+      this.drawAtmosphericAmbient(ctx, width, height, animTime);
       return;
     }
 
@@ -305,6 +323,44 @@ export class BoardRenderer {
 
     // 5. Circular Stone Wishing Well & Boulders
     this.drawWishingWell(ctx, width, height);
+
+    // 6. Atmospheric ambient effects
+    this.drawAtmosphericAmbient(ctx, width, height, animTime);
+  }
+
+  private drawAtmosphericAmbient(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
+    ctx.save();
+    // 1. Cyan pond water ripple glints oscillating softly
+    const pondCenterX = width * 0.16;
+    const pondCenterY = height * 0.72;
+    const rippleAlpha = 0.35 + Math.sin(animTime * 2.2) * 0.2;
+    ctx.strokeStyle = `rgba(165, 243, 252, ${rippleAlpha})`;
+    ctx.lineWidth = 1.5;
+
+    for (let i = 0; i < 3; i++) {
+      const rx = pondCenterX + Math.sin(animTime * 1.5 + i * 2) * 25;
+      const ry = pondCenterY + (i - 1) * 16 + Math.cos(animTime * 1.2 + i) * 6;
+      const rLen = 18 + i * 8;
+      ctx.beginPath();
+      ctx.moveTo(rx - rLen / 2, ry);
+      ctx.lineTo(rx + rLen / 2, ry);
+      ctx.stroke();
+    }
+
+    // 2. Translucent floating meadow pollen motes drifting with the breeze
+    const motes = 12;
+    for (let i = 0; i < motes; i++) {
+      const seedX = (i * 163.7) % width;
+      const seedY = (i * 97.3) % (height * 0.75) + height * 0.15;
+      const mx = (seedX - (animTime * 18 + i * 14)) % width;
+      const wrappedX = mx < 0 ? mx + width : mx;
+      const my = seedY + Math.sin(animTime * 1.2 + i * 1.7) * 8;
+      const moteAlpha = 0.25 + Math.sin(animTime * 2.5 + i) * 0.15;
+
+      ctx.fillStyle = i % 2 === 0 ? `rgba(254, 240, 138, ${moteAlpha})` : `rgba(255, 255, 255, ${moteAlpha * 0.8})`;
+      ctx.fillRect(Math.floor(wrappedX), Math.floor(my), 2, 2);
+    }
+    ctx.restore();
   }
 
   private drawMeadowDetails(ctx: CanvasRenderingContext2D, width: number, height: number): void {

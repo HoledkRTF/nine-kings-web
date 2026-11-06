@@ -37,6 +37,8 @@ function createMockContext(): CanvasRenderingContext2D {
     createLinearGradient: vi.fn(() => ({
       addColorStop: vi.fn(),
     })),
+    drawImage: vi.fn(),
+    imageSmoothingEnabled: true,
   } as unknown as CanvasRenderingContext2D;
 }
 
@@ -255,6 +257,34 @@ describe('BoardRenderer', () => {
       // Next frame should detect damage and spawn floating text
       renderer.render(mockCtx, width, height, grid, combat, 1.05);
       expect(mockCtx.strokeText).toHaveBeenCalledWith('-25', expect.any(Number), expect.any(Number));
+    });
+
+    it('renders procedural background fallback with wall, trees, pond, well and atmospheric motes', () => {
+      renderer.render(mockCtx, width, height, grid, null, 1.0);
+      expect(mockCtx.clearRect).toHaveBeenCalledWith(0, 0, width, height);
+      expect(mockCtx.fillRect).toHaveBeenCalled();
+      expect(mockCtx.stroke).toHaveBeenCalled();
+      expect(mockCtx.fill).toHaveBeenCalled();
+    });
+
+    it('renders image background with aspect-cover and pixel smoothing disabled when image is loaded', () => {
+      const mockImg = {
+        naturalWidth: 1920,
+        naturalHeight: 1080,
+      } as unknown as HTMLImageElement;
+
+      (renderer as any).bgImage = mockImg;
+      (renderer as any).isBgLoaded = true;
+
+      renderer.render(mockCtx, width, height, grid, null, 1.0);
+      expect(mockCtx.drawImage).toHaveBeenCalledWith(
+        mockImg,
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number)
+      );
+      expect(mockCtx.imageSmoothingEnabled).toBe(false);
     });
   });
 });
