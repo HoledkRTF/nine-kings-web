@@ -185,6 +185,11 @@ export class NineKingsGame {
         sound.playHorn();
         this.renderer.setZoomMode('FIGHT');
         updateUI();
+      } else if (e.code === 'KeyH' || e.key === 'h' || e.key === 'H') {
+        const hud = document.getElementById('camera-controller-hud');
+        if (hud) {
+          hud.style.display = hud.style.display === 'none' ? 'flex' : 'none';
+        }
       }
     });
 

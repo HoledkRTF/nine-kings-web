@@ -55,6 +55,7 @@ export class BoardRenderer {
   public targetPanY: number = -20;
   public zoomSpeed: number = 6.0;
   public panSpeed: number = 6.0;
+  private lastAnimTime: number = 0;
 
   // Effects & State
   particles: Particle[] = [];
@@ -277,7 +278,8 @@ export class BoardRenderer {
     animTime: number,
     activeSpellEffect?: { type: string; timer: number }
   ): void {
-    const dt = 0.016;
+    const dt = this.lastAnimTime > 0 ? Math.min(0.05, Math.max(0.001, animTime - this.lastAnimTime)) : 0.016;
+    this.lastAnimTime = animTime;
     this.updateCamera(dt);
 
     let shakeX = 0;
