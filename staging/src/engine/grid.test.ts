@@ -126,6 +126,67 @@ describe('KingdomGrid', () => {
     });
   });
 
+  describe('Dynamic Grid Expansion (3x3 -> 4x4)', () => {
+    it('starts at size 3 and reports canExpand = true', () => {
+      expect(grid.getSize()).toBe(3);
+      expect(grid.canExpand()).toBe(true);
+      expect(grid.getAllTiles().length).toBe(9);
+    });
+
+    it('expands grid to 4x4 with 16 plots while preserving existing cards and stacks', () => {
+      // Place card on existing tile
+      grid.placeCard(1, 1, footmanCard);
+      grid.placeCard(1, 1, footmanCard); // Lv.2 stack
+      expect(grid.getTile(1, 1)?.stack.length).toBe(1);
+
+      // Expand to 4x4
+      const expanded = grid.expandGrid(4);
+      expect(expanded).toBe(true);
+      expect(grid.getSize()).toBe(4);
+      expect(grid.canExpand()).toBe(false);
+      expect(grid.getAllTiles().length).toBe(16);
+
+      // Previous tile (1, 1) still intact with its stack and health
+      const tile11 = grid.getTile(1, 1);
+      expect(tile11?.baseCard?.id).toBe(footmanCard.id);
+      expect(tile11?.stack.length).toBe(1);
+
+      // Newly unlocked plots (x=3 or y=3) are now accessible and empty
+      expect(grid.getTile(3, 0)).not.toBeNull();
+      expect(grid.getTile(0, 3)).not.toBeNull();
+      expect(grid.getTile(3, 3)).not.toBeNull();
+      expect(grid.getTile(3, 3)?.baseCard).toBeNull();
+    });
+
+    it('allows placing cards and computing adjacency across expanded 4x4 boundaries', () => {
+      grid.expandGrid(4);
+
+      // Place blacksmith on (2, 2) and footman on (3, 2)
+      grid.placeCard(2, 2, blacksmithCard);
+      grid.placeCard(3, 2, footmanCard);
+
+      // (3, 2) is East neighbor of (2, 2), so Footman on (3, 2) receives Blacksmith adjacency buff (+25% ATK)
+      const atk = grid.getTileAttack(3, 2);
+      expect(atk).toBe(Math.round(20 * 1.25)); // 25
+    });
+
+    it('prevents expanding beyond maximum size 4', () => {
+      grid.expandGrid(4);
+      expect(grid.expandGrid(5)).toBe(false);
+      expect(grid.expandGrid(4)).toBe(false);
+    });
+
+    it('shrinks grid back to 3x3 cleanly', () => {
+      grid.expandGrid(4);
+      expect(grid.getSize()).toBe(4);
+      const shrunk = grid.shrinkGrid(3);
+      expect(shrunk).toBe(true);
+      expect(grid.getSize()).toBe(3);
+      expect(grid.getAllTiles().length).toBe(9);
+      expect(grid.getTile(3, 3)).toBeNull();
+    });
+  });
+
   describe('Basic Card Placement', () => {
     it('places a card on an empty tile and initializes its durability and stats', () => {
       const placed = grid.placeCard(1, 1, footmanCard);

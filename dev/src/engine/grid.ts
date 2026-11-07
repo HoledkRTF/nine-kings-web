@@ -8,30 +8,95 @@ export interface AdjacencyBonus {
 
 export class KingdomGrid {
   public static readonly GRID_SIZE = 3;
+  private size: number;
   private readonly tiles: TilePlot[][];
 
-  constructor() {
+  constructor(initialSize: number = 3) {
+    this.size = Math.max(3, Math.min(4, initialSize));
     this.tiles = [];
-    this.initGrid();
+    this.initGrid(this.size);
   }
 
-  private initGrid(): void {
-    for (let y = 0; y < KingdomGrid.GRID_SIZE; y++) {
+  public getSize(): number {
+    return this.size;
+  }
+
+  public canExpand(): boolean {
+    return this.size < 4;
+  }
+
+  private createEmptyTile(x: number, y: number): TilePlot {
+    return {
+      x,
+      y,
+      baseCard: null,
+      stack: [],
+      health: 0,
+      maxHealth: 0,
+      isDestroyed: false,
+      attackCooldown: 0,
+    };
+  }
+
+  private initGrid(size: number): void {
+    this.tiles.length = 0;
+    for (let y = 0; y < size; y++) {
       const row: TilePlot[] = [];
-      for (let x = 0; x < KingdomGrid.GRID_SIZE; x++) {
-        row.push({
-          x,
-          y,
-          baseCard: null,
-          stack: [],
-          health: 0,
-          maxHealth: 0,
-          isDestroyed: false,
-          attackCooldown: 0,
-        });
+      for (let x = 0; x < size; x++) {
+        row.push(this.createEmptyTile(x, y));
       }
       this.tiles.push(row);
     }
+  }
+
+  /**
+   * Expands the kingdom territory from current size (e.g. 3x3) to target size (e.g. 4x4),
+   * preserving all existing cards, structures, and tile health.
+   * Returns true if expansion occurred, false otherwise.
+   */
+  expandGrid(targetSize: number = 4): boolean {
+    if (targetSize <= this.size || targetSize > 4) {
+      return false;
+    }
+
+    const oldSize = this.size;
+    // 1. Extend existing rows with new column tiles
+    for (let y = 0; y < oldSize; y++) {
+      for (let x = oldSize; x < targetSize; x++) {
+        this.tiles[y].push(this.createEmptyTile(x, y));
+      }
+    }
+
+    // 2. Add brand new rows for y from oldSize to targetSize - 1
+    for (let y = oldSize; y < targetSize; y++) {
+      const newRow: TilePlot[] = [];
+      for (let x = 0; x < targetSize; x++) {
+        newRow.push(this.createEmptyTile(x, y));
+      }
+      this.tiles.push(newRow);
+    }
+
+    this.size = targetSize;
+    return true;
+  }
+
+  /**
+   * Reverts / shrinks grid size back to targetSize (e.g. 4x4 down to 3x3).
+   */
+  shrinkGrid(targetSize: number = 3): boolean {
+    if (targetSize >= this.size || targetSize < 3) {
+      return false;
+    }
+
+    // Truncate rows
+    this.tiles.length = targetSize;
+    // Truncate columns in remaining rows
+    for (let y = 0; y < targetSize; y++) {
+      this.tiles[y].length = targetSize;
+    }
+
+    this.size = targetSize;
+    return true;
   }
 
   /**
@@ -42,9 +107,9 @@ export class KingdomGrid {
       !Number.isInteger(x) ||
       !Number.isInteger(y) ||
       x < 0 ||
-      x >= KingdomGrid.GRID_SIZE ||
+      x >= this.size ||
       y < 0 ||
-      y >= KingdomGrid.GRID_SIZE
+      y >= this.size
     ) {
       return null;
     }
@@ -241,12 +306,12 @@ export class KingdomGrid {
   }
 
   /**
-   * Returns all 9 tiles as a flat array.
+   * Returns all tiles as a flat array (9 tiles for 3x3, 16 tiles for 4x4).
    */
   getAllTiles(): TilePlot[] {
     const all: TilePlot[] = [];
-    for (let y = 0; y < KingdomGrid.GRID_SIZE; y++) {
-      for (let x = 0; x < KingdomGrid.GRID_SIZE; x++) {
+    for (let y = 0; y < this.size; y++) {
+      for (let x = 0; x < this.size; x++) {
         all.push(this.tiles[y][x]);
       }
     }
@@ -257,8 +322,8 @@ export class KingdomGrid {
    * Resets all tiles in the grid.
    */
   reset(): void {
-    for (let y = 0; y < KingdomGrid.GRID_SIZE; y++) {
-      for (let x = 0; x < KingdomGrid.GRID_SIZE; x++) {
+    for (let y = 0; y < this.size; y++) {
+      for (let x = 0; x < this.size; x++) {
         const tile = this.tiles[y][x];
         tile.baseCard = null;
         tile.stack = [];

@@ -57,6 +57,13 @@ export class BoardRenderer {
   public panSpeed: number = 6.0;
   private lastAnimTime: number = 0;
 
+  // Dynamic Grid System (Authentic Flat 9 Kings Meadow: 3x3 default, expandable to 4x4)
+  public pureProceduralEnvironment: boolean = true; // Always render 100% pure procedural 16-bit meadow
+  public activeGridSize: number = 3;
+  public expansionAnimAlpha: number = 1.0;
+  public showCliffPlatform: boolean = false; // Flat on meadow pasture, zero extruded dirt cliff platform
+  public showStartingKeep: boolean = false; // Set true if starting castle keep sprite is desired on (1,1)
+
   // Effects & State
   particles: Particle[] = [];
   floatingTexts: FloatingText[] = [];
@@ -129,7 +136,7 @@ export class BoardRenderer {
     }
   }
 
-  getGridBounds(width: number, height: number): {
+  getGridBounds(width: number, height: number, gridSize: number = this.activeGridSize): {
     startX: number;
     startY: number;
     totalWidth: number;
@@ -137,8 +144,8 @@ export class BoardRenderer {
     tileSize: number;
     gap: number;
   } {
-    const totalWidth = 3 * this.tileSize + 2 * this.gap;
-    const totalHeight = 3 * this.tileSize + 2 * this.gap;
+    const totalWidth = gridSize * this.tileSize + (gridSize - 1) * this.gap;
+    const totalHeight = gridSize * this.tileSize + (gridSize - 1) * this.gap;
     return {
       startX: Math.round((width - totalWidth) / 2),
       startY: Math.round((height - totalHeight) / 2),
@@ -236,11 +243,12 @@ export class BoardRenderer {
   }
 
   /**
-   * Translates Grid Coordinates to Canvas Pixel Space in 2.5D Isometric space
+   * Translates Grid Coordinates to Canvas Pixel Space in 2.5D Isometric space.
+   * Dynamically centers whether grid size is 3x3 or expanded to 4x4.
    */
-  gridToPixel(gx: number, gy: number, width: number, height: number): { x: number; y: number } {
+  gridToPixel(gx: number, gy: number, width: number, height: number, gridSize: number = this.activeGridSize): { x: number; y: number } {
     const originX = width / 2;
-    const originY = Math.round(height * 0.41) - this.tileH;
+    const originY = Math.round(height * 0.41) - ((gridSize - 1) / 2) * this.tileH;
     const halfW = this.tileW / 2;
     const halfH = this.tileH / 2;
     return {
@@ -250,11 +258,11 @@ export class BoardRenderer {
   }
 
   /**
-   * Transforms Screen Pixels into Grid Coordinates (0..2, 0..2) via Isometric Diamond Hit Test
+   * Transforms Screen Pixels into Grid Coordinates (0..gridSize-1) via Isometric Diamond Hit Test.
    */
-  getTileAtPixel(px: number, py: number, width: number, height: number): { x: number; y: number } | null {
+  getTileAtPixel(px: number, py: number, width: number, height: number, gridSize: number = this.activeGridSize): { x: number; y: number } | null {
     const originX = width / 2;
-    const originY = Math.round(height * 0.41) - this.tileH;
+    const originY = Math.round(height * 0.41) - ((gridSize - 1) / 2) * this.tileH;
     const dx = px - originX;
     const dy = py - originY;
     const halfW = this.tileW / 2;
@@ -263,7 +271,7 @@ export class BoardRenderer {
     const gx = Math.floor((dx / halfW + dy / halfH) / 2);
     const gy = Math.floor((dy / halfH - dx / halfW) / 2);
 
-    if (gx >= 0 && gx < 3 && gy >= 0 && gy < 3) {
+    if (gx >= 0 && gx < gridSize && gy >= 0 && gy < gridSize) {
       return { x: gx, y: gy };
     }
     return null;
@@ -282,6 +290,20 @@ export class BoardRenderer {
     this.lastAnimTime = animTime;
     this.updateCamera(dt);
 
+    // Track dynamic grid expansion
+    const currentSize = grid.getSize();
+    if (currentSize !== this.activeGridSize) {
+      if (currentSize > this.activeGridSize) {
+        // Grid expanding: trigger gentle fade-in and golden boundary glow
+        this.expansionAnimAlpha = 0.0;
+      }
+      this.activeGridSize = currentSize;
+    }
+
+    if (this.expansionAnimAlpha < 1.0) {
+      this.expansionAnimAlpha = Math.min(1.0, this.expansionAnimAlpha + dt * 0.85);
+    }
+
     let shakeX = 0;
     let shakeY = 0;
     if (this.screenShakeTimer > 0) {
@@ -299,7 +321,7 @@ export class BoardRenderer {
 
     // Only render grid, combat, and diorama if NOT in pure background mode
     if (!this.pureBackgroundMode) {
-      // 2. Render 3x3 Isometric Floating Island (Back-to-Front Painter's Algorithm)
+      // 2. Render Expandable Isometric Meadow Grid (3x3 default, expandable to 4x4)
       this.drawIsometricDiorama(ctx, width, height, grid, animTime);
 
       // 3. Render Combat Invaders marching along isometric perimeter
@@ -326,8 +348,8 @@ export class BoardRenderer {
   private drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Image background with Aspect-Cover scaling & Dynamic Camera Zoom (used when pureBackgroundMode is false)
-    if (!this.pureBackgroundMode && this.isBgLoaded && this.bgImage && this.bgImage.naturalWidth > 0 && typeof ctx.drawImage === 'function') {
+    // 1. Image background with Aspect-Cover scaling (only if pureProceduralEnvironment is explicitly disabled for legacy unit mocks)
+    if (!this.pureProceduralEnvironment && !this.pureBackgroundMode && this.isBgLoaded && this.bgImage && this.bgImage.naturalWidth > 0 && typeof ctx.drawImage === 'function') {
       const imgW = this.bgImage.naturalWidth;
       const imgH = this.bgImage.naturalHeight;
       const baseScale = Math.max(width / imgW, height / imgH);
@@ -828,36 +850,49 @@ export class BoardRenderer {
   ): void {
     const halfW = this.tileW / 2;
     const halfH = this.tileH / 2;
+    const size = grid.getSize();
+    const maxDepth = (size - 1) * 2;
 
-    // Iterate tiles from back-to-front by isometric depth: (gx + gy) from 0 to 4
-    for (let depth = 0; depth <= 4; depth++) {
-      for (let gx = 0; gx < 3; gx++) {
+    // Iterate tiles from back-to-front by isometric depth: (gx + gy) from 0 to maxDepth
+    for (let depth = 0; depth <= maxDepth; depth++) {
+      for (let gx = 0; gx < size; gx++) {
         const gy = depth - gx;
-        if (gy < 0 || gy >= 3) continue;
+        if (gy < 0 || gy >= size) continue;
 
         const tile = grid.getTile(gx, gy);
         if (!tile) continue;
 
-        const pos = this.gridToPixel(gx, gy, width, height);
+        const pos = this.gridToPixel(gx, gy, width, height, size);
 
-        // 2.5D Extruded Tabletop Cliff Faces for authentic slab look
-        this.drawTileCliffFaces(ctx, pos.x, pos.y, halfW, halfH);
+        // 2.5D Extruded Tabletop Cliff Faces (only if platform mode is explicitly enabled)
+        if (this.showCliffPlatform) {
+          this.drawTileCliffFaces(ctx, pos.x, pos.y, halfW, halfH);
+        }
+
+        // Expansion fade-in alpha for newly unlocked outer row/column
+        const isExpandedTile = gx >= 3 || gy >= 3;
+        const tileAlpha = isExpandedTile ? Math.max(0.15, this.expansionAnimAlpha) : 1.0;
+
+        ctx.save();
+        if (tileAlpha < 1.0) {
+          ctx.globalAlpha = tileAlpha;
+        }
 
         // Isometric Diamond Top Face with thin crisp white grid lines
         this.drawTileTopFace(ctx, pos.x, pos.y, halfW, halfH, tile, animTime);
 
-        // Hover highlight reticle (glowing cyan / gold)
-        if (this.hoverTile && this.hoverTile.x === gx && this.hoverTile.y === gy) {
-          ctx.strokeStyle = '#38bdf8';
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.moveTo(pos.x, pos.y - halfH);
-          ctx.lineTo(pos.x + halfW, pos.y);
-          ctx.lineTo(pos.x, pos.y + halfH);
-          ctx.lineTo(pos.x - halfW, pos.y);
-          ctx.closePath();
-          ctx.stroke();
+        // Gold shimmer border during expansion animation
+        if (isExpandedTile && this.expansionAnimAlpha < 0.99) {
+          this.drawExpansionShimmer(ctx, pos.x, pos.y, halfW, halfH, animTime);
         }
+
+        // Hover highlight reticle (glowing cyan / gold with corner brackets)
+        if (this.hoverTile && this.hoverTile.x === gx && this.hoverTile.y === gy) {
+          this.drawHoverReticle(ctx, pos.x, pos.y, halfW, halfH, animTime);
+        }
+
+        // Subtle plot coordinate pip (e.g. "0,0") for tactical clarity
+        this.drawTilePlotIndicator(ctx, pos.x, pos.y, gx, gy, halfW, halfH);
 
         // Stationed Unit / Architectural Building
         if (tile.baseCard && !tile.isDestroyed) {
@@ -866,8 +901,8 @@ export class BoardRenderer {
           ctx.fillStyle = '#f1f5f9';
           ctx.textAlign = 'center';
           ctx.fillText(tile.baseCard.name, pos.x, pos.y - 30);
-        } else if (gx === 1 && gy === 1 && !tile.isDestroyed) {
-          // Starting Castle Keep on the center plot if empty
+        } else if (this.showStartingKeep && gx === 1 && gy === 1 && !tile.isDestroyed && !tile.baseCard) {
+          // Starting Castle Keep on the primary keep plot if empty and enabled
           this.drawStartingKeep(ctx, pos.x, pos.y, animTime);
         } else if (tile.isDestroyed) {
           ctx.font = 'bold 9px monospace';
@@ -878,8 +913,83 @@ export class BoardRenderer {
 
         // Structural Health Bar & Stack Stars
         this.drawTileOverlayUI(ctx, pos.x, pos.y, tile);
+
+        ctx.restore();
       }
     }
+  }
+
+  private drawExpansionShimmer(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    halfW: number,
+    halfH: number,
+    animTime: number
+  ): void {
+    const pulse = 0.5 + 0.5 * Math.sin(animTime * 6);
+    const alpha = (1 - this.expansionAnimAlpha) * (0.4 + 0.6 * pulse);
+    ctx.strokeStyle = `rgba(250, 204, 21, ${alpha.toFixed(3)})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y - halfH);
+    ctx.lineTo(x + halfW, y);
+    ctx.lineTo(x, y + halfH);
+    ctx.lineTo(x - halfW, y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  private drawHoverReticle(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    halfW: number,
+    halfH: number,
+    animTime: number
+  ): void {
+    const pulse = 0.75 + 0.25 * Math.sin(animTime * 8);
+    ctx.strokeStyle = `rgba(56, 189, 248, ${pulse.toFixed(2)})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y - halfH);
+    ctx.lineTo(x + halfW, y);
+    ctx.lineTo(x, y + halfH);
+    ctx.lineTo(x - halfW, y);
+    ctx.closePath();
+    ctx.stroke();
+
+    // Corner chevrons
+    const chev = 8;
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 2;
+    // North corner
+    ctx.beginPath();
+    ctx.moveTo(x - chev, y - halfH + chev * 0.5);
+    ctx.lineTo(x, y - halfH);
+    ctx.lineTo(x + chev, y - halfH + chev * 0.5);
+    ctx.stroke();
+    // South corner
+    ctx.beginPath();
+    ctx.moveTo(x - chev, y + halfH - chev * 0.5);
+    ctx.lineTo(x, y + halfH);
+    ctx.lineTo(x + chev, y + halfH - chev * 0.5);
+    ctx.stroke();
+  }
+
+  private drawTilePlotIndicator(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    gx: number,
+    gy: number,
+    halfW: number,
+    halfH: number
+  ): void {
+    ctx.font = '8px monospace';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${gx},${gy}`, x, y + halfH - 6);
   }
 
   private drawTileCliffFaces(ctx: CanvasRenderingContext2D, x: number, y: number, halfW: number, halfH: number): void {
@@ -1156,21 +1266,26 @@ export class BoardRenderer {
     } else {
       const isDamaged = tile.health < tile.maxHealth * 0.5;
 
-      // 1. Lush medieval meadow grass gradient (Sad Socket aesthetic)
+      // 1. Lush medieval meadow grass gradient (Sad Socket / 9 Kings aesthetic)
       if (typeof ctx.createLinearGradient === 'function') {
         const grassGrad = ctx.createLinearGradient(x - halfW, y - halfH, x + halfW, y + halfH);
         if (isDamaged) {
           grassGrad.addColorStop(0, '#543d2b');
           grassGrad.addColorStop(0.5, '#3d2b1e');
           grassGrad.addColorStop(1, '#271a12');
+        } else if (tile.baseCard) {
+          grassGrad.addColorStop(0, '#527c5b');
+          grassGrad.addColorStop(0.4, '#476e4f');
+          grassGrad.addColorStop(1, '#395b40');
         } else {
-          grassGrad.addColorStop(0, '#437c4d');
-          grassGrad.addColorStop(0.4, '#396b42');
-          grassGrad.addColorStop(1, '#2c5433');
+          // Translucent plot highlight that seamlessly blends with meadow (#679873)
+          grassGrad.addColorStop(0, 'rgba(125, 185, 140, 0.35)');
+          grassGrad.addColorStop(0.5, 'rgba(95, 150, 110, 0.22)');
+          grassGrad.addColorStop(1, 'rgba(65, 115, 80, 0.30)');
         }
         ctx.fillStyle = grassGrad;
       } else {
-        ctx.fillStyle = isDamaged ? '#3d2b1e' : '#396b42';
+        ctx.fillStyle = isDamaged ? '#3d2b1e' : '#527c5b';
       }
       ctx.fill();
 
