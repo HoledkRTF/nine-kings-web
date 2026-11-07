@@ -188,7 +188,8 @@ export class NineKingsGame {
       } else if (e.code === 'KeyH' || e.key === 'h' || e.key === 'H') {
         const hud = document.getElementById('camera-controller-hud');
         if (hud) {
-          hud.style.display = hud.style.display === 'none' ? 'flex' : 'none';
+          const isHidden = window.getComputedStyle(hud).display === 'none';
+          hud.style.display = isHidden ? 'flex' : 'none';
         }
       }
     });
