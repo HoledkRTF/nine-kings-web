@@ -277,6 +277,29 @@ export class BoardRenderer {
     return null;
   }
 
+  /**
+   * Converts screen pixel coordinates (e.g. mouse clientX/clientY) to world space coordinates,
+   * taking into account active dynamic camera zoom and pan.
+   */
+  screenToWorld(px: number, py: number, width: number, height: number): { x: number; y: number } {
+    const cx = width / 2;
+    const cy = height / 2;
+    const wx = cx - this.currentPanX + (px - cx) / this.currentZoom;
+    const wy = cy - this.currentPanY + (py - cy) / this.currentZoom;
+    return { x: wx, y: wy };
+  }
+
+  /**
+   * Converts world space coordinates to screen pixel coordinates.
+   */
+  worldToScreen(wx: number, wy: number, width: number, height: number): { x: number; y: number } {
+    const cx = width / 2;
+    const cy = height / 2;
+    const px = cx + (wx - cx + this.currentPanX) * this.currentZoom;
+    const py = cy + (wy - cy + this.currentPanY) * this.currentZoom;
+    return { x: px, y: py };
+  }
+
   render(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -313,15 +336,26 @@ export class BoardRenderer {
       if (this.screenShakeTimer <= 0) this.screenShakeIntensity = 0;
     }
 
+    // Clear viewport before rendering
+    ctx.clearRect(0, 0, width, height);
+
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
-    // 1. Ambient Tabletop Ethereal Background with Dynamic Zoom
+    // Dynamic Camera Transform applied to the entire living game world
+    // (Both background and grid plots scale and pan together in perfect synchrony)
+    const cx = width / 2;
+    const cy = height / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(this.currentZoom, this.currentZoom);
+    ctx.translate(-cx + this.currentPanX, -cy + this.currentPanY);
+
+    // 1. Ambient Tabletop Living Meadow Environment
     this.drawBackground(ctx, width, height, animTime);
 
-    // Only render grid, combat, and diorama if NOT in pure background mode
+    // 2. Render Expandable Isometric Meadow Grid (attached directly to the living pasture!)
     if (!this.pureBackgroundMode) {
-      // 2. Render Expandable Isometric Meadow Grid (3x3 default, expandable to 4x4)
       this.drawIsometricDiorama(ctx, width, height, grid, animTime);
 
       // 3. Render Combat Invaders marching along isometric perimeter
@@ -331,52 +365,44 @@ export class BoardRenderer {
       }
     }
 
-    // 4. Render Active Projectiles, Blood & VFX Particles
+    // 4. Render Active Projectiles, Blood & VFX Particles in world space
     this.updateAndDrawParticles(ctx, dt);
     this.updateAndDrawFloatingTexts(ctx, dt);
 
-    // 5. King Active Spell Overlays
+    ctx.restore(); // End Camera Transform
+
+    // 5. King Active Spell Overlays (Screen space overlay)
     if (activeSpellEffect && activeSpellEffect.timer > 0) {
       this.drawActiveSpellEffect(ctx, width, height, activeSpellEffect.type, animTime);
     } else if (combat && typeof combat.isRallyHornActive === 'function' && combat.isRallyHornActive()) {
       this.drawActiveSpellEffect(ctx, width, height, 'rally_horn', animTime);
     }
 
-    ctx.restore();
+    ctx.restore(); // End Screen Shake
   }
 
   private drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
-    ctx.clearRect(0, 0, width, height);
-
     // 1. Image background with Aspect-Cover scaling (only if pureProceduralEnvironment is explicitly disabled for legacy unit mocks)
     if (!this.pureProceduralEnvironment && !this.pureBackgroundMode && this.isBgLoaded && this.bgImage && this.bgImage.naturalWidth > 0 && typeof ctx.drawImage === 'function') {
       const imgW = this.bgImage.naturalWidth;
       const imgH = this.bgImage.naturalHeight;
       const baseScale = Math.max(width / imgW, height / imgH);
-      const scale = baseScale * this.currentZoom;
-      const drawW = imgW * scale;
-      const drawH = imgH * scale;
+      const drawW = imgW * baseScale;
+      const drawH = imgH * baseScale;
 
-      const drawX = Math.round((width - drawW) / 2 + this.currentPanX * scale);
-      const drawY = Math.round((height - drawH) / 2 + this.currentPanY * scale);
+      const drawX = Math.round((width - drawW) / 2);
+      const drawY = Math.round((height - drawH) / 2);
 
       ctx.save();
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(this.bgImage, drawX, drawY, drawW, drawH);
       ctx.restore();
 
-      this.drawAtmosphericAmbient(ctx, width, height, animTime, drawX, drawY, scale);
+      this.drawAtmosphericAmbient(ctx, width, height, animTime, drawX, drawY, baseScale);
       return;
     }
 
-    // 2. Pure Procedural 16-Bit Pixel-Art Meadow Environment with Dynamic Camera Zoom
-    ctx.save();
-    // Dynamic Camera Zoom & Pan (centered on canvas center)
-    const cx = width / 2;
-    const cy = height / 2;
-    ctx.translate(cx, cy);
-    ctx.scale(this.currentZoom, this.currentZoom);
-    ctx.translate(-cx + this.currentPanX, -cy + this.currentPanY);
+    // 2. Pure Procedural 16-Bit Pixel-Art Meadow Environment (rendered directly inside world camera transform)
 
     // Procedural 16-Bit Sage Meadow Pasture (#679873)
     ctx.fillStyle = '#679873';
@@ -399,8 +425,6 @@ export class BoardRenderer {
 
     // Atmospheric ambient effects (water ripple glints, pollen motes)
     this.drawAtmosphericAmbient(ctx, width, height, animTime);
-
-    ctx.restore();
   }
 
   private drawAtmosphericAmbient(

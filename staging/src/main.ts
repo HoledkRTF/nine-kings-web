@@ -76,7 +76,10 @@ export class NineKingsGame {
     // Initialize Card Hand UI
     this.handUI = new CardHandUI({
       canvasId: 'game-canvas',
-      getTileAtPixel: (px, py, width, height) => this.renderer.getTileAtPixel(px, py, width, height, this.grid.getSize()),
+      getTileAtPixel: (px, py, width, height) => {
+        const w = this.renderer.screenToWorld(px, py, width, height);
+        return this.renderer.getTileAtPixel(w.x, w.y, width, height, this.grid.getSize());
+      },
       onPlaceCard: (cardId, targetX, targetY) => this.handlePlaceCard(cardId, targetX, targetY),
       onEndYear: () => this.handleEndYear(),
       onCastSpell: () => this.handleCastSpell(),
@@ -256,7 +259,8 @@ export class NineKingsGame {
       const rect = this.canvas.getBoundingClientRect();
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
-      const tile = this.renderer.getTileAtPixel(px, py, rect.width, rect.height, this.grid.getSize());
+      const w = this.renderer.screenToWorld(px, py, rect.width, rect.height);
+      const tile = this.renderer.getTileAtPixel(w.x, w.y, rect.width, rect.height, this.grid.getSize());
       this.renderer.setHoverTile(tile);
     });
 
