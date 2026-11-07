@@ -326,8 +326,8 @@ export class BoardRenderer {
   private drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Authentic 16-Bit 9 Kings Meadow Environment with Aspect-Cover scaling & Dynamic Camera Zoom
-    if (this.isBgLoaded && this.bgImage && this.bgImage.naturalWidth > 0 && typeof ctx.drawImage === 'function') {
+    // 1. Image background with Aspect-Cover scaling & Dynamic Camera Zoom (used when pureBackgroundMode is false)
+    if (!this.pureBackgroundMode && this.isBgLoaded && this.bgImage && this.bgImage.naturalWidth > 0 && typeof ctx.drawImage === 'function') {
       const imgW = this.bgImage.naturalWidth;
       const imgH = this.bgImage.naturalHeight;
       const baseScale = Math.max(width / imgW, height / imgH);
@@ -335,7 +335,6 @@ export class BoardRenderer {
       const drawW = imgW * scale;
       const drawH = imgH * scale;
 
-      // Centered with smooth camera pan offsets
       const drawX = Math.round((width - drawW) / 2 + this.currentPanX * scale);
       const drawY = Math.round((height - drawH) / 2 + this.currentPanY * scale);
 
@@ -348,27 +347,38 @@ export class BoardRenderer {
       return;
     }
 
-    // Fallback procedural lush pasture for headless / unit test contexts
-    ctx.fillStyle = '#679873';
-    ctx.fillRect(0, 0, width, height);
+    // 2. Pure Procedural 16-Bit Pixel-Art Meadow Environment with Dynamic Camera Zoom
+    ctx.save();
+    // Dynamic Camera Zoom & Pan (centered on canvas center)
+    const cx = width / 2;
+    const cy = height / 2;
+    ctx.translate(cx, cy);
+    ctx.scale(this.currentZoom, this.currentZoom);
+    ctx.translate(-cx + this.currentPanX, -cy + this.currentPanY);
 
-    // Subtle meadow grass blades & tiny wildflowers (deterministic hash)
+    // Procedural 16-Bit Sage Meadow Pasture (#679873)
+    ctx.fillStyle = '#679873';
+    ctx.fillRect(-width * 0.5, -height * 0.5, width * 2, height * 2);
+
+    // Subtle 16-bit meadow grass blades & tiny wildflowers
     this.drawMeadowDetails(ctx, width, height);
 
-    // 2. Perimeter Cobblestone Wall across the upper region
+    // Perimeter Cobblestone Wall across the upper region
     this.drawPerimeterStoneWall(ctx, width, height);
 
-    // 3. Dense Evergreen Pine / Spruce Forest lining the wall and meadow edges
+    // Dense Evergreen Pine / Spruce Forest lining the wall and meadow edges
     this.drawPineForest(ctx, width, height, animTime);
 
-    // 4. Curved Cyan Pond with Sandy Shoreline in lower-left
+    // Curved Cyan Pond with Sandy Shoreline in lower-left
     this.drawPond(ctx, width, height, animTime);
 
-    // 5. Circular Stone Wishing Well & Boulders
+    // Circular Stone Wishing Well & Boulders
     this.drawWishingWell(ctx, width, height);
 
-    // 6. Atmospheric ambient effects
+    // Atmospheric ambient effects (water ripple glints, pollen motes)
     this.drawAtmosphericAmbient(ctx, width, height, animTime);
+
+    ctx.restore();
   }
 
   private drawAtmosphericAmbient(
@@ -416,99 +426,135 @@ export class BoardRenderer {
 
   private drawMeadowDetails(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     ctx.save();
-    const stepX = 40;
-    const stepY = 28;
-    for (let x = 12; x < width; x += stepX) {
-      for (let y = 12; y < height; y += stepY) {
+    // 16-Bit Bayer matrix dither texture across the pasture
+    const stepX = 16;
+    const stepY = 12;
+    for (let x = -width * 0.4; x < width * 1.4; x += stepX) {
+      for (let y = -height * 0.4; y < height * 1.4; y += stepY) {
         const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
         const seed = hash - Math.floor(hash);
 
-        if (seed > 0.5) {
-          ctx.fillStyle = seed > 0.75 ? '#588863' : '#77a881';
-          ctx.fillRect(x + (seed * 16 - 8), y, 2, 3);
-          ctx.fillRect(x + (seed * 16 - 8) + 2, y - 1, 2, 2);
-        } else if (seed < 0.07) {
-          ctx.fillStyle = seed < 0.035 ? '#fef08a' : '#ffffff';
+        if (seed > 0.42) {
+          ctx.fillStyle = seed > 0.78 ? '#527c5b' : seed > 0.6 ? '#73a37e' : '#5d8c67';
+          // 2x2 or 2x3 discrete pixel dither flecks
+          ctx.fillRect(x, y, 3, 2);
+          ctx.fillRect(x + 2, y + 2, 2, 2);
+        } else if (seed < 0.05) {
+          ctx.fillStyle = seed < 0.02 ? '#fef08a' : '#ffffff';
           ctx.fillRect(x, y, 2, 2);
         }
       }
     }
+
+    // Soft central daylight illumination on the pasture
+    const radGrd = ctx.createRadialGradient(width * 0.5, height * 0.52, 60, width * 0.5, height * 0.52, width * 0.65);
+    radGrd.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
+    radGrd.addColorStop(0.5, 'rgba(255, 255, 255, 0.03)');
+    radGrd.addColorStop(1, 'rgba(15, 23, 42, 0.18)');
+    ctx.fillStyle = radGrd;
+    ctx.fillRect(-width * 0.5, -height * 0.5, width * 2, height * 2);
     ctx.restore();
   }
 
   private drawPerimeterStoneWall(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     ctx.save();
-    const wallApexY = Math.max(20, height * 0.06);
-    const wallLeftY = height * 0.22;
-    const wallRightY = height * 0.16;
-    const apexX = width * 0.72;
-    const wallH = 28;
+    const wallApexY = Math.max(30, height * 0.08);
+    const wallLeftY = height * 0.28;
+    const wallRightY = height * 0.22;
+    const apexX = width * 0.70;
+    const wallH = 34;
 
-    // Ground contact shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    // 1. Wall ground contact shadow
+    ctx.fillStyle = 'rgba(10, 18, 26, 0.35)';
     ctx.beginPath();
-    ctx.moveTo(0, wallLeftY + wallH);
+    ctx.moveTo(-width * 0.2, wallLeftY + wallH);
     ctx.lineTo(apexX, wallApexY + wallH);
-    ctx.lineTo(width, wallRightY + wallH);
-    ctx.lineTo(width, wallRightY + wallH + 12);
-    ctx.lineTo(apexX, wallApexY + wallH + 16);
-    ctx.lineTo(0, wallLeftY + wallH + 14);
+    ctx.lineTo(width * 1.2, wallRightY + wallH);
+    ctx.lineTo(width * 1.2, wallRightY + wallH + 16);
+    ctx.lineTo(apexX, wallApexY + wallH + 20);
+    ctx.lineTo(-width * 0.2, wallLeftY + wallH + 18);
     ctx.closePath();
     ctx.fill();
 
-    // Wall main stone body (Left to Apex)
-    ctx.fillStyle = '#4b5563';
+    // 2. Wall stone body (Left to Apex)
+    ctx.fillStyle = '#47525d';
     ctx.beginPath();
-    ctx.moveTo(0, wallLeftY);
+    ctx.moveTo(-width * 0.2, wallLeftY);
     ctx.lineTo(apexX, wallApexY);
     ctx.lineTo(apexX, wallApexY + wallH);
-    ctx.lineTo(0, wallLeftY + wallH);
+    ctx.lineTo(-width * 0.2, wallLeftY + wallH);
     ctx.closePath();
     ctx.fill();
 
-    // Wall stone body (Apex to Right)
-    ctx.fillStyle = '#374151';
+    // 3. Wall stone body (Apex to Right)
+    ctx.fillStyle = '#37414b';
     ctx.beginPath();
     ctx.moveTo(apexX, wallApexY);
-    ctx.lineTo(width, wallRightY);
-    ctx.lineTo(width, wallRightY + wallH);
+    ctx.lineTo(width * 1.2, wallRightY);
+    ctx.lineTo(width * 1.2, wallRightY + wallH);
     ctx.lineTo(apexX, wallApexY + wallH);
     ctx.closePath();
     ctx.fill();
 
-    // Top capstone ridge
-    ctx.strokeStyle = '#6b7280';
-    ctx.lineWidth = 3;
+    // 4. Cobblestone Rock Textures along the wall face
+    const drawStoneStrips = (startX: number, endX: number, startY: number, endY: number, baseColor: string, isRight: boolean) => {
+      const segs = 28;
+      for (let i = 0; i < segs; i++) {
+        const t = i / segs;
+        const sx = startX + t * (endX - startX);
+        const sy = startY + t * (endY - startY);
+        const hVal = Math.sin(i * 19.3) * 0.5 + 0.5;
+
+        // Individual stone block
+        ctx.fillStyle = hVal > 0.6 ? '#5c6977' : hVal > 0.3 ? baseColor : '#323c46';
+        ctx.fillRect(sx, sy + 6, 22, 12);
+        ctx.strokeStyle = '#1e252d';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(sx, sy + 6, 22, 12);
+
+        // Lower row stone block
+        ctx.fillStyle = hVal > 0.5 ? '#3b4550' : '#2b333c';
+        ctx.fillRect(sx + 10, sy + 18, 20, 11);
+        ctx.strokeRect(sx + 10, sy + 18, 20, 11);
+
+        // Moss / ivy fleck
+        if (hVal > 0.7) {
+          ctx.fillStyle = '#3f6249';
+          ctx.fillRect(sx + 4, sy + 14, 5, 4);
+        }
+      }
+    };
+
+    drawStoneStrips(-width * 0.2, apexX, wallLeftY, wallApexY, '#47525d', false);
+    drawStoneStrips(apexX, width * 1.2, wallApexY, wallRightY, '#37414b', true);
+
+    // 5. Top capstone ridge
+    ctx.strokeStyle = '#718091';
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(0, wallLeftY);
+    ctx.moveTo(-width * 0.2, wallLeftY);
     ctx.lineTo(apexX, wallApexY);
-    ctx.lineTo(width, wallRightY);
+    ctx.lineTo(width * 1.2, wallRightY);
     ctx.stroke();
 
-    // Cobblestone Brick details & Crenellations
-    ctx.fillStyle = '#64748b';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1;
+    // 6. Crenellations with 3D chiseled depth
+    const drawCrenellations = (startX: number, endX: number, startY: number, endY: number, count: number) => {
+      for (let i = 0; i < count; i += 2) {
+        const t = i / count;
+        const bx = startX + t * (endX - startX);
+        const by = startY + t * (endY - startY) - 10;
+        ctx.fillStyle = '#637080';
+        ctx.fillRect(bx, by, 16, 11);
+        ctx.fillStyle = '#7a899b';
+        ctx.fillRect(bx, by, 16, 3); // Highlight cap
+        ctx.strokeStyle = '#182028';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(bx, by, 16, 11);
+      }
+    };
 
-    // Crenellations along left flank
-    const countL = 16;
-    for (let i = 0; i < countL; i += 2) {
-      const t = i / countL;
-      const bx = t * apexX;
-      const by = wallLeftY + t * (wallApexY - wallLeftY) - 7;
-      ctx.fillRect(bx, by, 14, 8);
-      ctx.strokeRect(bx, by, 14, 8);
-    }
-
-    // Crenellations along right flank
-    const countR = 10;
-    for (let i = 0; i < countR; i += 2) {
-      const t = i / countR;
-      const bx = apexX + t * (width - apexX);
-      const by = wallApexY + t * (wallRightY - wallApexY) - 7;
-      ctx.fillRect(bx, by, 14, 8);
-      ctx.strokeRect(bx, by, 14, 8);
-    }
+    drawCrenellations(-width * 0.15, apexX, wallLeftY, wallApexY, 22);
+    drawCrenellations(apexX, width * 1.15, wallApexY, wallRightY, 16);
     ctx.restore();
   }
 
@@ -520,32 +566,35 @@ export class BoardRenderer {
     animTime: number
   ): void {
     ctx.save();
-    const sway = Math.sin(animTime * 1.5 + x * 0.05) * (scale * 1.6);
+    const sway = Math.sin(animTime * 1.8 + x * 0.04) * (scale * 2.0);
 
-    // Soft tree shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    // Soft tree contact shadow
+    ctx.fillStyle = 'rgba(10, 18, 26, 0.32)';
     ctx.beginPath();
-    ctx.ellipse(x + 4 * scale, y + 4 * scale, 12 * scale, 6 * scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 5 * scale, y + 6 * scale, 16 * scale, 8 * scale, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Tree Trunk
-    ctx.fillStyle = '#261911';
-    ctx.fillRect(x - 2.5 * scale, y - 6 * scale, 5 * scale, 10 * scale);
+    // Sturdy wooden trunk
+    ctx.fillStyle = '#2b1b13';
+    ctx.fillRect(x - 3.5 * scale, y - 8 * scale, 7 * scale, 14 * scale);
+    ctx.fillStyle = '#3d271c';
+    ctx.fillRect(x - 3.5 * scale, y - 8 * scale, 3 * scale, 14 * scale); // Highlight on left of trunk
 
-    // 4 Stacked Conifer Evergreen Tiers
+    // 5 Layered Conifer Evergreen Tiers with stepped pixel branches
     const tiers = [
-      { w: 26 * scale, h: 14 * scale, dy: -6 * scale },
-      { w: 22 * scale, h: 13 * scale, dy: -14 * scale },
-      { w: 16 * scale, h: 12 * scale, dy: -22 * scale },
-      { w: 10 * scale, h: 11 * scale, dy: -30 * scale }
+      { w: 36 * scale, h: 18 * scale, dy: -6 * scale },
+      { w: 30 * scale, h: 17 * scale, dy: -18 * scale },
+      { w: 24 * scale, h: 16 * scale, dy: -30 * scale },
+      { w: 18 * scale, h: 15 * scale, dy: -41 * scale },
+      { w: 11 * scale, h: 13 * scale, dy: -51 * scale }
     ];
 
     for (let i = 0; i < tiers.length; i++) {
       const t = tiers[i];
-      const tierSway = (i / 3) * sway;
+      const tierSway = (i / 4) * sway;
 
-      // Base deep needle green
-      ctx.fillStyle = i === 0 ? '#14271c' : i === 1 ? '#1c3827' : i === 2 ? '#254b35' : '#326346';
+      // Base needle green (layered deep to light)
+      ctx.fillStyle = i === 0 ? '#102217' : i === 1 ? '#183323' : i === 2 ? '#214430' : i === 3 ? '#2c593f' : '#397050';
       ctx.beginPath();
       ctx.moveTo(x - t.w / 2, y + t.dy);
       ctx.lineTo(x + tierSway, y + t.dy - t.h);
@@ -553,8 +602,8 @@ export class BoardRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // Right shaded half
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      // Right shaded half (authentic retro light source from NW)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
       ctx.beginPath();
       ctx.moveTo(x + tierSway, y + t.dy - t.h);
       ctx.lineTo(x + t.w / 2, y + t.dy);
@@ -562,9 +611,9 @@ export class BoardRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // Highlight needle edge
-      ctx.strokeStyle = '#43775b';
-      ctx.lineWidth = 1;
+      // Highlight needle edge on left
+      ctx.strokeStyle = '#4e8564';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(x - t.w / 2, y + t.dy);
       ctx.lineTo(x + tierSway, y + t.dy - t.h);
@@ -575,53 +624,54 @@ export class BoardRenderer {
 
   private drawPineForest(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
     // 1. Back row along the stone wall
-    const wallApexY = Math.max(20, height * 0.06);
-    const wallLeftY = height * 0.22;
-    const apexX = width * 0.72;
+    const wallApexY = Math.max(30, height * 0.08);
+    const wallLeftY = height * 0.28;
+    const apexX = width * 0.70;
 
-    for (let i = -20; i <= width + 20; i += 45) {
+    for (let i = -width * 0.15; i <= width * 1.15; i += 50) {
       let wy: number;
       if (i < apexX) {
-        const t = Math.max(0, i / apexX);
-        wy = wallLeftY + t * (wallApexY - wallLeftY) - 18;
+        const t = Math.max(0, (i + width * 0.15) / (apexX + width * 0.15));
+        wy = wallLeftY + t * (wallApexY - wallLeftY) - 22;
       } else {
-        const t = (i - apexX) / (width - apexX);
-        wy = wallApexY + t * (height * 0.16 - wallApexY) - 18;
+        const t = (i - apexX) / (width * 1.15 - apexX);
+        wy = wallApexY + t * (height * 0.22 - wallApexY) - 22;
       }
-      this.drawSinglePineTree(ctx, i, wy, 1.25, animTime);
+      this.drawSinglePineTree(ctx, i, wy, 1.45, animTime);
     }
 
-    // 2. Left Flank Pine Grove
+    // 2. Left Flank Conifer Pine Grove
     const leftTrees = [
-      { x: 30, y: height * 0.32, s: 1.2 },
-      { x: 75, y: height * 0.38, s: 1.15 },
-      { x: 45, y: height * 0.46, s: 1.3 },
-      { x: 95, y: height * 0.52, s: 1.25 },
-      { x: 40, y: height * 0.62, s: 1.35 },
-      { x: 80, y: height * 0.72, s: 1.2 }
+      { x: Math.max(30, width * 0.03), y: height * 0.38, s: 1.35 },
+      { x: Math.max(85, width * 0.07), y: height * 0.44, s: 1.25 },
+      { x: Math.max(45, width * 0.04), y: height * 0.54, s: 1.4 },
+      { x: Math.max(105, width * 0.09), y: height * 0.60, s: 1.3 },
+      { x: Math.max(40, width * 0.03), y: height * 0.70, s: 1.45 },
+      { x: Math.max(90, width * 0.08), y: height * 0.80, s: 1.3 }
     ];
     for (const tr of leftTrees) {
       this.drawSinglePineTree(ctx, tr.x, tr.y, tr.s, animTime);
     }
 
-    // 3. Right Flank Pine Grove
+    // 3. Right Flank Dense Pine Grove
     const rightTrees = [
-      { x: width - 40, y: height * 0.28, s: 1.3 },
-      { x: width - 85, y: height * 0.36, s: 1.15 },
-      { x: width - 45, y: height * 0.48, s: 1.25 },
-      { x: width - 90, y: height * 0.58, s: 1.3 },
-      { x: width - 50, y: height * 0.70, s: 1.35 }
+      { x: width * 0.96, y: height * 0.32, s: 1.45 },
+      { x: width * 0.90, y: height * 0.40, s: 1.3 },
+      { x: width * 0.95, y: height * 0.52, s: 1.4 },
+      { x: width * 0.88, y: height * 0.62, s: 1.35 },
+      { x: width * 0.94, y: height * 0.74, s: 1.5 },
+      { x: width * 0.87, y: height * 0.84, s: 1.35 }
     ];
     for (const tr of rightTrees) {
       this.drawSinglePineTree(ctx, tr.x, tr.y, tr.s, animTime);
     }
 
-    // 4. Meadow Flank Pine Trees (framing the 3x3 grid)
+    // 4. Meadow Flank Pine Trees framing the open central pasture
     const meadowTrees = [
-      { x: Math.max(160, width * 0.22), y: height * 0.40, s: 1.15 },
-      { x: Math.max(190, width * 0.25), y: height * 0.65, s: 1.2 },
-      { x: Math.min(width - 160, width * 0.78), y: height * 0.42, s: 1.15 },
-      { x: Math.min(width - 190, width * 0.75), y: height * 0.62, s: 1.2 }
+      { x: Math.max(180, width * 0.18), y: height * 0.46, s: 1.25 },
+      { x: Math.max(215, width * 0.22), y: height * 0.70, s: 1.3 },
+      { x: Math.min(width - 180, width * 0.82), y: height * 0.46, s: 1.25 },
+      { x: Math.min(width - 215, width * 0.78), y: height * 0.68, s: 1.3 }
     ];
     for (const tr of meadowTrees) {
       this.drawSinglePineTree(ctx, tr.x, tr.y, tr.s, animTime);
@@ -630,45 +680,45 @@ export class BoardRenderer {
 
   private drawPond(ctx: CanvasRenderingContext2D, width: number, height: number, animTime: number): void {
     ctx.save();
-    const px = Math.min(180, width * 0.16);
-    const py = Math.max(height - 130, height * 0.82);
-    const rx = 140;
-    const ry = 80;
+    const px = Math.min(220, width * 0.16);
+    const py = Math.max(height - 140, height * 0.84);
+    const rx = 160;
+    const ry = 95;
 
-    // Sandy Shoreline Rim
-    ctx.fillStyle = '#8b7a58';
+    // Organic Sandy Shoreline
+    ctx.fillStyle = '#7a6747';
     ctx.beginPath();
-    ctx.ellipse(px, py, rx + 12, ry + 10, -0.15, 0, Math.PI * 2);
+    ctx.ellipse(px, py, rx + 18, ry + 14, -0.12, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#a89571';
+    ctx.fillStyle = '#9e865f';
     ctx.beginPath();
-    ctx.ellipse(px + 4, py + 2, rx + 6, ry + 5, -0.15, 0, Math.PI * 2);
+    ctx.ellipse(px + 4, py + 2, rx + 10, ry + 8, -0.12, 0, Math.PI * 2);
     ctx.fill();
 
-    // Cyan Pond Water (matches 9 Kings Steam screenshot)
-    ctx.fillStyle = '#3b8496';
+    // Cyan Pond Water (Authentic 9 Kings gradient)
+    ctx.fillStyle = '#2b7588';
     ctx.beginPath();
-    ctx.ellipse(px, py, rx, ry, -0.15, 0, Math.PI * 2);
+    ctx.ellipse(px, py, rx, ry, -0.12, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#56a6ba';
+    ctx.fillStyle = '#4199ac';
     ctx.beginPath();
-    ctx.ellipse(px - 10, py - 6, rx * 0.78, ry * 0.75, -0.15, 0, Math.PI * 2);
+    ctx.ellipse(px - 12, py - 8, rx * 0.78, ry * 0.74, -0.12, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#7bc7d6';
+    ctx.fillStyle = '#67bbcc';
     ctx.beginPath();
-    ctx.ellipse(px - 20, py - 12, rx * 0.52, ry * 0.5, -0.15, 0, Math.PI * 2);
+    ctx.ellipse(px - 24, py - 14, rx * 0.52, ry * 0.48, -0.12, 0, Math.PI * 2);
     ctx.fill();
 
-    // Gentle animated wave ripple lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 3; i++) {
-      const waveOffset = Math.sin(animTime * 2 + i * 1.8) * 6;
+    // Animated water caustics / ripple lines
+    ctx.strokeStyle = 'rgba(215, 250, 255, 0.55)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const waveOffset = Math.sin(animTime * 2.2 + i * 1.6) * 8;
       ctx.beginPath();
-      ctx.arc(px - 15 + i * 20 + waveOffset, py - 5 + i * 8, 14 + i * 8, 0.2, Math.PI - 0.2);
+      ctx.arc(px - 25 + i * 26 + waveOffset, py - 8 + i * 10, 16 + i * 10, 0.25, Math.PI - 0.25);
       ctx.stroke();
     }
     ctx.restore();
@@ -676,73 +726,95 @@ export class BoardRenderer {
 
   private drawWishingWell(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     ctx.save();
-    const wx = Math.min(230, width * 0.20);
-    const wy = Math.max(height - 240, height * 0.58);
+    // Authentic 9 Kings wishing well: circular stone cistern sitting on grass, no roof
+    const wx = Math.min(270, width * 0.21);
+    const wy = Math.max(height - 260, height * 0.58);
+    const rOuterX = 32;
+    const rOuterY = 18;
+    const rInnerX = 22;
+    const rInnerY = 12;
 
-    // Well ground shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    // Well contact ground shadow
+    ctx.fillStyle = 'rgba(10, 18, 26, 0.35)';
     ctx.beginPath();
-    ctx.ellipse(wx, wy + 8, 26, 14, 0, 0, Math.PI * 2);
+    ctx.ellipse(wx + 3, wy + 10, rOuterX + 5, rOuterY + 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Circular stone well base
-    ctx.fillStyle = '#525c68';
+    // Circular cobblestone wall cylinder
+    ctx.fillStyle = '#3a4450';
     ctx.beginPath();
-    ctx.ellipse(wx, wy, 24, 13, 0, 0, Math.PI * 2);
+    ctx.ellipse(wx, wy + 8, rOuterX, rOuterY, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#6b7886';
+    ctx.fillStyle = '#525d6b';
     ctx.beginPath();
-    ctx.ellipse(wx, wy - 3, 24, 13, 0, 0, Math.PI * 2);
+    ctx.ellipse(wx, wy, rOuterX, rOuterY, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = '#334155';
+    // Individual chiseled stone segments around the rim
+    ctx.strokeStyle = '#252e37';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Dark water interior
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.ellipse(wx, wy - 4, 17, 9, 0, 0, Math.PI * 2);
-    ctx.fill();
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+      const cx1 = wx + Math.cos(a) * rInnerX;
+      const cy1 = wy + Math.sin(a) * rInnerY;
+      const cx2 = wx + Math.cos(a) * rOuterX;
+      const cy2 = wy + Math.sin(a) * rOuterY;
+      ctx.beginPath();
+      ctx.moveTo(cx1, cy1);
+      ctx.lineTo(cx2, cy2);
+      ctx.stroke();
+    }
 
-    ctx.fillStyle = '#38bdf8';
+    // Top capstone highlight
+    ctx.strokeStyle = '#7c8b9d';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(wx + 3, wy - 5, 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Wooden timber roof posts
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(wx - 18, wy - 26, 4, 22);
-    ctx.fillRect(wx + 14, wy - 26, 4, 22);
-
-    // Well Roof
-    ctx.fillStyle = '#92400e';
-    ctx.beginPath();
-    ctx.moveTo(wx - 24, wy - 24);
-    ctx.lineTo(wx, wy - 36);
-    ctx.lineTo(wx + 24, wy - 24);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#451a03';
+    ctx.ellipse(wx, wy, rOuterX - 1, rOuterY - 1, 0, Math.PI * 0.8, Math.PI * 1.8);
     ctx.stroke();
 
-    // Boulders nearby
+    // Dark mysterious blue water interior
+    ctx.fillStyle = '#112233';
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, rInnerX, rInnerY, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1e3a5f';
+    ctx.beginPath();
+    ctx.ellipse(wx, wy - 1, rInnerX * 0.85, rInnerY * 0.85, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Water sparkle glint
+    ctx.fillStyle = '#67e8f9';
+    ctx.beginPath();
+    ctx.arc(wx + 4, wy - 2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Boulders resting by the well
     const boulders = [
-      { bx: wx + 34, by: wy + 6, br: 11 },
-      { bx: wx + 48, by: wy + 10, br: 8 }
+      { bx: wx + 42, by: wy + 8, rx: 14, ry: 9 },
+      { bx: wx + 58, by: wy + 14, rx: 10, ry: 6 }
     ];
     for (const b of boulders) {
-      ctx.fillStyle = '#475569';
+      ctx.fillStyle = 'rgba(10, 18, 26, 0.25)';
       ctx.beginPath();
-      ctx.arc(b.bx, b.by, b.br, 0, Math.PI * 2);
+      ctx.ellipse(b.bx + 2, b.by + 3, b.rx, b.ry, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#64748b';
+
+      ctx.fillStyle = '#45505e';
       ctx.beginPath();
-      ctx.arc(b.bx - 2, b.by - 2, b.br * 0.7, 0, Math.PI * 2);
+      ctx.ellipse(b.bx, b.by, b.rx, b.ry, -0.1, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#4d7c0f';
-      ctx.fillRect(b.bx - 3, b.by - b.br, 4, 2);
+
+      ctx.fillStyle = '#627082';
+      ctx.beginPath();
+      ctx.ellipse(b.bx - 2, b.by - 2, b.rx * 0.65, b.ry * 0.6, -0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#222b34';
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
     ctx.restore();
   }
