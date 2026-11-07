@@ -70,12 +70,13 @@ export class NineKingsGame {
     this.combat = new CombatEngine();
     this.timeline = new TimelineManager(1, ['king_of_greed']);
     this.renderer = new BoardRenderer();
-    this.renderer.pureBackgroundMode = true; // Display pure living environment background without cards or grid
+    this.renderer.pureBackgroundMode = false; // Render authentic 9 Kings meadow grid
+    this.renderer.showCliffPlatform = false; // Flat on meadow grass, zero extruded cliff platform
 
     // Initialize Card Hand UI
     this.handUI = new CardHandUI({
       canvasId: 'game-canvas',
-      getTileAtPixel: (px, py, width, height) => this.renderer.getTileAtPixel(px, py, width, height),
+      getTileAtPixel: (px, py, width, height) => this.renderer.getTileAtPixel(px, py, width, height, this.grid.getSize()),
       onPlaceCard: (cardId, targetX, targetY) => this.handlePlaceCard(cardId, targetX, targetY),
       onEndYear: () => this.handleEndYear(),
       onCastSpell: () => this.handleCastSpell(),
@@ -144,6 +145,7 @@ export class NineKingsGame {
   private initCameraControls(): void {
     const btnPlanning = document.getElementById('btn-zoom-planning');
     const btnBattle = document.getElementById('btn-zoom-battle');
+    const btnToggleGrid = document.getElementById('btn-toggle-grid');
     const modeLabel = document.getElementById('current-mode-label');
 
     const updateUI = () => {
@@ -156,6 +158,7 @@ export class NineKingsGame {
         btnPlanning?.classList.remove('active');
         if (modeLabel) modeLabel.textContent = 'FIGHT IN PROGRESS';
       }
+      this.updateGridUI();
     };
 
     btnPlanning?.addEventListener('click', () => {
@@ -167,6 +170,12 @@ export class NineKingsGame {
     btnBattle?.addEventListener('click', () => {
       sound.playHorn();
       this.renderer.setZoomMode('FIGHT');
+      updateUI();
+    });
+
+    btnToggleGrid?.addEventListener('click', () => {
+      sound.playCardSelect();
+      this.toggleGridSize();
       updateUI();
     });
 
@@ -184,6 +193,10 @@ export class NineKingsGame {
       } else if (e.key === '2' || e.code === 'KeyB') {
         sound.playHorn();
         this.renderer.setZoomMode('FIGHT');
+        updateUI();
+      } else if (e.key === 'g' || e.key === 'G') {
+        sound.playCardSelect();
+        this.toggleGridSize();
         updateUI();
       } else if (e.code === 'KeyH' || e.key === 'h' || e.key === 'H') {
         const hud = document.getElementById('camera-controller-hud');
@@ -243,13 +256,53 @@ export class NineKingsGame {
       const rect = this.canvas.getBoundingClientRect();
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
-      const tile = this.renderer.getTileAtPixel(px, py, rect.width, rect.height);
+      const tile = this.renderer.getTileAtPixel(px, py, rect.width, rect.height, this.grid.getSize());
       this.renderer.setHoverTile(tile);
     });
 
     this.canvas.addEventListener('mouseleave', () => {
       this.renderer.setHoverTile(null);
     });
+  }
+
+  public expandGrid(targetSize: number = 4): boolean {
+    const success = this.grid.expandGrid(targetSize);
+    if (success) {
+      this.updateGridUI();
+    }
+    return success;
+  }
+
+  public shrinkGrid(targetSize: number = 3): boolean {
+    const success = this.grid.shrinkGrid(targetSize);
+    if (success) {
+      this.updateGridUI();
+    }
+    return success;
+  }
+
+  public toggleGridSize(): void {
+    if (this.grid.getSize() === 3) {
+      this.expandGrid(4);
+    } else {
+      this.shrinkGrid(3);
+    }
+  }
+
+  public getGridSize(): number {
+    return this.grid.getSize();
+  }
+
+  public updateGridUI(): void {
+    const size = this.grid.getSize();
+    const sizeLabel = document.getElementById('grid-size-label');
+    if (sizeLabel) {
+      sizeLabel.innerHTML = `${size}&times;${size}`;
+    }
+    const btnText = document.getElementById('grid-expand-btn-text');
+    if (btnText) {
+      btnText.innerHTML = size === 3 ? 'EXPAND TO 4&times;4 [G]' : 'SHRINK TO 3&times;3 [G]';
+    }
   }
 
   /**
@@ -841,5 +894,5 @@ export class NineKingsGame {
 
 // Instantiate game when DOM is loaded
 window.addEventListener('DOMContentLoaded', () => {
-  new NineKingsGame();
+  (window as any).game = new NineKingsGame();
 });

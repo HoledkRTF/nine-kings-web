@@ -151,6 +151,21 @@ describe('BoardRenderer', () => {
       expect(pNorth.x).toBe(400 + 1.5 * (renderer.tileW / 2));
       expect(pNorth.y).toBe(Math.round(height * 0.41) - renderer.tileH - 1.5 * (renderer.tileH / 2));
     });
+
+    it('calculates 4x4 grid bounds and converts 4x4 coordinates accurately', () => {
+      const bounds4 = renderer.getGridBounds(width, height, 4);
+      const expectedTotal = 4 * renderer.tileSize + 3 * renderer.gap; // 384
+      expect(bounds4.totalWidth).toBe(expectedTotal);
+      expect(bounds4.totalHeight).toBe(expectedTotal);
+
+      // (3, 3) in 4x4 mode
+      const p33 = renderer.gridToPixel(3, 3, width, height, 4);
+      const tile33 = renderer.getTileAtPixel(p33.x, p33.y, width, height, 4);
+      expect(tile33).toEqual({ x: 3, y: 3 });
+
+      // Out of bounds in 4x4 mode (4, 4)
+      expect(renderer.getTileAtPixel(20, 20, width, height, 4)).toBeNull();
+    });
   });
 
   describe('Hover & Visual Helpers', () => {
@@ -206,6 +221,14 @@ describe('BoardRenderer', () => {
 
       renderer.render(mockCtx, width, height, grid, null, 1.0);
       expect(mockCtx.fillText).toHaveBeenCalledWith('L2', expect.any(Number), expect.any(Number));
+    });
+
+    it('renders expanded 4x4 grid cleanly and draws stationed cards on newly expanded plots', () => {
+      grid.expandGrid(4);
+      grid.placeCard(3, 3, TEST_UNIT_CARD);
+
+      renderer.render(mockCtx, width, height, grid, null, 1.0);
+      expect(mockCtx.fillText).toHaveBeenCalledWith(expect.stringContaining('Footman'), expect.any(Number), expect.any(Number));
     });
 
     it('renders enchantment aura glow rings for static and combustion', () => {
@@ -275,6 +298,7 @@ describe('BoardRenderer', () => {
 
       (renderer as any).bgImage = mockImg;
       (renderer as any).isBgLoaded = true;
+      renderer.pureProceduralEnvironment = false;
 
       renderer.render(mockCtx, width, height, grid, null, 1.0);
       expect(mockCtx.drawImage).toHaveBeenCalledWith(
