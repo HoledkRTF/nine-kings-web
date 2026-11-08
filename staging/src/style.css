@@ -184,7 +184,7 @@ canvas {
 }
 
 /* ==========================================================================
-   TOP-RIGHT BATTLE CONTROLS (AUTO, SPEED)
+   TOP-RIGHT BATTLE CONTROLS (AUTO, SPEED, MODES)
    ========================================================================== */
 #top-right-controls {
   position: absolute;
@@ -192,32 +192,42 @@ canvas {
   right: 20px;
   z-index: 10;
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
 .ctrl-pill-btn {
-  background: rgba(255, 255, 255, 0.95);
-  color: #0f172a;
-  border: 1px solid #cbd5e1;
+  background: rgba(15, 23, 42, 0.88);
+  color: #cbd5e1;
+  border: 1.5px solid #475569;
   font-family: inherit;
   font-size: 10px;
   font-weight: 800;
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: 6px 12px;
+  border-radius: 6px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  transition: all 0.15s;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
 }
 
 .ctrl-pill-btn:hover {
-  background: #ffffff;
+  background: rgba(30, 41, 59, 0.95);
+  border-color: #f59e0b;
+  color: #ffffff;
   transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.4);
 }
 
 .ctrl-pill-btn.active {
-  background: #facc15;
-  border-color: #ca8a04;
-  color: #000000;
+  background: linear-gradient(180deg, #d97706 0%, #92400e 100%);
+  border-color: #fde68a;
+  color: #fffbeb;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 /* ==========================================================================
@@ -340,8 +350,8 @@ canvas {
 
 /* Authentic Tarot-Style Fantasy Card (Matching Official 9 Kings Steam Art) */
 .card-item {
-  width: 140px;
-  height: 220px;
+  width: 135px;
+  height: 175px;
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -707,4 +717,23 @@ canvas {
 .mode-status-highlight {
   color: #4ade80;
   font-weight: 700;
+}
+
+.hud-hint-pill-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 5px 12px;
+  backdrop-filter: blur(6px);
+  font-size: 8.5px;
+  color: #94a3b8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  user-select: none;
 }

@@ -4,8 +4,10 @@ import {
   DeckManager,
   KING_DEFINITIONS,
   ALL_CARDS,
+  KING_OF_NOTHING_CARDS,
   createStarterDeck,
   generateMerchantStock,
+  instantiateCard,
 } from './cards/deck';
 import { CombatEngine } from './battle/combat-engine';
 import { TimelineManager, MERCHANT_YEARS, WAR_MILESTONE_YEAR, PEACE_MILESTONE_YEAR, FINAL_BOSS_YEAR } from './battle/timeline';
@@ -115,6 +117,24 @@ export class NineKingsGame {
     this.timeline = new TimelineManager(1, ['king_of_greed']);
     this.renderer.reset();
 
+    // Populate authentic starter kingdom on the living pasture grid
+    const footmanCard = instantiateCard(KING_OF_NOTHING_CARDS[0]); // Footman battalion
+    const archerCard = instantiateCard(KING_OF_NOTHING_CARDS[1]);  // Archer marksmen
+    const windmillCard: Card = {
+      id: 'starter_windmill',
+      name: 'Windmill',
+      type: 'building',
+      kingId: 'king_of_nothing',
+      cost: 4,
+      description: 'Generates wheat and crown revenue.',
+      healthBonus: 140,
+      attackBonus: 0,
+      attackRange: 0,
+    };
+    this.grid.placeCard(0, 1, footmanCard);
+    this.grid.placeCard(1, 2, archerCard);
+    this.grid.placeCard(2, 1, windmillCard);
+
     // Draw initial 5-card hand for Year 1
     this.deck.drawYearHand(5);
 
@@ -202,7 +222,7 @@ export class NineKingsGame {
         this.toggleGridSize();
         updateUI();
       } else if (e.code === 'KeyH' || e.key === 'h' || e.key === 'H') {
-        const hud = document.getElementById('camera-controller-hud');
+        const hud = document.getElementById('camera-controller-hud') || document.getElementById('hud-hint-bar');
         if (hud) {
           const isHidden = window.getComputedStyle(hud).display === 'none';
           hud.style.display = isHidden ? 'flex' : 'none';
@@ -325,7 +345,17 @@ export class NineKingsGame {
     const success = this.grid.placeCard(targetX, targetY, card);
     if (success) {
       sound.playCardPlace();
-      this.renderer.addShake(4, 0.15);
+      const dpr = window.devicePixelRatio || 1;
+      const pos = this.renderer.gridToPixel(
+        targetX,
+        targetY,
+        this.canvas.width / dpr,
+        this.canvas.height / dpr,
+        this.grid.getSize()
+      );
+      this.renderer.spawnParticleBurst(pos.x, pos.y, '#facc15', 18);
+      this.renderer.addFloatingText(pos.x, pos.y - 25, `+${card.name}`, '#fde047');
+      this.renderer.addShake(6, 0.22);
       this.deck.playCard(cardId);
       this.handUI.renderHand(this.deck.hand, this.deck);
       return true;

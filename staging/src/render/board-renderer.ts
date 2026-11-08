@@ -71,6 +71,7 @@ export class BoardRenderer {
   hoverTile: { x: number; y: number } | null = null;
   screenShakeTimer: number = 0;
   screenShakeIntensity: number = 0;
+  screenShakeMaxDuration: number = 0.25;
   private previousInvaderHp: Map<string, number> = new Map();
   private previousTileHp: Map<string, number> = new Map();
 
@@ -211,6 +212,7 @@ export class BoardRenderer {
   addShake(intensity: number = 8, duration: number = 0.25): void {
     this.screenShakeIntensity = intensity;
     this.screenShakeTimer = duration;
+    this.screenShakeMaxDuration = Math.max(0.01, duration);
   }
 
   addFloatingText(x: number, y: number, text: string, color: string = '#facc15'): void {
@@ -331,8 +333,10 @@ export class BoardRenderer {
     let shakeY = 0;
     if (this.screenShakeTimer > 0) {
       this.screenShakeTimer -= dt;
-      shakeX = (Math.random() - 0.5) * this.screenShakeIntensity;
-      shakeY = (Math.random() - 0.5) * this.screenShakeIntensity;
+      const progress = Math.max(0, this.screenShakeTimer / (this.screenShakeMaxDuration || 0.25));
+      const trauma = progress * progress; // Quadratic falloff for punchy impact
+      shakeX = (Math.random() * 2 - 1) * this.screenShakeIntensity * trauma;
+      shakeY = (Math.random() * 2 - 1) * this.screenShakeIntensity * trauma;
       if (this.screenShakeTimer <= 0) this.screenShakeIntensity = 0;
     }
 
@@ -1309,10 +1313,15 @@ export class BoardRenderer {
         // Stationed Unit / Architectural Building
         if (tile.baseCard && !tile.isDestroyed) {
           this.drawStructureSprite(ctx, pos.x, pos.y, tile, animTime);
+          ctx.save();
           ctx.font = 'bold 9px monospace';
-          ctx.fillStyle = '#f1f5f9';
           ctx.textAlign = 'center';
-          ctx.fillText(tile.baseCard.name, pos.x, pos.y - 30);
+          ctx.strokeStyle = '#020617';
+          ctx.lineWidth = 2.4;
+          ctx.strokeText(tile.baseCard.name, pos.x, pos.y - 32);
+          ctx.fillStyle = '#f8fafc';
+          ctx.fillText(tile.baseCard.name, pos.x, pos.y - 32);
+          ctx.restore();
         } else if (this.showStartingKeep && gx === 1 && gy === 1 && !tile.isDestroyed && !tile.baseCard) {
           // Starting Castle Keep on the primary keep plot if empty and enabled
           this.drawStartingKeep(ctx, pos.x, pos.y, animTime);
@@ -1572,12 +1581,6 @@ export class BoardRenderer {
     ctx.fillStyle = '#fbbf24';
     ctx.fillRect(4, -53 + flap * 0.5, 5, 3.5);
 
-    // Label
-    ctx.font = 'bold 9px monospace';
-    ctx.fillStyle = '#fef08a';
-    ctx.textAlign = 'center';
-    ctx.fillText('ROYAL KEEP', 0, -42);
-
     ctx.restore();
   }
 
@@ -1657,17 +1660,16 @@ export class BoardRenderer {
     }
 
     // THE ICONIC 9 KINGS BOLD CENTRAL TROOP COUNT BADGE
-    const baseCount = isArcher ? 58 : isKnight ? 78 : 24;
-    const troopCount = baseCount * stackLevel + (tile.x * 12 + tile.y * 16);
+    const troopCount = tile.health > 0 ? tile.health : (isArcher ? 60 : isKnight ? 180 : 120) * stackLevel;
 
     ctx.save();
-    ctx.font = 'bold 16px monospace';
+    ctx.font = 'bold 15px monospace';
     ctx.textAlign = 'center';
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3.8;
-    ctx.strokeText(String(troopCount), x, y - 6);
+    ctx.lineWidth = 3.6;
+    ctx.strokeText(String(troopCount), x, y + 2);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(String(troopCount), x, y - 6);
+    ctx.fillText(String(troopCount), x, y + 2);
     ctx.restore();
   }
 
@@ -2072,28 +2074,43 @@ export class BoardRenderer {
   ): void {
     if (tile.isDestroyed || !tile.baseCard) return;
 
-    const hpRatio = Math.max(0, tile.health / tile.maxHealth);
-    const barW = 52;
-    const barH = 5;
-    const barX = x - barW / 2;
-    const barY = y - 52;
-
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(barX, barY, barW, barH);
-
-    ctx.fillStyle = hpRatio > 0.5 ? '#22c55e' : hpRatio > 0.25 ? '#eab308' : '#ef4444';
-    ctx.fillRect(barX, barY, barW * hpRatio, barH);
-
-    ctx.strokeStyle = '#020617';
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(barX, barY, barW, barH);
-
     const stackLevel = 1 + tile.stack.length;
+    const heightElevation = (stackLevel - 1) * 8;
+    const isBuilding = tile.baseCard.type === 'building' || tile.baseCard.type === 'economy';
+    const isDamaged = tile.health < (tile.maxHealth || 1);
+
+    // Slim Health Bar for damaged units or buildings
+    if (isDamaged || isBuilding) {
+      const hpRatio = Math.max(0, tile.health / (tile.maxHealth || 1));
+      const barW = 46;
+      const barH = 4;
+      const barX = x - barW / 2;
+      const barY = y - 44 - heightElevation;
+
+      ctx.save();
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(barX, barY, barW, barH);
+
+      ctx.fillStyle = hpRatio > 0.5 ? '#22c55e' : hpRatio > 0.25 ? '#eab308' : '#ef4444';
+      ctx.fillRect(barX, barY, barW * hpRatio, barH);
+
+      ctx.strokeStyle = '#020617';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barX, barY, barW, barH);
+      ctx.restore();
+    }
+
+    // Stack Level Badge (e.g. "L2")
     if (stackLevel > 1) {
+      ctx.save();
       ctx.font = 'bold 9px monospace';
-      ctx.fillStyle = '#fbbf24';
       ctx.textAlign = 'center';
-      ctx.fillText(`L${stackLevel}`, x, barY - 4);
+      ctx.strokeStyle = '#020617';
+      ctx.lineWidth = 2.4;
+      ctx.strokeText(`L${stackLevel}`, x, y - 48 - heightElevation);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillText(`L${stackLevel}`, x, y - 48 - heightElevation);
+      ctx.restore();
     }
   }
 
