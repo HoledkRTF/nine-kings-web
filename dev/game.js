@@ -484,19 +484,26 @@ class ImposterGame {
           <button class="btn-ghost" id="randomize-names-btn" style="font-size: 0.8rem; cursor: pointer;">🎲 Randomize</button>
         </div>
         <div class="player-list">
-          ${this.state.players.map((p, idx) => `
+          ${this.state.players.length === 0 ? `
+            <div style="text-align: center; padding: 20px 10px; color: var(--text-dim); font-size: 0.9rem;">
+              No players added yet. Add at least 3 players below to start!
+            </div>
+          ` : this.state.players.map((p, idx) => `
             <div class="player-item">
               <div class="player-info">
                 ${renderAvatarSvg(p.name, 34)}
                 <span class="player-name">${p.name}</span>
                 <span class="player-score">✦ ${this.state.scores[p.name] || 0} pts</span>
               </div>
-              ${this.state.players.length > 3 ? `
-                <button class="del-player-btn" data-index="${idx}" title="Remove player">✕</button>
-              ` : ''}
+              <button class="del-player-btn" data-index="${idx}" title="Remove player">✕</button>
             </div>
           `).join('')}
         </div>
+        ${this.state.players.length < 3 ? `
+          <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.78rem; color: #fbbf24; display: flex; align-items: center; gap: 6px;">
+            <span>⚠️</span> Need at least 3 players to start (${this.state.players.length}/3)
+          </div>
+        ` : ''}
         <div class="add-player-row">
           <input type="text" id="new-player-input" class="input-field" placeholder="Add player name..." maxlength="14" />
           <button class="btn btn-primary" id="add-player-btn" style="width: auto; padding: 10px 18px;">+ Add</button>
@@ -615,8 +622,9 @@ class ImposterGame {
 
       <!-- Start Button -->
       <div style="margin-top: 10px; margin-bottom: 24px;">
-        <button class="btn btn-primary" id="start-game-btn" style="padding: 18px; font-size: 1.15rem; font-family: 'Space Grotesk', sans-serif;">
-          🚀 Start Pass & Play Game
+        <button class="btn ${this.state.players.length >= 3 ? 'btn-primary' : 'btn-secondary'}" id="start-game-btn" 
+          style="padding: 18px; font-size: 1.15rem; font-family: 'Space Grotesk', sans-serif; ${this.state.players.length < 3 ? 'opacity: 0.6;' : ''}">
+          ${this.state.players.length >= 3 ? '🚀 Start Pass & Play Game' : `👥 Need at least 3 players (${this.state.players.length}/3)`}
         </button>
       </div>
     `;
@@ -652,8 +660,12 @@ class ImposterGame {
     document.querySelectorAll('.del-player-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         const idx = parseInt(e.currentTarget.dataset.index, 10);
-        if (!isNaN(idx) && this.state.players.length > 3) {
+        if (!isNaN(idx) && idx >= 0 && idx < this.state.players.length) {
           this.state.players.splice(idx, 1);
+          const maxPossible = Math.max(1, Math.floor(this.state.players.length / 2));
+          if (this.state.numImposters > maxPossible) {
+            this.state.numImposters = maxPossible;
+          }
           this.render();
         }
       });
