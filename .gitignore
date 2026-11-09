@@ -11,3 +11,5 @@ inspect_*.png
 browser_preview_*.png
 full_top_strip.png
 tree_sample_*.png
+
+.vercel/
