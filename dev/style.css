@@ -531,6 +531,12 @@ input:checked + .slider:before {
   box-shadow: 0 0 35px var(--accent-crew-glow);
 }
 
+.card-back.role-undercover {
+  background: linear-gradient(145deg, #2e1065 0%, #170d36 100%);
+  border: 2px solid #8b5cf6;
+  box-shadow: 0 0 35px rgba(139, 92, 246, 0.4);
+}
+
 .card-back.role-imposter {
   background: linear-gradient(145deg, #7f1d1d 0%, #450a0a 100%);
   border: 2px solid #ef4444;

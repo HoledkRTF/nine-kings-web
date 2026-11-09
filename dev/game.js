@@ -763,25 +763,32 @@ class ImposterGame {
     let wordToShow = this.state.secretWord;
     let hintDesc = 'Describe your word with a subtle clue. Do not give it away!';
 
-    if (isMrWhite) {
-      roleClass = 'role-mrwhite';
-      roleTitle = 'YOU ARE MR. WHITE';
-      wordToShow = '???';
-      hintDesc = 'You have NO word! Listen carefully to every clue, pretend you know it, and bluff your way through.';
-    } else if (isImposter) {
-      roleClass = 'role-imposter';
-      roleTitle = 'YOU ARE THE IMPOSTER!';
-      if (this.state.mode === 'undercover') {
-        wordToShow = this.state.imposterWord || '???';
-        hintDesc = 'Your secret word is slightly different from the crew! Blend in and do not get caught.';
+    if (this.state.mode === 'undercover') {
+      if (isMrWhite) {
+        roleClass = 'role-mrwhite';
+        roleTitle = 'YOU ARE MR. WHITE';
+        wordToShow = '???';
+        hintDesc = 'You have NO word! Listen carefully to every clue, pretend you know it, and bluff your way through.';
       } else {
+        // Undercover Mode: Imposter does NOT know they are the imposter!
+        // Both Crew and Undercover receive identical card styling and secret words from the pair.
+        roleClass = 'role-undercover';
+        roleTitle = 'YOUR SECRET WORD';
+        wordToShow = isImposter ? (this.state.imposterWord || this.state.secretWord) : this.state.secretWord;
+        hintDesc = 'Describe your word without saying it. Listen closely to others — someone has a slightly different word!';
+      }
+    } else {
+      // Classic Mode
+      if (isImposter) {
+        roleClass = 'role-imposter';
+        roleTitle = 'YOU ARE THE IMPOSTER!';
         wordToShow = this.state.isImposterHintEnabled ? `Category: ${this.state.secretCategory}` : '???';
         hintDesc = 'You do not know the secret word! Listen to other clues and bluff your way to victory.';
+      } else if (isGuardian) {
+        roleClass = 'role-guardian';
+        roleTitle = 'YOU ARE THE GUARDIAN';
+        hintDesc = 'You know the secret word! During voting, you will secretly shield one player from elimination.';
       }
-    } else if (isGuardian) {
-      roleClass = 'role-guardian';
-      roleTitle = 'YOU ARE THE GUARDIAN';
-      hintDesc = 'You know the secret word! During voting, you will secretly shield one player from elimination.';
     }
 
     return `
@@ -1390,11 +1397,14 @@ class ImposterGame {
           <button class="icon-btn" id="close-rules-btn">✕</button>
         </div>
         <div style="font-size: 0.88rem; line-height: 1.6; color: var(--text-muted); display: flex; flex-direction: column; gap: 12px;">
-          <p><strong>1. Secret Cards:</strong> Pass the device around. Each player taps to reveal their secret role and word, then passes it to the next player.</p>
-          <p><strong>2. The Imposter:</strong> One or more players are Imposters who do NOT know the secret word (or have a slightly different word in Undercover mode).</p>
-          <p><strong>3. Giving Clues:</strong> Players take turns giving a short, one-word or brief clue about their word. The Imposter must listen, bluff, and pretend they know it.</p>
-          <p><strong>4. Secret Vote:</strong> Debate who seems suspicious, then pass the device around to cast secret ballots.</p>
-          <p><strong>5. Winning:</strong> The Crew wins if they find and eliminate all imposters. The Imposters win if they survive or equal the crew's numbers!</p>
+          <p><strong>1. Secret Cards:</strong> Pass the device around. Each player taps to reveal their secret word in private, then passes it to the next player.</p>
+          <p><strong>2. Classic vs. Undercover:</strong><br>
+            • <em>Classic Mode:</em> Imposters know they are the imposter and receive no word.<br>
+            • <em>Undercover Mode:</em> Imposters do <strong>NOT</strong> know they are the imposter! Everyone receives a word from a paired set (e.g., <em>Coffee</em> vs. <em>Tea</em>). All secret cards look 100% identical!
+          </p>
+          <p><strong>3. Giving Clues:</strong> Players take turns giving a short clue. Listen carefully — someone's clue will sound slightly off!</p>
+          <p><strong>4. Secret Vote:</strong> Pass the device to cast secret ballots on who has the odd word out.</p>
+          <p><strong>5. Winning:</strong> The Crew wins by voting out all imposters. Imposters win if they survive or bluff until equal numbers!</p>
         </div>
         <button class="btn btn-primary" id="modal-ok-btn" style="margin-top: 20px;">Got It</button>
       </div>
