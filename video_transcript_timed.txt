@@ -1,0 +1,15 @@
+[0.0s - 5.6s]  Claude, I don't want my vibe-coded app to feel slow and lose users, so please add
+[5.6s - 12.5s]  skeleton loading screens. Serve images in WebP or AVIF. Prevent duplicate API calls.
+[12.5s - 18.2s]  Debounce search and auto-complete inputs. Paginate API results. Serve static files through
+[18.2s - 24.6s]  a CDN. Move slow tasks to a background job queue. Fix n plus one queries. Enable
+[24.6s - 29.5s]  Broughtly or Gzip compression, cache frequently access data with Redis.
+[29.5s - 35.9s]  Remove unused dependencies, set timeouts for external API calls, stream AI responses token
+[35.9s - 42.2s]  by token, update the UI before the server responds, lazy load images below the screen,
+[42.2s - 47.8s]  run independent requests in parallel, add database indexes for common queries, trace slow
+[47.8s - 53.0s]  back end requests with open telemetry, place servers close to the database, render pages
+[53.0s - 58.9s]  on the server or at build time, load third-party scripts after the page, split JavaScript
+[58.9s - 65.2s]  by page, virtualized long lists, select only the columns you need, use database connection
+[65.2s - 71.4s]  pooling, prevent unnecessary re-renders, enable browser caching for static files, load balance
+[71.4s - 77.5s]  traffic across multiple app instances, self-host fonts and limit font weights, track real user
+[77.5s - 82.4s]  speed with a performance monitoring tool, test on slow phones and networks.
+[82.4s - 85.6s]  Comment, app, and I'll send you the complete app performance toolkit.
