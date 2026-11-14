@@ -13,3 +13,6 @@ full_top_strip.png
 tree_sample_*.png
 
 .vercel/
+
+.vercel
+.env*
