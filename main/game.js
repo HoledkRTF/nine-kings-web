@@ -5,10 +5,33 @@ import { renderAvatarSvg, getPlayerAvatar } from './avatars.js';
 // --- Default State ---
 const DEFAULT_PLAYERS = ['Alex', 'Jordan', 'Sam', 'Taylor'];
 
+const ICONS = {
+  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  mask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/></svg>',
+  tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>',
+  sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>',
+  help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  arrowRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>',
+  skull: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>'
+};
+
 class ImposterGame {
   constructor() {
     this.state = {
       mode: 'classic', // 'classic' or 'undercover'
+      playMode: 'pass', // 'pass' or 'online'
       players: DEFAULT_PLAYERS.map(name => ({ name, role: null, isEliminated: false, isMrWhite: false, isGuardian: false })),
       scores: {},
       numImposters: 1,
@@ -16,24 +39,27 @@ class ImposterGame {
       selectedCategories: ['general', 'animals', 'foodDrinks', 'movies', 'videoGames'],
       customWords: [],
       difficulty: 'medium',
-      timeLimit: 180, // seconds, 0 = unlimited
+      timeLimit: 300, // seconds, 0 = unlimited
       roundType: 'hint', // 'hint', 'question', 'silent', 'drawing'
       isGuardianEnabled: false,
       isMrWhiteEnabled: false,
       isImposterHintEnabled: true,
       isLastChanceEnabled: false,
 
+      // UI-only state
+      openPanels: { players: false, categories: false },
+
       // Active Game State
-      screen: 'setup', // setup, reveal, discussion, voting_pass, voting_input, voting_results, mrwhite_guess, imposter_guess, victory
+      screen: 'home', // home, setup, reveal, discussion, voting_pass, voting_input, voting_results, mrwhite_guess, imposter_guess, victory
       secretWord: '',
       secretCategory: '',
       imposterWord: null,
       startingPlayerName: null,
       revealIndex: 0,
       isCardRevealed: false,
-      
+
       // Timer
-      remainingSeconds: 180,
+      remainingSeconds: 300,
       timerRunning: false,
       timerInterval: null,
 
@@ -48,6 +74,8 @@ class ImposterGame {
       voteResults: null,
       eliminatedThisRound: [],
       undercoverRound: 1,
+      pendingWinner: null,
+      firstRoundVotes: null,
       winner: null,
       usedWords: []
     };
@@ -56,6 +84,9 @@ class ImposterGame {
     this.confettiCtx = null;
     this.confettiParticles = [];
     this.confettiAnimationId = null;
+
+    // Exposed for debugging in the browser console.
+    window.__imposterGame = this;
 
     this.init();
   }
@@ -109,7 +140,7 @@ class ImposterGame {
   launchConfetti() {
     if (!this.confettiCtx) return;
     this.confettiParticles = [];
-    const colors = ['#6366f1', '#10b981', '#ef4444', '#f59e0b', '#ec4899', '#06b6d4'];
+    const colors = ['#b91c1c', '#10b981', '#ef4444', '#f59e0b', '#06b6d4', '#ffffff'];
     for (let i = 0; i < 120; i++) {
       this.confettiParticles.push({
         x: Math.random() * this.confettiCanvas.width,
@@ -155,11 +186,10 @@ class ImposterGame {
 
   startGame() {
     if (this.state.players.length < 3) {
-      alert('You need at least 3 players to start!');
+      this.showAlert('Need at least 3 players', 'Add 3 to 15 players before starting a game.');
       return;
     }
 
-    // Pick words
     const selection = getWordSelection(
       this.state.selectedCategories,
       this.state.mode === 'undercover',
@@ -222,10 +252,40 @@ class ImposterGame {
     this.state.timerRunning = false;
     this.state.undercoverRound = 1;
     this.state.winner = null;
+    this.state.pendingWinner = null;
+    this.state.firstRoundVotes = null;
+    this.state.votes = [];
     this.state.guardianProtectedName = null;
     this.state.guardianShieldActivated = false;
+    this.state.openPanels = { players: false, categories: false };
 
     sound.start();
+    this.render();
+  }
+
+  quickStart() {
+    this.state.players = DEFAULT_PLAYERS.map(name => ({ name, role: null, isEliminated: false, isMrWhite: false, isGuardian: false }));
+    this.initScores();
+    this.state.numImposters = 1;
+    this.state.mode = 'classic';
+    this.state.timeLimit = 300;
+    this.startGame();
+  }
+
+  goHome() {
+    this.pauseTimer();
+    this.state.screen = 'home';
+    this.render();
+  }
+
+  goSetup() {
+    this.pauseTimer();
+    this.state.screen = 'setup';
+    this.render();
+  }
+
+  togglePanel(name) {
+    this.state.openPanels[name] = !this.state.openPanels[name];
     this.render();
   }
 
@@ -264,7 +324,7 @@ class ImposterGame {
 
   updateTimerDisplay() {
     const timerVal = document.getElementById('timer-val-display');
-    const timerCircle = document.getElementById('timer-progress-circle');
+    const timerBar = document.getElementById('timer-bar-fill');
     const pauseBtn = document.getElementById('timer-pause-btn');
 
     if (timerVal) {
@@ -278,15 +338,15 @@ class ImposterGame {
       }
     }
 
-    if (timerCircle && this.state.timeLimit > 0) {
-      const total = this.state.timeLimit;
-      const frac = Math.max(0, this.state.remainingSeconds / total);
-      const circumference = 2 * Math.PI * 68; // radius 68
-      timerCircle.style.strokeDashoffset = (1 - frac) * circumference;
+    if (timerBar && this.state.timeLimit > 0) {
+      const frac = Math.max(0, this.state.remainingSeconds / this.state.timeLimit);
+      timerBar.style.width = `${frac * 100}%`;
+      timerBar.classList.toggle('warning', this.state.remainingSeconds <= 15);
     }
 
     if (pauseBtn) {
-      pauseBtn.textContent = this.state.timerRunning ? '⏸️ Pause' : '▶️ Resume';
+      pauseBtn.innerHTML = this.state.timerRunning ? ICONS.pause : ICONS.play;
+      pauseBtn.title = this.state.timerRunning ? 'Pause timer' : 'Resume timer';
     }
   }
 
@@ -356,6 +416,9 @@ class ImposterGame {
 
     this.state.voteResults = { tallies: voteTallies, maxVotes, accused, shieldSaved };
     this.state.eliminatedThisRound = finalEliminated;
+    if (this.state.undercoverRound === 1 && !this.state.firstRoundVotes) {
+      this.state.firstRoundVotes = this.state.votes.map(v => ({ voter: v.voter, accused: [...v.accused] }));
+    }
 
     // Eliminate players
     finalEliminated.forEach(name => {
@@ -372,32 +435,37 @@ class ImposterGame {
       const p = this.state.players.find(pl => pl.name === n);
       return p && p.isMrWhite;
     })) {
-      // Mr White eliminated! Give them a guess
       this.state.screen = 'mrwhite_guess';
       this.render();
       return;
     }
 
     if (aliveImposters.length === 0) {
-      // Imposter caught! Check last chance guess
       if (this.state.isLastChanceEnabled) {
         this.state.screen = 'imposter_guess';
         this.render();
         return;
       }
-      this.declareWinner('crew');
-    } else if (aliveImposters.length >= aliveCrew.length) {
-      this.declareWinner('imposters');
-    } else {
-      // Game continues!
+      this.state.pendingWinner = 'crew';
       this.state.screen = 'voting_results';
       this.render();
+      return;
     }
+
+    if (aliveImposters.length >= aliveCrew.length) {
+      this.state.pendingWinner = 'imposters';
+    } else {
+      this.state.pendingWinner = null;
+    }
+
+    this.state.screen = 'voting_results';
+    this.render();
   }
 
   declareWinner(winner) {
     this.state.winner = winner;
     this.state.screen = 'victory';
+    this.state.pendingWinner = null;
 
     // Award scores
     this.state.players.forEach(p => {
@@ -425,6 +493,10 @@ class ImposterGame {
     if (!container) return;
 
     switch (this.state.screen) {
+      case 'home':
+        container.innerHTML = this.renderHomeScreen();
+        this.bindHomeEvents();
+        break;
       case 'setup':
         container.innerHTML = this.renderSetupScreen();
         this.bindSetupEvents();
@@ -464,181 +536,305 @@ class ImposterGame {
     }
   }
 
-  // --- Setup Screen Template ---
-  renderSetupScreen() {
+  // --- Shared UI helpers ---
+
+  renderTitleCard(subtitle) {
     return `
-      <!-- Mode Tabs -->
-      <div class="tab-switch">
-        <button class="tab-btn ${this.state.mode === 'classic' ? 'active' : ''}" id="mode-classic-btn">
-          <span>🕵️ Classic Imposter</span>
+      <div class="hero-title-card">
+        ${this.state.screen === 'setup' ? `<button class="hero-back" id="back-home-btn" aria-label="Back">‹</button>` : ''}
+        <div class="hero-logo">🕵️</div>
+        <div class="hero-copy">
+          <h1>Imposter Game</h1>
+          <span>${subtitle}</span>
+        </div>
+        <div class="hero-actions">
+          <button class="hero-icon" id="header-settings-btn" aria-label="Settings">${ICONS.gear}</button>
+          <button class="hero-icon" id="header-help-btn" aria-label="How to Play">${ICONS.help}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderModeCards() {
+    const pass = this.state.playMode === 'pass';
+    return `
+      <div class="mode-grid">
+        <button type="button" class="mode-card ${!pass ? 'selected' : ''}" id="mode-online-btn">
+          <span class="mode-top"><span class="mode-icon">${ICONS.globe}</span><span class="${!pass ? 'mode-check' : 'mode-radio'}">${!pass ? ICONS.check : ''}</span></span>
+          <span class="mode-name">Online</span>
+          <span class="mode-desc">Play remotely with friends</span>
         </button>
-        <button class="tab-btn ${this.state.mode === 'undercover' ? 'active' : ''}" id="mode-undercover-btn">
-          <span>🤫 Undercover Mode</span>
-        </button>
-      </div>
-
-      <!-- Players Card -->
-      <div class="glass-panel">
-        <div class="panel-header">
-          <span class="panel-title">👥 Players (${this.state.players.length})</span>
-          <button class="btn-ghost" id="randomize-names-btn" style="font-size: 0.8rem; cursor: pointer;">🎲 Randomize</button>
-        </div>
-        <div class="player-list">
-          ${this.state.players.length === 0 ? `
-            <div style="text-align: center; padding: 20px 10px; color: var(--text-dim); font-size: 0.9rem;">
-              No players added yet. Add at least 3 players below to start!
-            </div>
-          ` : this.state.players.map((p, idx) => `
-            <div class="player-item">
-              <div class="player-info">
-                ${renderAvatarSvg(p.name, 34)}
-                <span class="player-name">${p.name}</span>
-                <span class="player-score">✦ ${this.state.scores[p.name] || 0} pts</span>
-              </div>
-              <button class="del-player-btn" data-index="${idx}" title="Remove player">✕</button>
-            </div>
-          `).join('')}
-        </div>
-        ${this.state.players.length < 3 ? `
-          <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.78rem; color: #fbbf24; display: flex; align-items: center; gap: 6px;">
-            <span>⚠️</span> Need at least 3 players to start (${this.state.players.length}/3)
-          </div>
-        ` : ''}
-        <div class="add-player-row">
-          <input type="text" id="new-player-input" class="input-field" placeholder="Add player name..." maxlength="14" />
-          <button class="btn btn-primary" id="add-player-btn" style="width: auto; padding: 10px 18px;">+ Add</button>
-        </div>
-      </div>
-
-      <!-- Settings Card -->
-      <div class="glass-panel">
-        <div class="panel-header">
-          <span class="panel-title">⚙️ Game Rules & Modifiers</span>
-        </div>
-
-        <!-- Imposters count -->
-        <div class="setting-row">
-          <div class="setting-label">
-            <span class="setting-title">Number of Imposters</span>
-            <span class="setting-desc">Hidden among crewmates</span>
-          </div>
-          <div class="stepper">
-            <button class="stepper-btn" id="stepper-imp-sub">−</button>
-            <span class="stepper-val" id="stepper-imp-val">${this.state.numImposters}</span>
-            <button class="stepper-btn" id="stepper-imp-add">+</button>
-          </div>
-        </div>
-
-        <!-- Timer Setting -->
-        <div class="setting-row">
-          <div class="setting-label">
-            <span class="setting-title">Discussion Timer</span>
-            <span class="setting-desc">Time limit for giving clues</span>
-          </div>
-          <div class="stepper">
-            <button class="stepper-btn" id="stepper-timer-sub">−</button>
-            <span class="stepper-val" id="stepper-timer-val">${this.state.timeLimit === 0 ? 'Off' : `${this.state.timeLimit / 60}m`}</span>
-            <button class="stepper-btn" id="stepper-timer-add">+</button>
-          </div>
-        </div>
-
-        <!-- Modifiers -->
-        <div class="setting-row">
-          <div class="setting-label">
-            <span class="setting-title">Chaos Mode</span>
-            <span class="setting-desc">Randomized surprise imposter count</span>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="toggle-chaos" ${this.state.isChaosMode ? 'checked' : ''} />
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-label">
-            <span class="setting-title">Guardian Role</span>
-            <span class="setting-desc">One player secretly shields a friend</span>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="toggle-guardian" ${this.state.isGuardianEnabled ? 'checked' : ''} />
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        ${this.state.mode === 'undercover' ? `
-          <div class="setting-row">
-            <div class="setting-label">
-              <span class="setting-title">Mr. White Role</span>
-              <span class="setting-desc">Has NO word, must bluff & guess</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggle-mrwhite" ${this.state.isMrWhiteEnabled ? 'checked' : ''} />
-              <span class="slider"></span>
-            </label>
-          </div>
-        ` : `
-          <div class="setting-row">
-            <div class="setting-label">
-              <span class="setting-title">Imposter Hint</span>
-              <span class="setting-desc">Imposter sees the word's category</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggle-imphint" ${this.state.isImposterHintEnabled ? 'checked' : ''} />
-              <span class="slider"></span>
-            </label>
-          </div>
-        `}
-
-        <div class="setting-row">
-          <div class="setting-label">
-            <span class="setting-title">Last Chance Guess</span>
-            <span class="setting-desc">Caught imposters can guess word to win</span>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="toggle-lastchance" ${this.state.isLastChanceEnabled ? 'checked' : ''} />
-            <span class="slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Categories Card -->
-      <div class="glass-panel">
-        <div class="panel-header">
-          <span class="panel-title">🏷️ Categories (${this.state.selectedCategories.length} selected)</span>
-          <button class="btn-ghost" id="toggle-all-cats-btn" style="font-size: 0.8rem; cursor: pointer;">Select All</button>
-        </div>
-        <div class="category-chips">
-          ${Object.keys(CATEGORY_LABELS).map(catKey => {
-            const isSelected = this.state.selectedCategories.includes(catKey);
-            return `
-              <div class="cat-chip ${isSelected ? 'selected' : ''}" data-cat="${catKey}">
-                <span>${CATEGORY_ICONS[catKey] || '🏷️'}</span>
-                <span>${CATEGORY_LABELS[catKey]}</span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-
-      <!-- Start Button -->
-      <div style="margin-top: 10px; margin-bottom: 24px;">
-        <button class="btn ${this.state.players.length >= 3 ? 'btn-primary' : 'btn-secondary'}" id="start-game-btn" 
-          style="padding: 18px; font-size: 1.15rem; font-family: 'Space Grotesk', sans-serif; ${this.state.players.length < 3 ? 'opacity: 0.6;' : ''}">
-          ${this.state.players.length >= 3 ? '🚀 Start Pass & Play Game' : `👥 Need at least 3 players (${this.state.players.length}/3)`}
+        <button type="button" class="mode-card ${pass ? 'selected' : ''}" id="mode-pass-btn">
+          <span class="mode-top"><span class="mode-icon">${ICONS.phone}</span><span class="${pass ? 'mode-check' : 'mode-radio'}">${pass ? ICONS.check : ''}</span></span>
+          <span class="mode-name">Pass &amp; Play</span>
+          <span class="mode-desc">Play locally on one device</span>
         </button>
       </div>
     `;
   }
 
+  renderToggle(id, checked, extra = '') {
+    return `
+      <label class="switch">
+        <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} />
+        <span class="slider"></span>
+      </label>
+    `;
+  }
+
+  renderSettingsCard({ key, icon, title, summary, open, body }) {
+    return `
+      <div class="settings-card ${open ? 'open' : ''}">
+        <button type="button" class="settings-head" data-panel="${key}">
+          <span class="settings-head-icon">${icon}</span>
+          <span class="settings-head-text">
+            <span class="settings-head-title">${title}</span>
+            <span class="settings-head-sub">${summary}</span>
+          </span>
+          <span class="settings-chevron">${ICONS.chevron}</span>
+        </button>
+        ${open ? `<div class="settings-body">${body}</div>` : ''}
+      </div>
+    `;
+  }
+
+  // --- Home Screen ---
+  renderHomeScreen() {
+    return `
+      <div class="home-wrap">
+        ${this.renderTitleCard('PASS & PLAY')}
+        ${this.renderModeCards()}
+
+        <div class="home-info-card">
+          <h3>How it works</h3>
+          <ol class="how-list">
+            <li><span>1</span> Add 3 to 15 players and pick a word category.</li>
+            <li><span>2</span> Pass the phone around, each player secretly views the word.</li>
+            <li><span>3</span> Take turns giving a one-word clue about it.</li>
+            <li><span>4</span> Discuss, then vote on who you think the imposter is.</li>
+          </ol>
+        </div>
+
+        <button class="btn btn-red btn-lg" id="home-start-btn">
+          ${ICONS.play}<span>Start Pass &amp; Play</span>
+        </button>
+        <button class="btn btn-dark" id="home-quick-btn">Quick start with 4 players</button>
+
+        <p class="home-footnote">3–15 players · 40+ categories · No download</p>
+      </div>
+    `;
+  }
+
+  bindHomeEvents() {
+    document.getElementById('mode-online-btn')?.addEventListener('click', () => this.showOnlineModal());
+    document.getElementById('mode-pass-btn')?.addEventListener('click', () => this.goSetup());
+    document.getElementById('home-start-btn')?.addEventListener('click', () => this.goSetup());
+    document.getElementById('home-quick-btn')?.addEventListener('click', () => this.quickStart());
+    document.getElementById('header-settings-btn')?.addEventListener('click', () => this.showSettingsModal());
+    document.getElementById('header-help-btn')?.addEventListener('click', () => this.showRulesModal());
+  }
+
+  // --- Setup Screen ---
+  renderSetupScreen() {
+    const p = this.state.players;
+    const names = p.length ? p.map(x => x.name).join(', ') : 'Add players';
+    const selected = this.state.selectedCategories.length;
+    const timerLabel = this.state.timeLimit === 0 ? 'Off' : `${this.state.timeLimit / 60} min`;
+    const roundLabels = { hint: 'Hint Round', question: 'Question Round', silent: 'Silent Round', drawing: 'Drawing Round' };
+
+    const playersBody = `
+      <div class="player-list">
+        ${p.length === 0 ? `
+          <div class="empty-note">No players added yet. Add at least 3 players below to start!</div>
+        ` : p.map((pl, idx) => `
+          <div class="player-item">
+            <div class="player-info">
+              ${renderAvatarSvg(pl.name, 36)}
+              <span class="player-name">${pl.name}</span>
+              <span class="player-score">${this.state.scores[pl.name] || 0} pts</span>
+            </div>
+            <button class="del-player-btn" data-index="${idx}" title="Remove player">✕</button>
+          </div>
+        `).join('')}
+      </div>
+      ${p.length < 3 ? `<div class="min-note">⚠️ Need at least 3 players to start (${p.length}/3)</div>` : ''}
+      <div class="add-player-row">
+        <input type="text" id="new-player-input" class="input-field" placeholder="Enter player name" maxlength="14" />
+        <button class="btn btn-dark btn-compact" id="add-player-btn">+ Add</button>
+      </div>
+    `;
+
+    const categoriesBody = `
+      <div class="category-chips">
+        ${Object.keys(CATEGORY_LABELS).map(catKey => {
+          const isSelected = this.state.selectedCategories.includes(catKey);
+          return `
+            <div class="cat-chip ${isSelected ? 'selected' : ''}" data-cat="${catKey}">
+              <span>${CATEGORY_ICONS[catKey] || '🏷️'}</span>
+              <span>${CATEGORY_LABELS[catKey]}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <button class="btn btn-dark btn-compact" id="toggle-all-cats-btn">Select All Categories</button>
+    `;
+
+    const impostersBody = `
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Imposter Hint</span>
+          <span class="setting-desc">Imposter sees the category</span>
+        </div>
+        ${this.renderToggle('toggle-imphint', this.state.isImposterHintEnabled)}
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Imposters</span>
+          <span class="setting-desc">Hidden among crewmates</span>
+        </div>
+        <div class="stepper">
+          <button class="stepper-btn" id="stepper-imp-sub">−</button>
+          <span class="stepper-val" id="stepper-imp-val">${this.state.numImposters}</span>
+          <button class="stepper-btn" id="stepper-imp-add">+</button>
+        </div>
+      </div>
+      <p class="hint-note">Up to 3 imposters with 6+ players.</p>
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Random Imposters</span>
+          <span class="setting-desc">Number of imposters changes every round (1-3)</span>
+        </div>
+        ${this.renderToggle('toggle-chaos', this.state.isChaosMode)}
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Last chance guess</span>
+          <span class="setting-desc">A caught imposter gets one guess at the secret word.</span>
+        </div>
+        ${this.renderToggle('toggle-lastchance', this.state.isLastChanceEnabled)}
+      </div>
+    `;
+
+    const roundsBody = `
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Round Type</span>
+          <span class="setting-desc">How players give clues</span>
+        </div>
+        <select id="round-type-select" class="input-field select-compact">
+          ${Object.entries(roundLabels).map(([val, label]) => `<option value="${val}" ${this.state.roundType === val ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Time Limit</span>
+          <span class="setting-desc">Discussion timer</span>
+        </div>
+        <div class="stepper">
+          <button class="stepper-btn" id="stepper-timer-sub">−</button>
+          <span class="stepper-val" id="stepper-timer-val">${timerLabel}</span>
+          <button class="stepper-btn" id="stepper-timer-add">+</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Guardian Role</span>
+          <span class="setting-desc">One player secretly shields a friend</span>
+        </div>
+        ${this.renderToggle('toggle-guardian', this.state.isGuardianEnabled)}
+      </div>
+    `;
+
+    return `
+      <div class="setup-wrap">
+        ${this.renderTitleCard('PASS & PLAY')}
+        ${this.renderModeCards()}
+
+        ${this.renderSettingsCard({
+          key: 'players',
+          icon: ICONS.users,
+          title: 'PLAYERS',
+          summary: names,
+          open: this.state.openPanels.players,
+          body: playersBody
+        })}
+
+        <div class="settings-card undercover-card">
+          <div class="undercover-row">
+            <div class="undercover-copy">
+              <div class="undercover-title">
+                <span class="undercover-icon">${ICONS.mask}</span>
+                <span>Undercover Mode</span>
+                <span class="badge-new">NEW</span>
+                <button type="button" class="info-dot" id="undercover-info-btn" aria-label="About Undercover Mode">i</button>
+              </div>
+              <p class="setting-desc">Everyone gets a word — the imposter gets a related one.</p>
+            </div>
+            ${this.renderToggle('toggle-undercover', this.state.mode === 'undercover')}
+          </div>
+        </div>
+
+        ${this.state.mode === 'undercover' ? `
+          <div class="settings-card">
+            <div class="setting-row" style="border-bottom:none;padding:4px 0;">
+              <div class="setting-label">
+                <span class="setting-title">Mr. White Role</span>
+                <span class="setting-desc">Has NO word, must bluff &amp; guess</span>
+              </div>
+              ${this.renderToggle('toggle-mrwhite', this.state.isMrWhiteEnabled)}
+            </div>
+          </div>
+        ` : ''}
+
+        ${this.renderSettingsCard({
+          key: 'categories',
+          icon: ICONS.tag,
+          title: 'CATEGORIES',
+          summary: `${selected} selected`,
+          open: this.state.openPanels.categories,
+          body: categoriesBody
+        })}
+
+        ${this.renderSettingsCard({
+          key: 'imposters',
+          icon: ICONS.sliders,
+          title: 'IMPOSTERS',
+          summary: `${this.state.numImposters} imposter${this.state.numImposters > 1 ? 's' : ''}${this.state.isChaosMode ? ' · random' : ''}`,
+          open: this.state.openPanels.imposters,
+          body: impostersBody
+        })}
+
+        ${this.renderSettingsCard({
+          key: 'rounds',
+          icon: ICONS.clock,
+          title: 'ROUNDS & TIMER',
+          summary: `${roundLabels[this.state.roundType]} · ${timerLabel}`,
+          open: this.state.openPanels.rounds,
+          body: roundsBody
+        })}
+
+        <div class="setup-spacer"></div>
+
+        <div class="start-dock">
+          <button class="btn btn-red btn-lg" id="start-game-btn" ${p.length < 3 ? 'disabled' : ''}>
+            ${p.length < 3 ? `Add ${3 - p.length} more player${3 - p.length === 1 ? '' : 's'}` : 'START GAME'}
+          </button>
+          <button class="btn btn-dark" id="quick-start-btn">Quick start with 4 players</button>
+        </div>
+      </div>
+    `;
+  }
+
   bindSetupEvents() {
-    // Mode toggles
-    document.getElementById('mode-classic-btn')?.addEventListener('click', () => {
-      this.state.mode = 'classic';
-      this.render();
-    });
-    document.getElementById('mode-undercover-btn')?.addEventListener('click', () => {
-      this.state.mode = 'undercover';
-      this.render();
+    document.getElementById('back-home-btn')?.addEventListener('click', () => this.goHome());
+    document.getElementById('header-settings-btn')?.addEventListener('click', () => this.showSettingsModal());
+    document.getElementById('header-help-btn')?.addEventListener('click', () => this.showRulesModal());
+    document.getElementById('mode-online-btn')?.addEventListener('click', () => this.showOnlineModal());
+    document.getElementById('mode-pass-btn')?.addEventListener('click', () => this.goSetup());
+
+    // Expandable panels
+    document.querySelectorAll('.settings-head').forEach(head => {
+      head.addEventListener('click', () => this.togglePanel(head.dataset.panel));
     });
 
     // Add Player
@@ -650,6 +846,7 @@ class ImposterGame {
         this.state.players.push({ name, role: null, isEliminated: false, isMrWhite: false, isGuardian: false });
         if (this.state.scores[name] === undefined) this.state.scores[name] = 0;
         input.value = '';
+        this.state.openPanels.players = true;
         this.render();
       }
     };
@@ -666,18 +863,10 @@ class ImposterGame {
           if (this.state.numImposters > maxPossible) {
             this.state.numImposters = maxPossible;
           }
+          this.state.openPanels.players = true;
           this.render();
         }
       });
-    });
-
-    // Randomize names
-    document.getElementById('randomize-names-btn')?.addEventListener('click', () => {
-      const presets = ['Alex', 'Jordan', 'Sam', 'Taylor', 'Morgan', 'Riley', 'Casey', 'Avery', 'Logan', 'Mason', 'Ella', 'Quinn'];
-      const shuffled = presets.sort(() => Math.random() - 0.5).slice(0, Math.max(4, this.state.players.length));
-      this.state.players = shuffled.map(name => ({ name, role: null, isEliminated: false, isMrWhite: false, isGuardian: false }));
-      this.initScores();
-      this.render();
     });
 
     // Steppers
@@ -686,7 +875,7 @@ class ImposterGame {
       this.render();
     });
     document.getElementById('stepper-imp-add')?.addEventListener('click', () => {
-      const maxPossible = Math.max(1, Math.floor(this.state.players.length / 2));
+      const maxPossible = Math.max(1, Math.min(3, Math.floor(this.state.players.length / 2)));
       this.state.numImposters = Math.min(maxPossible, this.state.numImposters + 1);
       this.render();
     });
@@ -705,20 +894,28 @@ class ImposterGame {
     });
 
     // Switches
+    document.getElementById('toggle-undercover')?.addEventListener('change', e => {
+      this.state.mode = e.target.checked ? 'undercover' : 'classic';
+      this.render();
+    });
+    document.getElementById('toggle-mrwhite')?.addEventListener('change', e => {
+      this.state.isMrWhiteEnabled = e.target.checked;
+    });
     document.getElementById('toggle-chaos')?.addEventListener('change', e => {
       this.state.isChaosMode = e.target.checked;
     });
     document.getElementById('toggle-guardian')?.addEventListener('change', e => {
       this.state.isGuardianEnabled = e.target.checked;
     });
-    document.getElementById('toggle-mrwhite')?.addEventListener('change', e => {
-      this.state.isMrWhiteEnabled = e.target.checked;
-    });
     document.getElementById('toggle-imphint')?.addEventListener('change', e => {
       this.state.isImposterHintEnabled = e.target.checked;
     });
     document.getElementById('toggle-lastchance')?.addEventListener('change', e => {
       this.state.isLastChanceEnabled = e.target.checked;
+    });
+
+    document.getElementById('round-type-select')?.addEventListener('change', e => {
+      this.state.roundType = e.target.value;
     });
 
     // Categories
@@ -732,6 +929,7 @@ class ImposterGame {
         } else {
           this.state.selectedCategories.push(cat);
         }
+        this.state.openPanels.categories = true;
         this.render();
       });
     });
@@ -743,111 +941,116 @@ class ImposterGame {
       } else {
         this.state.selectedCategories = [...all];
       }
+      this.state.openPanels.categories = true;
       this.render();
+    });
+
+    document.getElementById('undercover-info-btn')?.addEventListener('click', () => {
+      this.showInfoModal('Undercover Mode', `
+        <p>The imposter does <strong>not</strong> know they are the imposter. Everyone receives a word from a related pair — the crew gets one and the imposter gets the other.</p>
+        <p>Optional <strong>Mr. White</strong> role gets no word at all and one last-chance guess if voted out.</p>
+      `);
     });
 
     // Start
     document.getElementById('start-game-btn')?.addEventListener('click', () => this.startGame());
+    document.getElementById('quick-start-btn')?.addEventListener('click', () => this.quickStart());
   }
 
-  // --- Reveal Screen Template (3D Card) ---
+  // --- Reveal Screen Template ---
   renderRevealScreen() {
     const curPlayer = this.state.players[this.state.revealIndex];
     const isRevealed = this.state.isCardRevealed;
     const isImposter = curPlayer.role === 'imposter';
     const isMrWhite = curPlayer.isMrWhite;
     const isGuardian = curPlayer.isGuardian;
+    const isLast = this.state.revealIndex + 1 >= this.state.players.length;
 
     let roleClass = 'role-crew';
-    let roleTitle = 'CREWMATE';
+    let roleTitle = 'THE SECRET WORD';
     let wordToShow = this.state.secretWord;
-    let hintDesc = 'Describe your word with a subtle clue. Do not give it away!';
+    let roleIcon = '🗣️';
+    let hintDesc = "Don't say the word directly, drop hints.";
 
     if (this.state.mode === 'undercover') {
       if (isMrWhite) {
         roleClass = 'role-mrwhite';
         roleTitle = 'YOU ARE MR. WHITE';
         wordToShow = '???';
-        hintDesc = 'You have NO word! Listen carefully to every clue, pretend you know it, and bluff your way through.';
+        roleIcon = '🎩';
+        hintDesc = 'You have NO word! Listen carefully and bluff your way through.';
       } else {
-        // Undercover Mode: Imposter does NOT know they are the imposter!
-        // Both Crew and Undercover receive identical card styling and secret words from the pair.
         roleClass = 'role-undercover';
-        roleTitle = 'YOUR SECRET WORD';
+        roleTitle = 'THE SECRET WORD';
         wordToShow = isImposter ? (this.state.imposterWord || this.state.secretWord) : this.state.secretWord;
-        hintDesc = 'Describe your word without saying it. Listen closely to others — someone has a slightly different word!';
+        roleIcon = '🕵️';
+        hintDesc = "Describe your word without saying it. Someone has a slightly different word!";
       }
     } else {
-      // Classic Mode
       if (isImposter) {
         roleClass = 'role-imposter';
         roleTitle = 'YOU ARE THE IMPOSTER!';
-        wordToShow = this.state.isImposterHintEnabled ? `Category: ${this.state.secretCategory}` : '???';
-        hintDesc = 'You do not know the secret word! Listen to other clues and bluff your way to victory.';
+        wordToShow = this.state.isImposterHintEnabled ? null : '???';
+        roleIcon = '💀';
+        hintDesc = this.state.isImposterHintEnabled
+          ? "You don't know the word. Use the category to bluff your way through."
+          : "You don't know the secret word! Listen to clues and bluff.";
       } else if (isGuardian) {
         roleClass = 'role-guardian';
         roleTitle = 'YOU ARE THE GUARDIAN';
-        hintDesc = 'You know the secret word! During voting, you will secretly shield one player from elimination.';
+        roleIcon = '🛡️';
+        hintDesc = 'You know the secret word! During voting, secretly shield one player.';
       }
     }
 
     return `
-      <!-- Step Indicator -->
-      <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 12px;">
-        ${this.state.players.map((_, idx) => `
-          <div style="height: 6px; border-radius: 4px; transition: all 0.3s ease; 
-            width: ${idx === this.state.revealIndex ? '28px' : '8px'}; 
-            background: ${idx < this.state.revealIndex ? '#10b981' : idx === this.state.revealIndex ? '#ffffff' : 'rgba(255,255,255,0.15)'};">
-          </div>
-        `).join('')}
-      </div>
+      <div class="reveal-stage">
+        <div class="progress-segments">
+          ${this.state.players.map((_, idx) => `
+            <span class="progress-seg ${idx < this.state.revealIndex ? 'done' : ''} ${idx === this.state.revealIndex ? 'active' : ''}"></span>
+          `).join('')}
+        </div>
 
-      <div style="text-align: center; margin-bottom: 8px;">
-        <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.08em;">
-          Step ${this.state.revealIndex + 1} of ${this.state.players.length}
-        </span>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.8rem; font-weight: 700; margin-top: 2px;">
-          Pass phone to ${curPlayer.name}
-        </h2>
-      </div>
+        <div class="pass-label">${ICONS.eyeOff} PASS THE DEVICE TO</div>
 
-      <!-- 3D Card Scene -->
-      <div class="card-scene">
+        <div class="avatar-ring">
+          ${renderAvatarSvg(curPlayer.name, 96)}
+        </div>
+        <h2 class="player-hero-name">${curPlayer.name}</h2>
+        <p class="player-hero-sub">Player ${this.state.revealIndex + 1} of ${this.state.players.length}</p>
+
         <div class="reveal-card ${isRevealed ? 'flipped' : ''}" id="reveal-card-element">
-          
-          <!-- Card Front (Locked) -->
           <div class="card-face card-front">
-            <div class="peek-icon">👁️</div>
-            ${renderAvatarSvg(curPlayer.name, 64)}
-            <h3 style="font-size: 1.4rem; font-weight: 700; margin-top: 12px; margin-bottom: 4px;">${curPlayer.name}</h3>
-            <p style="font-size: 0.95rem; font-weight: 600; color: #a5b4fc; margin-bottom: 8px;">Tap to reveal your secret card</p>
-            <p style="font-size: 0.78rem; color: var(--text-dim);">Make sure no one else is looking!</p>
+            <div class="card-lock">${ICONS.lock}</div>
+            <span class="card-front-title">TAP TO REVEAL</span>
+            <span class="card-front-sub">Make sure no one else is looking at your screen.</span>
           </div>
 
-          <!-- Card Back (Revealed) -->
           <div class="card-face card-back ${roleClass}">
+            <div class="card-role-icon">${roleIcon}</div>
             <span class="role-badge">${roleTitle}</span>
-            <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8;">
-              ${this.state.secretCategory}
-            </span>
-            <div class="secret-word-display">${wordToShow}</div>
+            ${wordToShow ? `<div class="secret-word-display">${wordToShow} <span class="word-dot"></span></div>` : ''}
+            ${this.state.mode === 'classic' && isImposter ? `
+              <div class="category-pill">CATEGORY: <strong>${this.state.secretCategory}</strong></div>
+            ` : `
+              <div class="category-pill">CATEGORY: <strong>${this.state.secretCategory}</strong></div>
+            `}
             <p class="role-instructions">${hintDesc}</p>
           </div>
-
         </div>
-      </div>
 
-      <!-- Bottom Button -->
-      <div>
-        ${isRevealed ? `
-          <button class="btn btn-primary" id="next-player-reveal-btn" style="padding: 16px; font-size: 1.05rem;">
-            ${this.state.revealIndex + 1 < this.state.players.length ? '🔒 Hide & Pass to Next Player' : '🚀 Start Discussion'}
-          </button>
-        ` : `
-          <button class="btn btn-secondary" id="reveal-now-btn" style="padding: 16px; font-size: 1.05rem;">
-            👁️ Tap to Reveal Card
-          </button>
-        `}
+        <div class="stage-actions">
+          ${isRevealed ? `
+            <button class="btn btn-dark btn-lg" id="next-player-reveal-btn">
+              ${isLast ? 'START GAME' : 'HIDE &amp; PASS'} <span class="arrow">${ICONS.arrowRight}</span>
+            </button>
+          ` : `
+            <button class="btn btn-red btn-lg" id="reveal-now-btn">
+              ${ICONS.lock} TAP TO REVEAL
+            </button>
+          `}
+          <button class="btn btn-ghost-quiet" id="quit-reveal-btn">✕ QUIT GAME</button>
+        </div>
       </div>
     `;
   }
@@ -865,7 +1068,9 @@ class ImposterGame {
       }
     };
 
-    card?.addEventListener('click', doFlip);
+    card?.addEventListener('click', () => {
+      if (!this.state.isCardRevealed) doFlip();
+    });
     revealBtn?.addEventListener('click', doFlip);
 
     nextBtn?.addEventListener('click', () => {
@@ -875,13 +1080,18 @@ class ImposterGame {
         this.state.isCardRevealed = false;
         this.render();
       } else {
-        // All players revealed! Proceed to Discussion
         this.state.screen = 'discussion';
         this.render();
         if (this.state.timeLimit > 0) {
           this.startTimer();
         }
       }
+    });
+
+    document.getElementById('quit-reveal-btn')?.addEventListener('click', () => {
+      this.pauseTimer();
+      this.state.screen = 'setup';
+      this.render();
     });
   }
 
@@ -891,76 +1101,72 @@ class ImposterGame {
     const m = Math.floor(this.state.remainingSeconds / 60);
     const s = this.state.remainingSeconds % 60;
     const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    const roundDescriptions = {
+      hint: "Discuss amongst yourselves. The imposter must blend in. Everyone else, try to find the liar!",
+      question: 'Only ask yes-or-no questions. The imposter must keep up with the answers!',
+      silent: 'No talking! Vote on instinct alone.',
+      drawing: 'Draw your clues. No words, no letters, no numbers!'
+    };
+    const roundTitles = { hint: 'Hint Round', question: 'Question Round', silent: 'Silent Round', drawing: 'Drawing Round' };
+
+    const currentSpeaker = this.state.startingPlayerName && living.some(p => p.name === this.state.startingPlayerName)
+      ? this.state.startingPlayerName
+      : living[0]?.name;
+
+    // Order begins at the starting speaker, then follows the table order.
+    const startIdx = Math.max(0, living.findIndex(p => p.name === currentSpeaker));
+    const ordered = [...living.slice(startIdx), ...living.slice(0, startIdx)];
 
     return `
-      <!-- Spotlight banner -->
-      <div class="speaker-spotlight">
-        ${renderAvatarSvg(this.state.startingPlayerName || living[0].name, 44)}
-        <div>
-          <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #10b981; letter-spacing: 0.08em;">Starting Speaker</span>
-          <h3 style="font-size: 1.05rem; font-weight: 700;">${this.state.startingPlayerName} gives the 1st clue!</h3>
+      <div class="discussion-wrap">
+        <div class="timer-card">
+          <div class="timer-head">
+            <span>DISCUSSION TIMER</span>
+            <div class="timer-head-actions">
+              <button class="timer-icon-btn" id="timer-sub-btn" title="Subtract 30 seconds">${ICONS.clock}</button>
+              <button class="timer-icon-btn" id="timer-pause-btn" title="Pause timer">${ICONS.pause}</button>
+            </div>
+          </div>
+          <div class="timer-big" id="timer-val-display">${this.state.timeLimit === 0 ? '∞' : timeStr}</div>
+          <div class="timer-bar"><div class="timer-bar-fill" id="timer-bar-fill" style="width:${this.state.timeLimit > 0 ? '100%' : '0%'}"></div></div>
+          ${this.state.timeLimit > 0 ? `<button class="timer-add" id="timer-add-btn">+30s</button>` : ''}
         </div>
-      </div>
 
-      <!-- Timer Hero -->
-      <div class="glass-panel" style="text-align: center;">
-        <span class="panel-title" style="justify-content: center; margin-bottom: 8px;">⏳ Discussion Phase</span>
-        
-        <div class="timer-hero">
-          <div class="timer-circle">
-            <svg width="160" height="160">
-              <circle cx="80" cy="80" r="68" stroke="rgba(255,255,255,0.08)" stroke-width="8" fill="none" />
-              <circle id="timer-progress-circle" cx="80" cy="80" r="68" stroke="url(#timer-grad)" stroke-width="8" fill="none" 
-                stroke-linecap="round" stroke-dasharray="427" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear;" />
-              <defs>
-                <linearGradient id="timer-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#6366f1" />
-                  <stop offset="100%" stop-color="#10b981" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div class="timer-val" id="timer-val-display">${this.state.timeLimit === 0 ? '∞' : timeStr}</div>
+        <div class="speakers-card">
+          <div class="speakers-head">
+            <span>SPEAKERS WILL BE IN THIS ORDER:</span>
+            <span>${living.length} Players</span>
           </div>
 
-          <!-- Timer Controls -->
-          ${this.state.timeLimit > 0 ? `
-            <div style="display: flex; gap: 10px; margin-top: 14px;">
-              <button class="btn btn-secondary" id="timer-sub-btn" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">-30s</button>
-              <button class="btn btn-secondary" id="timer-pause-btn" style="width: auto; padding: 6px 16px; font-size: 0.85rem;">
-                ${this.state.timerRunning ? '⏸️ Pause' : '▶️ Resume'}
-              </button>
-              <button class="btn btn-secondary" id="timer-add-btn" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">+30s</button>
+          <div class="speaker-now">
+            ${renderAvatarSvg(ordered[0].name, 52)}
+            <div class="speaker-now-copy">
+              <span class="speaker-now-label">NOW SPEAKING · 1/${ordered.length}</span>
+              <span class="speaker-now-name">${ordered[0].name}</span>
             </div>
-          ` : ''}
-        </div>
+            <button class="btn btn-light-pill" id="next-speaker-btn">Next ${ICONS.arrowRight}</button>
+          </div>
 
-        <p style="font-size: 0.82rem; color: var(--text-dim); margin-top: 6px;">
-          Take turns giving one-word or short clues in clockwise order.
-        </p>
-      </div>
-
-      <!-- Turn Order Lineup -->
-      <div class="glass-panel">
-        <span class="panel-title" style="margin-bottom: 10px;">🔄 Speaking Order</span>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          ${living.map((p, idx) => `
-            <div class="player-item" style="${p.name === this.state.startingPlayerName ? 'border-color: rgba(99,102,241,0.5); background: rgba(99,102,241,0.1);' : ''}">
-              <div class="player-info">
-                ${renderAvatarSvg(p.name, 32)}
-                <span class="player-name">${p.name}</span>
-                ${p.name === this.state.startingPlayerName ? '<span style="font-size: 0.7rem; background: #6366f1; color: white; padding: 1px 6px; border-radius: 4px; font-weight: 700;">1st</span>' : ''}
+          <div class="speaker-chips">
+            ${ordered.map((p, idx) => `
+              <div class="speaker-chip ${idx === 0 ? 'active' : ''}">
+                <span class="speaker-num">${idx + 1}</span>
+                ${renderAvatarSvg(p.name, 22)}
+                <span>${p.name}</span>
               </div>
-              <span style="font-size: 0.8rem; color: var(--text-dim); font-weight: 600;">Turn #${idx + 1}</span>
-            </div>
-          `).join('')}
+            `).join('')}
+          </div>
         </div>
-      </div>
 
-      <!-- Vote Button -->
-      <div style="margin-bottom: 24px;">
-        <button class="btn btn-primary" id="start-voting-btn" style="padding: 16px; font-size: 1.1rem; font-family: 'Space Grotesk', sans-serif;">
-          🗳️ Ready to Vote!
-        </button>
+        <div class="round-block">
+          <h3>${roundTitles[this.state.roundType] || 'Hint Round'}</h3>
+          <p>${roundDescriptions[this.state.roundType] || roundDescriptions.hint}</p>
+        </div>
+
+        <div class="stage-actions">
+          <button class="btn btn-red btn-lg" id="start-voting-btn">VOTE SOMEONE OUT</button>
+          <button class="btn btn-ghost-quiet" id="end-game-btn">END GAME</button>
+        </div>
       </div>
     `;
   }
@@ -977,8 +1183,32 @@ class ImposterGame {
     document.getElementById('timer-sub-btn')?.addEventListener('click', () => this.addTimerSeconds(-30));
     document.getElementById('timer-add-btn')?.addEventListener('click', () => this.addTimerSeconds(30));
 
+    // Speaker progression is cosmetic, matching the site's turn tracker.
+    let speakerIdx = 0;
+    document.getElementById('next-speaker-btn')?.addEventListener('click', () => {
+      const living = this.state.players.filter(p => !p.isEliminated);
+      if (!living.length) return;
+      speakerIdx = (speakerIdx + 1) % living.length;
+      const current = document.querySelector('.speaker-now');
+      const nameEl = current?.querySelector('.speaker-now-name');
+      const labelEl = current?.querySelector('.speaker-now-label');
+      if (nameEl) nameEl.textContent = living[speakerIdx].name;
+      if (labelEl) labelEl.textContent = `NOW SPEAKING · ${speakerIdx + 1}/${living.length}`;
+      document.querySelectorAll('.speaker-chip').forEach((chip, idx) => {
+        chip.classList.toggle('active', idx === speakerIdx);
+      });
+    });
+
     document.getElementById('start-voting-btn')?.addEventListener('click', () => {
       this.startVotingPhase();
+    });
+
+    document.getElementById('end-game-btn')?.addEventListener('click', () => {
+      this.showConfirmModal('End this game?', 'You will return to the setup screen and scores stay as they are.', () => {
+        this.pauseTimer();
+        this.state.screen = 'setup';
+        this.render();
+      });
     });
   }
 
@@ -987,28 +1217,27 @@ class ImposterGame {
     const voter = this.state.votingQueue[this.state.currentVoterIndex];
 
     return `
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; text-align: center;">
-        
-        <div style="margin-bottom: 20px;">
-          <span style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.1em;">
-            Ballot ${this.state.currentVoterIndex + 1} of ${this.state.votingQueue.length}
-          </span>
-          <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2.2rem; font-weight: 800; margin-top: 6px;">
-            Pass phone to ${voter}
-          </h2>
+      <div class="vote-stage">
+        <div class="progress-segments">
+          ${this.state.votingQueue.map((_, idx) => `
+            <span class="progress-seg ${idx < this.state.currentVoterIndex ? 'done' : ''} ${idx === this.state.currentVoterIndex ? 'active' : ''}"></span>
+          `).join('')}
         </div>
 
-        <div style="margin: 20px 0;">
+        <div class="pass-label">${ICONS.eyeOff} PASS THE DEVICE TO</div>
+
+        <div class="avatar-ring">
           ${renderAvatarSvg(voter, 96)}
+          <span class="voter-badge">${this.state.currentVoterIndex + 1}</span>
         </div>
+        <h2 class="player-hero-name">${voter}</h2>
+        <p class="player-hero-sub">Voter ${this.state.currentVoterIndex + 1} of ${this.state.votingQueue.length}</p>
 
-        <p style="font-size: 0.95rem; color: var(--text-muted); max-width: 280px; margin-bottom: 32px;">
-          Keep your vote secret! Confirm your identity to cast your ballot.
-        </p>
-
-        <button class="btn btn-primary" id="confirm-voter-btn" style="padding: 18px; font-size: 1.15rem; font-family: 'Space Grotesk', sans-serif; max-width: 320px;">
-          I am ${voter} — Cast Vote
-        </button>
+        <div class="stage-actions">
+          <button class="btn btn-red btn-lg" id="confirm-voter-btn">I'm Ready ${ICONS.arrowRight}</button>
+          <button class="btn btn-dark" id="back-discussion-btn">💬 Back to discussion</button>
+          <button class="btn btn-ghost-quiet" id="quit-vote-btn">✕ QUIT GAME</button>
+        </div>
       </div>
     `;
   }
@@ -1019,6 +1248,14 @@ class ImposterGame {
       this.state.screen = 'voting_input';
       this.render();
     });
+    document.getElementById('back-discussion-btn')?.addEventListener('click', () => {
+      this.state.screen = 'discussion';
+      this.render();
+    });
+    document.getElementById('quit-vote-btn')?.addEventListener('click', () => {
+      this.state.screen = 'setup';
+      this.render();
+    });
   }
 
   // --- Voting: Input Screen ---
@@ -1027,72 +1264,67 @@ class ImposterGame {
     const isGuardian = voter === this.state.guardianPlayerName;
     const living = this.state.players.filter(p => !p.isEliminated);
     const candidates = living.filter(p => p.name !== voter);
+    const maxSelect = this.state.numImposters;
 
     return `
-      <div style="margin-bottom: 16px;">
-        <span style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.08em;">
-          Secret Ballot
-        </span>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.6rem; font-weight: 700; margin-top: 2px;">
-          ${voter}, who is the imposter?
-        </h2>
-        <p style="font-size: 0.82rem; color: var(--text-dim);">Select who you suspect.</p>
-      </div>
-
-      <!-- Suspect Grid -->
-      <div class="vote-grid">
-        ${candidates.map(p => {
-          const isSelected = this.state.currentSelectedAccused.includes(p.name);
-          return `
-            <div class="vote-card ${isSelected ? 'selected' : ''}" data-player="${p.name}">
-              ${renderAvatarSvg(p.name, 48)}
-              <span style="font-weight: 700; font-size: 1rem;">${p.name}</span>
-              <span style="font-size: 0.72rem; color: ${isSelected ? '#ef4444' : 'var(--text-dim)'}; font-weight: 600;">
-                ${isSelected ? '🔴 SUSPECT' : 'Tap to select'}
-              </span>
+      <div class="vote-input-wrap">
+        <div class="vote-input-head">
+          <div class="vote-input-top">
+            ${renderAvatarSvg(voter, 44)}
+            <div>
+              <span class="vote-input-overline">${voter} IS VOTING</span>
+              <h2>Select ${maxSelect} Suspect${maxSelect > 1 ? 's' : ''}</h2>
+              <span class="vote-count-pill ${this.state.currentSelectedAccused.length ? 'active' : ''}">${this.state.currentSelectedAccused.length}/${maxSelect} selected</span>
             </div>
-          `;
-        }).join('')}
-      </div>
-
-      <!-- Guardian Choice if applicable -->
-      ${isGuardian ? `
-        <div class="glass-panel" style="border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); margin-bottom: 16px;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-            <span style="font-size: 20px;">🛡️</span>
-            <span style="font-weight: 700; font-size: 0.95rem; color: #fbbf24;">Guardian Shield</span>
           </div>
-          <p style="font-size: 0.78rem; color: var(--text-dim); margin-bottom: 8px;">
-            Select one player to shield from elimination this round:
-          </p>
-          <select id="guardian-shield-select" class="input-field" style="width: 100%;">
-            <option value="">Do not protect anyone</option>
-            ${living.map(p => `
-              <option value="${p.name}" ${this.state.guardianProtectedName === p.name ? 'selected' : ''}>
-                Shield ${p.name}
-              </option>
+          <div class="progress-segments small">
+            ${this.state.votingQueue.map((_, idx) => `
+              <span class="progress-seg ${idx < this.state.currentVoterIndex ? 'done' : ''} ${idx === this.state.currentVoterIndex ? 'active' : ''}"></span>
             `).join('')}
-          </select>
+          </div>
         </div>
-      ` : ''}
 
-      <!-- Submit Vote -->
-      <div>
-        <button class="btn btn-danger" id="submit-vote-btn" style="padding: 16px; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif;">
-          Submit Secret Ballot
-        </button>
+        <div class="vote-list">
+          ${candidates.map(p => {
+            const isSelected = this.state.currentSelectedAccused.includes(p.name);
+            return `
+              <button type="button" class="vote-list-item ${isSelected ? 'selected' : ''}" data-player="${p.name}">
+                ${renderAvatarSvg(p.name, 44)}
+                <span class="vote-list-name">${p.name}</span>
+                <span class="vote-radio">${isSelected ? ICONS.check : ''}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+
+        ${isGuardian ? `
+          <div class="guardian-panel">
+            <div class="guardian-head">🛡️ Guardian Shield</div>
+            <p>Select one player to shield from elimination this round:</p>
+            <select id="guardian-shield-select" class="input-field">
+              <option value="">Do not protect anyone</option>
+              ${living.map(p => `<option value="${p.name}" ${this.state.guardianProtectedName === p.name ? 'selected' : ''}>Shield ${p.name}</option>`).join('')}
+            </select>
+          </div>
+        ` : ''}
+
+        <div class="stage-actions">
+          <button class="btn btn-red btn-lg" id="submit-vote-btn" ${this.state.currentSelectedAccused.length === 0 ? 'disabled' : ''}>
+            ${ICONS.check} Submit Vote
+          </button>
+          <button class="btn btn-ghost-quiet" id="quit-vote-input-btn">✕ QUIT GAME</button>
+        </div>
       </div>
     `;
   }
 
   bindVotingInputEvents() {
-    document.querySelectorAll('.vote-card').forEach(card => {
+    document.querySelectorAll('.vote-list-item').forEach(card => {
       card.addEventListener('click', () => {
         const name = card.dataset.player;
         if (this.state.currentSelectedAccused.includes(name)) {
           this.state.currentSelectedAccused = this.state.currentSelectedAccused.filter(n => n !== name);
         } else {
-          // Allow selection up to imposter count
           if (this.state.currentSelectedAccused.length < this.state.numImposters) {
             this.state.currentSelectedAccused.push(name);
           } else {
@@ -1104,17 +1336,21 @@ class ImposterGame {
       });
     });
 
-    const shieldSelect = document.getElementById('guardian-shield-select');
-    shieldSelect?.addEventListener('change', e => {
+    document.getElementById('guardian-shield-select')?.addEventListener('change', e => {
       this.state.guardianProtectedName = e.target.value || null;
     });
 
     document.getElementById('submit-vote-btn')?.addEventListener('click', () => {
       if (this.state.currentSelectedAccused.length === 0) {
-        alert('Please select at least one suspect to vote for!');
+        this.showAlert('Pick a suspect', 'Select at least one player before submitting your secret ballot.');
         return;
       }
       this.submitVote(this.state.currentSelectedAccused);
+    });
+
+    document.getElementById('quit-vote-input-btn')?.addEventListener('click', () => {
+      this.state.screen = 'setup';
+      this.render();
     });
   }
 
@@ -1122,71 +1358,72 @@ class ImposterGame {
   renderVotingResultsScreen() {
     const res = this.state.voteResults;
     const eliminated = this.state.eliminatedThisRound;
+    const sorted = Object.entries(res?.tallies || {}).sort((a, b) => b[1] - a[1]);
+    const gameOver = !!this.state.pendingWinner;
 
     return `
-      <div style="text-align: center; margin-bottom: 16px;">
-        <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.08em;">
-          Round ${this.state.undercoverRound} Results
-        </span>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 800; margin-top: 2px;">
-          Vote Outcome
-        </h2>
-      </div>
-
-      <!-- Shield activation alert if applicable -->
-      ${res?.shieldSaved ? `
-        <div class="glass-panel" style="background: rgba(245, 158, 11, 0.15); border-color: #f59e0b; text-align: center; margin-bottom: 14px;">
-          <div style="font-size: 28px; margin-bottom: 4px;">🛡️</div>
-          <h3 style="font-size: 1.15rem; font-weight: 700; color: #fbbf24;">GUARDIAN SHIELD ACTIVATED!</h3>
-          <p style="font-size: 0.85rem; color: #fde68a;">${this.state.guardianProtectedName} received the most votes but was protected!</p>
+      <div class="results-wrap">
+        <div class="results-head">
+          <div class="results-icon">${ICONS.trophy}</div>
+          <h2>Voting Results</h2>
+          <p>See who everyone voted for</p>
         </div>
-      ` : ''}
 
-      <!-- Elimination Notice -->
-      <div class="glass-panel" style="text-align: center; padding: 20px;">
-        ${eliminated.length > 0 ? `
-          <div style="font-size: 32px; margin-bottom: 6px;">⚰️</div>
-          <h3 style="font-size: 1.3rem; font-weight: 800; color: #f87171;">
-            ${eliminated.join(' & ')} was eliminated!
-          </h3>
-        ` : `
-          <div style="font-size: 32px; margin-bottom: 6px;">🤝</div>
-          <h3 style="font-size: 1.3rem; font-weight: 800; color: #94a3b8;">
-            No one was eliminated this round!
-          </h3>
-        `}
-      </div>
+        ${res?.shieldSaved ? `
+          <div class="shield-alert">
+            <div>🛡️</div>
+            <h3>GUARDIAN SHIELD ACTIVATED!</h3>
+            <p>${this.state.guardianProtectedName} received the most votes but was protected!</p>
+          </div>
+        ` : ''}
 
-      <!-- Vote Tallies Breakdown -->
-      <div class="glass-panel">
-        <span class="panel-title" style="margin-bottom: 10px;">📊 Vote Breakdown</span>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          ${Object.entries(res?.tallies || {}).sort((a, b) => b[1] - a[1]).map(([name, count]) => `
-            <div class="player-item" style="${eliminated.includes(name) ? 'opacity: 0.6; text-decoration: line-through;' : ''}">
-              <div class="player-info">
-                ${renderAvatarSvg(name, 32)}
-                <span class="player-name">${name}</span>
+        <div class="results-list">
+          ${sorted.map(([name, count], idx) => {
+            const votersFor = (this.state.votes || []).filter(v => v.accused.includes(name)).map(v => v.voter);
+            return `
+              <div class="result-card ${idx === 0 && count > 0 ? 'top' : ''}">
+                <div class="result-row">
+                  <span class="result-rank">#${idx + 1}</span>
+                  ${renderAvatarSvg(name, 40)}
+                  <span class="result-name">${name}</span>
+                  <span class="result-votes"><strong>${count}</strong> VOTE${count === 1 ? '' : 'S'}</span>
+                </div>
+                <div class="voted-by">
+                  <span class="voted-by-label">VOTED BY:</span>
+                  ${votersFor.length ? votersFor.map(v => `
+                    <span class="voter-chip">${renderAvatarSvg(v, 16)}${v}</span>
+                  `).join('') : '<span class="muted-note">No votes</span>'}
+                </div>
               </div>
-              <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.1rem; color: ${count > 0 ? '#ef4444' : 'var(--text-dim)'};">
-                ${count} vote${count !== 1 ? 's' : ''}
-              </span>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
-      </div>
 
-      <!-- Next Round Button -->
-      <div style="margin-bottom: 24px;">
-        <button class="btn btn-primary" id="next-round-btn" style="padding: 16px; font-size: 1.1rem; font-family: 'Space Grotesk', sans-serif;">
-          🔄 Continue to Next Round
-        </button>
+        ${eliminated.length > 0 ? `
+          <div class="elimination-note">
+            ${eliminated.join(' & ')} ${eliminated.length > 1 ? 'were' : 'was'} eliminated.
+          </div>
+        ` : ''}
+
+        <div class="stage-actions">
+          ${gameOver ? `
+            <button class="btn btn-red btn-lg" id="reveal-imposter-btn">${ICONS.skull} REVEAL IMPOSTER</button>
+          ` : `
+            <button class="btn btn-red btn-lg" id="next-round-btn">CONTINUE TO NEXT ROUND ${ICONS.arrowRight}</button>
+          `}
+        </div>
       </div>
     `;
   }
 
   bindVotingResultsEvents() {
+    document.getElementById('reveal-imposter-btn')?.addEventListener('click', () => {
+      this.declareWinner(this.state.pendingWinner || 'crew');
+    });
+
     document.getElementById('next-round-btn')?.addEventListener('click', () => {
       this.state.undercoverRound++;
+      this.state.pendingWinner = null;
       this.state.screen = 'discussion';
       this.state.remainingSeconds = this.state.timeLimit;
       this.state.timerRunning = false;
@@ -1198,29 +1435,21 @@ class ImposterGame {
   // --- Mr. White Guess Screen ---
   renderMrWhiteGuessScreen() {
     return `
-      <div style="text-align: center; margin-bottom: 20px;">
-        <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #e2e8f0; letter-spacing: 0.08em;">
-          Mr. White Caught!
-        </span>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2.2rem; font-weight: 800; margin-top: 2px;">
-          Final Guess
-        </h2>
-      </div>
-
-      <div class="glass-panel" style="text-align: center; padding: 24px;">
-        <div style="font-size: 40px; margin-bottom: 12px;">🎩</div>
-        <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 8px;">Mr. White has one chance to steal victory!</h3>
-        <p style="font-size: 0.88rem; color: var(--text-dim); margin-bottom: 20px;">
-          If Mr. White guesses the exact secret word, the imposters win!
-        </p>
-
-        <div style="margin-bottom: 18px;">
-          <input type="text" id="mrwhite-guess-input" class="input-field" placeholder="Enter guessed word..." style="font-size: 1.1rem; text-align: center; padding: 14px;" />
+      <div class="guess-wrap">
+        <div class="results-head">
+          <span class="guess-overline">Mr. White Caught!</span>
+          <h2>Final Guess</h2>
         </div>
 
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-secondary" id="mrwhite-surrender-btn">Did Not Guess Word</button>
-          <button class="btn btn-primary" id="mrwhite-submit-btn">Submit Guess</button>
+        <div class="glass-panel guess-card">
+          <div class="guess-icon">🎩</div>
+          <h3>Mr. White has one chance to steal victory!</h3>
+          <p>If Mr. White guesses the exact secret word, the imposters win!</p>
+          <input type="text" id="mrwhite-guess-input" class="input-field" placeholder="Enter guessed word..." />
+          <div class="guess-actions">
+            <button class="btn btn-dark" id="mrwhite-surrender-btn">Did Not Guess</button>
+            <button class="btn btn-red" id="mrwhite-submit-btn">Submit Guess</button>
+          </div>
         </div>
       </div>
     `;
@@ -1231,17 +1460,14 @@ class ImposterGame {
       const cleanGuess = (guess || '').trim().toLowerCase();
       const secret = this.state.secretWord.toLowerCase();
       if (cleanGuess === secret) {
-        alert('🎉 AMAZING! Mr. White correctly guessed the secret word!');
-        this.declareWinner('imposters');
+        this.showAlert('Correct!', `🎉 Mr. White correctly guessed "${this.state.secretWord}"!`, () => this.declareWinner('imposters'));
       } else {
-        alert(`❌ Incorrect! The secret word was "${this.state.secretWord}".`);
-        this.declareWinner('crew');
+        this.showAlert('Incorrect', `❌ The secret word was "${this.state.secretWord}".`, () => this.declareWinner('crew'));
       }
     };
 
     document.getElementById('mrwhite-submit-btn')?.addEventListener('click', () => {
-      const val = document.getElementById('mrwhite-guess-input')?.value;
-      checkGuess(val);
+      checkGuess(document.getElementById('mrwhite-guess-input')?.value);
     });
 
     document.getElementById('mrwhite-surrender-btn')?.addEventListener('click', () => {
@@ -1252,29 +1478,21 @@ class ImposterGame {
   // --- Imposter Guess Screen ---
   renderImposterGuessScreen() {
     return `
-      <div style="text-align: center; margin-bottom: 20px;">
-        <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #ef4444; letter-spacing: 0.08em;">
-          Last Chance
-        </span>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2.2rem; font-weight: 800; margin-top: 2px;">
-          Imposter's Last Stand
-        </h2>
-      </div>
-
-      <div class="glass-panel" style="text-align: center; padding: 24px;">
-        <div style="font-size: 40px; margin-bottom: 12px;">🚨</div>
-        <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 8px;">Guess the secret word to steal the win!</h3>
-        <p style="font-size: 0.88rem; color: var(--text-dim); margin-bottom: 20px;">
-          The imposter was voted out, but has one final chance.
-        </p>
-
-        <div style="margin-bottom: 18px;">
-          <input type="text" id="imposter-guess-input" class="input-field" placeholder="Enter secret word..." style="font-size: 1.1rem; text-align: center; padding: 14px;" />
+      <div class="guess-wrap">
+        <div class="results-head">
+          <span class="guess-overline">Last Chance</span>
+          <h2>Imposter's Last Stand</h2>
         </div>
 
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-secondary" id="imposter-surrender-btn">Pass / Surrender</button>
-          <button class="btn btn-primary" id="imposter-submit-btn">Submit Guess</button>
+        <div class="glass-panel guess-card">
+          <div class="guess-icon">🚨</div>
+          <h3>Guess the secret word to steal the win!</h3>
+          <p>The imposter was voted out, but has one final chance.</p>
+          <input type="text" id="imposter-guess-input" class="input-field" placeholder="Enter secret word..." />
+          <div class="guess-actions">
+            <button class="btn btn-dark" id="imposter-surrender-btn">Pass / Surrender</button>
+            <button class="btn btn-red" id="imposter-submit-btn">Submit Guess</button>
+          </div>
         </div>
       </div>
     `;
@@ -1285,17 +1503,14 @@ class ImposterGame {
       const cleanGuess = (guess || '').trim().toLowerCase();
       const secret = this.state.secretWord.toLowerCase();
       if (cleanGuess === secret) {
-        alert('🎉 Imposter guessed the word and stole the victory!');
-        this.declareWinner('imposters');
+        this.showAlert('Correct!', '🎉 Imposter guessed the word and stole the victory!', () => this.declareWinner('imposters'));
       } else {
-        alert(`❌ Incorrect! The word was "${this.state.secretWord}". Crew wins!`);
-        this.declareWinner('crew');
+        this.showAlert('Incorrect', `❌ The word was "${this.state.secretWord}". Crew wins!`, () => this.declareWinner('crew'));
       }
     };
 
     document.getElementById('imposter-submit-btn')?.addEventListener('click', () => {
-      const val = document.getElementById('imposter-guess-input')?.value;
-      checkGuess(val);
+      checkGuess(document.getElementById('imposter-guess-input')?.value);
     });
 
     document.getElementById('imposter-surrender-btn')?.addEventListener('click', () => {
@@ -1304,74 +1519,118 @@ class ImposterGame {
   }
 
   // --- Victory Screen ---
+  getLeaderboard() {
+    const sorted = [...this.state.players].sort((a, b) => (this.state.scores[b.name] || 0) - (this.state.scores[a.name] || 0));
+    let rank = 1;
+    return sorted.map((p, idx) => {
+      if (idx > 0 && (this.state.scores[p.name] || 0) !== (this.state.scores[sorted[idx - 1].name] || 0)) {
+        rank = idx + 1;
+      }
+      return { ...p, rank, score: this.state.scores[p.name] || 0 };
+    });
+  }
+
+  getMatchAwards() {
+    const votes = this.state.firstRoundVotes || [];
+    const imposters = this.state.players.filter(p => p.role === 'imposter').map(p => p.name);
+    const sharpEye = votes.filter(v => v.accused.some(n => imposters.includes(n))).map(v => v.voter);
+
+    // Red herring: the most-suspected crew member.
+    const tallies = this.state.voteResults?.tallies || {};
+    let redHerring = null;
+    let max = -1;
+    Object.entries(tallies).forEach(([name, count]) => {
+      const p = this.state.players.find(pl => pl.name === name);
+      if (p && p.role === 'crew' && count > max) {
+        max = count;
+        redHerring = name;
+      }
+    });
+
+    const awards = [];
+    if (sharpEye.length) awards.push({ icon: '🎯', names: sharpEye.join(', '), title: 'Sharp eye', desc: 'Voted right in the first vote' });
+    if (redHerring && max > 0) awards.push({ icon: '🐟', names: redHerring, title: 'Red herring', desc: 'Most suspected, totally innocent' });
+    return awards;
+  }
+
   renderVictoryScreen() {
     const isCrew = this.state.winner === 'crew';
+    const leaderboard = this.getLeaderboard();
+    const awards = this.getMatchAwards();
 
     return `
-      <div style="text-align: center; margin: 16px 0 24px;">
-        <span style="font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: ${isCrew ? '#34d399' : '#f87171'};">
-          Game Over
-        </span>
-        <div class="winner-banner ${isCrew ? 'winner-crew' : 'winner-imposter'}">
-          ${isCrew ? 'CREW WINS!' : 'IMPOSTERS WIN!'}
+      <div class="victory-wrap">
+        <div class="victory-card">
+          <div class="victory-avatar">
+            ${renderAvatarSvg(isCrew ? (this.state.players.find(p => p.role === 'crew')?.name || 'Crew') : (this.state.players.find(p => p.role === 'imposter')?.name || 'Imposter'), 96)}
+            <span class="victory-badge">${isCrew ? '🛡️' : '💀'}</span>
+          </div>
+          <span class="victory-overline">VICTORY</span>
+          <h2 class="${isCrew ? 'crew-win' : 'imposter-win'}">${isCrew ? 'CREW WINS!' : 'IMPOSTERS WIN!'}</h2>
         </div>
-      </div>
 
-      <!-- Secret Word Reveal Card -->
-      <div class="glass-panel" style="text-align: center; border-color: ${isCrew ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'};">
-        <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.08em;">
-          Secret Word & Category
-        </span>
-        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 2.4rem; font-weight: 800; margin: 6px 0; color: #ffffff;">
-          ${this.state.secretWord}
-        </div>
-        <span style="font-size: 0.88rem; font-weight: 600; color: #a5b4fc;">
-          ${this.state.secretCategory}
-        </span>
-        ${this.state.imposterWord ? `
-          <div style="margin-top: 10px; font-size: 0.85rem; color: #f87171;">
-            Undercover Word: <strong>${this.state.imposterWord}</strong>
+        ${awards.length ? `
+          <div class="awards-card">
+            <div class="awards-head">MATCH AWARDS</div>
+            <div class="awards-grid">
+              ${awards.map(a => `
+                <div class="award-card">
+                  <div class="award-icon">${a.icon}</div>
+                  <div class="award-name">${a.names}</div>
+                  <div class="award-title">${a.title}</div>
+                  <div class="award-desc">${a.desc}</div>
+                </div>
+              `).join('')}
+            </div>
           </div>
         ` : ''}
-      </div>
 
-      <!-- Player Identity Reveal -->
-      <div class="glass-panel">
-        <span class="panel-title" style="margin-bottom: 12px;">🎭 Identity Reveal</span>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          ${this.state.players.map(p => {
-            const isImp = p.role === 'imposter';
-            const isGrd = p.isGuardian;
-            const isMrW = p.isMrWhite;
-            let badge = isImp ? '🔴 IMPOSTER' : '🟢 CREW';
-            let badgeColor = isImp ? '#ef4444' : '#10b981';
-            if (isMrW) { badge = '🎩 MR. WHITE'; badgeColor = '#94a3b8'; }
-            else if (isGrd) { badge = '🛡️ GUARDIAN'; badgeColor = '#f59e0b'; }
+        <div class="reveal-summary">
+          <div class="reveal-summary-cell">
+            <span>THE SECRET WORD WAS:</span>
+            <strong>${this.state.secretWord}</strong>
+            ${this.state.imposterWord ? `<em>Undercover word: ${this.state.imposterWord}</em>` : ''}
+          </div>
+          <div class="reveal-summary-cell imposter-cell">
+            <span>THE IMPOSTER WAS:</span>
+            <div class="imposter-names">
+              ${this.state.players.filter(p => p.role === 'imposter').map(p => `<span class="imposter-pill">${renderAvatarSvg(p.name, 16)}${p.name}</span>`).join('')}
+            </div>
+          </div>
+        </div>
 
+        <div class="results-card-compact">
+          <div class="results-head-small">VOTING RESULTS</div>
+          ${Object.entries(this.state.voteResults?.tallies || {}).sort((a, b) => b[1] - a[1]).map(([name, count]) => {
+            const p = this.state.players.find(pl => pl.name === name);
             return `
-              <div class="player-item">
-                <div class="player-info">
-                  ${renderAvatarSvg(p.name, 34)}
-                  <div>
-                    <div class="player-name">${p.name}</div>
-                    <span style="font-size: 0.68rem; font-weight: 800; color: ${badgeColor};">${badge}</span>
-                  </div>
-                </div>
-                <span class="player-score">✦ ${this.state.scores[p.name]} pts</span>
+              <div class="compact-row">
+                <span>${name}${p?.role === 'imposter' ? ' <span class="mini-tag">Imposter</span>' : ''}</span>
+                <strong>${count} VOTE${count === 1 ? '' : 'S'}</strong>
               </div>
             `;
           }).join('')}
         </div>
-      </div>
 
-      <!-- Actions -->
-      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px;">
-        <button class="btn btn-primary" id="play-again-btn" style="padding: 16px; font-size: 1.1rem; font-family: 'Space Grotesk', sans-serif;">
-          🔁 Play Again with New Word
-        </button>
-        <button class="btn btn-secondary" id="back-home-btn" style="padding: 14px;">
-          ⚙️ Change Settings / Players
-        </button>
+        <div class="leaderboard-card">
+          <div class="results-head-small">LEADERBOARD</div>
+          ${leaderboard.map(p => `
+            <div class="leaderboard-row">
+              <span class="lb-rank">#${p.rank}</span>
+              ${renderAvatarSvg(p.name, 28)}
+              <span class="lb-name">${p.name}</span>
+              <span class="lb-score">${p.score} pts</span>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="stage-actions">
+          <button class="btn btn-red btn-lg" id="play-again-btn">Play Again</button>
+          <div class="victory-secondary">
+            <button class="btn btn-dark" id="share-result-btn">${ICONS.share} Share result</button>
+            <button class="btn btn-dark" id="back-home-btn">Main Menu</button>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -1382,39 +1641,126 @@ class ImposterGame {
     });
 
     document.getElementById('back-home-btn')?.addEventListener('click', () => {
-      this.state.screen = 'setup';
+      this.state.screen = 'home';
       this.render();
+    });
+
+    document.getElementById('share-result-btn')?.addEventListener('click', async () => {
+      const imp = this.state.players.filter(p => p.role === 'imposter').map(p => p.name).join(', ');
+      const text = `${this.state.winner === 'crew' ? 'Crew' : 'Imposters'} won! Secret word: ${this.state.secretWord}. Imposter: ${imp}.`;
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: 'Find The Imposter', text });
+        } else if (navigator.clipboard) {
+          await navigator.clipboard.writeText(text);
+          this.showAlert('Copied!', 'Result copied to your clipboard.');
+        }
+      } catch (e) {
+        // Share was cancelled; nothing to do.
+      }
     });
   }
 
+  // --- Modals ---
+
   showRulesModal() {
+    this.showInfoModal('How to Play', `
+      <p><strong>1. Secret cards:</strong> Pass the device around. Each player taps to reveal their secret word in private, then hides it before passing.</p>
+      <p><strong>2. Classic vs. Undercover:</strong> In Classic the imposter knows their role and gets no word. In Undercover the imposter gets a related but different word — and doesn't know they're the imposter.</p>
+      <p><strong>3. Clues:</strong> Take turns giving a short one-word clue. Listen for someone whose clue sounds slightly off.</p>
+      <p><strong>4. Vote:</strong> Pass the device again to cast secret ballots on who has the odd word out.</p>
+      <p><strong>5. Winning:</strong> The Crew wins by voting out all imposters. Imposters win if they survive or reach equal numbers.</p>
+    `);
+  }
+
+  showInfoModal(title, html) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal-content">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-          <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.3rem; font-weight: 700;">How to Play</h3>
-          <button class="icon-btn" id="close-rules-btn">✕</button>
+        <div class="modal-head">
+          <h3>${title}</h3>
+          <button class="icon-btn" id="close-info-btn">✕</button>
         </div>
-        <div style="font-size: 0.88rem; line-height: 1.6; color: var(--text-muted); display: flex; flex-direction: column; gap: 12px;">
-          <p><strong>1. Secret Cards:</strong> Pass the device around. Each player taps to reveal their secret word in private, then passes it to the next player.</p>
-          <p><strong>2. Classic vs. Undercover:</strong><br>
-            • <em>Classic Mode:</em> Imposters know they are the imposter and receive no word.<br>
-            • <em>Undercover Mode:</em> Imposters do <strong>NOT</strong> know they are the imposter! Everyone receives a word from a paired set (e.g., <em>Coffee</em> vs. <em>Tea</em>). All secret cards look 100% identical!
-          </p>
-          <p><strong>3. Giving Clues:</strong> Players take turns giving a short clue. Listen carefully — someone's clue will sound slightly off!</p>
-          <p><strong>4. Secret Vote:</strong> Pass the device to cast secret ballots on who has the odd word out.</p>
-          <p><strong>5. Winning:</strong> The Crew wins by voting out all imposters. Imposters win if they survive or bluff until equal numbers!</p>
-        </div>
-        <button class="btn btn-primary" id="modal-ok-btn" style="margin-top: 20px;">Got It</button>
+        <div class="modal-body">${html}</div>
+        <button class="btn btn-red" id="modal-ok-btn" style="margin-top:20px;">Got It</button>
       </div>
     `;
     document.body.appendChild(modal);
 
     const close = () => modal.remove();
-    modal.querySelector('#close-rules-btn')?.addEventListener('click', close);
+    modal.querySelector('#close-info-btn')?.addEventListener('click', close);
     modal.querySelector('#modal-ok-btn')?.addEventListener('click', close);
     modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  }
+
+  showAlert(title, message, onClose) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content modal-small">
+        <div class="modal-head">
+          <h3>${title}</h3>
+          <button class="icon-btn" id="close-alert-btn">✕</button>
+        </div>
+        <p class="modal-text">${message}</p>
+        <button class="btn btn-red" id="alert-ok-btn" style="margin-top:18px;">OK</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close = () => {
+      modal.remove();
+      if (onClose) onClose();
+    };
+    modal.querySelector('#close-alert-btn')?.addEventListener('click', close);
+    modal.querySelector('#alert-ok-btn')?.addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  }
+
+  showConfirmModal(title, message, onConfirm) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content modal-small">
+        <div class="modal-head">
+          <h3>${title}</h3>
+          <button class="icon-btn" id="close-confirm-btn">✕</button>
+        </div>
+        <p class="modal-text">${message}</p>
+        <div class="modal-actions">
+          <button class="btn btn-dark" id="confirm-cancel-btn">Cancel</button>
+          <button class="btn btn-red" id="confirm-ok-btn">Confirm</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    modal.querySelector('#close-confirm-btn')?.addEventListener('click', close);
+    modal.querySelector('#confirm-cancel-btn')?.addEventListener('click', close);
+    modal.querySelector('#confirm-ok-btn')?.addEventListener('click', () => {
+      close();
+      onConfirm();
+    });
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  }
+
+  showOnlineModal() {
+    this.showInfoModal('Online mode', `
+      <p>Online rooms need a live server, which this local build doesn't include.</p>
+      <p>Use <strong>Pass &amp; Play</strong> to play together on one device — all roles, voting and scoring work the same way.</p>
+    `);
+    this.state.playMode = 'pass';
+  }
+
+  showSettingsModal() {
+    this.showInfoModal('Game Settings', `
+      <p><strong>Players:</strong> 3–15 on one device.</p>
+      <p><strong>Modes:</strong> Classic, Undercover and optional Mr. White.</p>
+      <p><strong>Modifiers:</strong> Guardian, random imposters, last-chance guess and round type.</p>
+      <p>Change these from the setup screen before starting a round.</p>
+    `);
   }
 }
 
