@@ -14,6 +14,8 @@ const ICONS = {
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>',
   help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
+  volume: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  volumeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>',
   globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>',
   lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
@@ -26,6 +28,19 @@ const ICONS = {
   trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>'
 };
+
+// Masked imposter face used in the header and hero card.
+const LOGO_MARK = `
+  <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+    <path d="M11 25.5C11 18 20.5 13 32 13s21 5 21 12.5C53 41 43.5 53 32 53S11 41 11 25.5Z" fill="#180a0a"/>
+    <path d="M18 22c8-3.4 20-3.4 28 0" stroke="#f87171" stroke-width="2" stroke-linecap="round" opacity=".45"/>
+    <ellipse cx="24" cy="28.5" rx="5" ry="3.8" fill="#fff"/>
+    <ellipse cx="40" cy="28.5" rx="5" ry="3.8" fill="#fff"/>
+    <circle cx="24.6" cy="29" r="1.9" fill="#180a0a"/>
+    <circle cx="39.4" cy="29" r="1.9" fill="#180a0a"/>
+    <path d="M25.5 39.5c4.6 3.2 8.4 3.2 13 0" stroke="#f87171" stroke-width="2.6" stroke-linecap="round"/>
+  </svg>
+`;
 
 class ImposterGame {
   constructor() {
@@ -84,6 +99,7 @@ class ImposterGame {
     this.confettiCtx = null;
     this.confettiParticles = [];
     this.confettiAnimationId = null;
+    this._lastScreen = null;
 
     // Exposed for debugging in the browser console.
     window.__imposterGame = this;
@@ -106,12 +122,23 @@ class ImposterGame {
     });
   }
 
+  // Light haptic tap on supported devices. Never throws.
+  buzz(pattern = 8) {
+    if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+    try {
+      navigator.vibrate(pattern);
+    } catch (e) {
+      // Haptics are optional.
+    }
+  }
+
   bindGlobalEvents() {
     const soundToggle = document.getElementById('sound-toggle');
     if (soundToggle) {
       soundToggle.addEventListener('click', () => {
         const isMuted = sound.toggleMute();
-        soundToggle.textContent = isMuted ? '🔇' : '🔊';
+        soundToggle.innerHTML = isMuted ? ICONS.volumeOff : ICONS.volume;
+        soundToggle.title = isMuted ? 'Unmute sound' : 'Mute sound';
       });
     }
 
@@ -260,6 +287,7 @@ class ImposterGame {
     this.state.openPanels = { players: false, categories: false };
 
     sound.start();
+    this.buzz([10, 30, 10]);
     this.render();
   }
 
@@ -285,8 +313,18 @@ class ImposterGame {
   }
 
   togglePanel(name) {
-    this.state.openPanels[name] = !this.state.openPanels[name];
-    this.render();
+    const open = !this.state.openPanels[name];
+    this.state.openPanels[name] = open;
+    const head = document.querySelector(`.settings-head[data-panel="${name}"]`);
+    if (head) {
+      const card = head.closest('.settings-card');
+      card?.classList.toggle('open', open);
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const wrap = card?.querySelector('.settings-body-wrap');
+      wrap?.classList.toggle('open', open);
+      wrap?.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+    this.buzz(6);
   }
 
   // --- Timer Controls ---
@@ -368,6 +406,7 @@ class ImposterGame {
     const voter = this.state.votingQueue[this.state.currentVoterIndex];
     this.state.votes.push({ voter, accused: accusedList });
     sound.voteSubmit();
+    this.buzz(10);
 
     this.state.currentVoterIndex++;
     if (this.state.currentVoterIndex < this.state.votingQueue.length) {
@@ -483,6 +522,7 @@ class ImposterGame {
     }
 
     this.launchConfetti();
+    this.buzz([14, 40, 14, 40, 22]);
     this.render();
   }
 
@@ -491,6 +531,9 @@ class ImposterGame {
   render() {
     const container = document.getElementById('screen-container');
     if (!container) return;
+
+    const screenChanged = this._lastScreen !== this.state.screen;
+    this._lastScreen = this.state.screen;
 
     switch (this.state.screen) {
       case 'home':
@@ -534,6 +577,14 @@ class ImposterGame {
         this.bindVictoryEvents();
         break;
     }
+
+    if (screenChanged) {
+      container.classList.remove('screen-enter');
+      // Force a reflow so the animation restarts on every screen change.
+      void container.offsetWidth;
+      container.classList.add('screen-enter');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   // --- Shared UI helpers ---
@@ -542,7 +593,7 @@ class ImposterGame {
     return `
       <div class="hero-title-card">
         ${this.state.screen === 'setup' ? `<button class="hero-back" id="back-home-btn" aria-label="Back">‹</button>` : ''}
-        <div class="hero-logo">🕵️</div>
+        <div class="hero-logo">${LOGO_MARK}</div>
         <div class="hero-copy">
           <h1>Imposter Game</h1>
           <span>${subtitle}</span>
@@ -585,7 +636,7 @@ class ImposterGame {
   renderSettingsCard({ key, icon, title, summary, open, body }) {
     return `
       <div class="settings-card ${open ? 'open' : ''}">
-        <button type="button" class="settings-head" data-panel="${key}">
+        <button type="button" class="settings-head" data-panel="${key}" aria-expanded="${open ? 'true' : 'false'}" aria-controls="settings-body-${key}">
           <span class="settings-head-icon">${icon}</span>
           <span class="settings-head-text">
             <span class="settings-head-title">${title}</span>
@@ -593,7 +644,11 @@ class ImposterGame {
           </span>
           <span class="settings-chevron">${ICONS.chevron}</span>
         </button>
-        ${open ? `<div class="settings-body">${body}</div>` : ''}
+        <div class="settings-body-wrap ${open ? 'open' : ''}" id="settings-body-${key}" aria-hidden="${open ? 'false' : 'true'}">
+          <div class="settings-body-inner">
+            <div class="settings-body">${body}</div>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -1004,7 +1059,7 @@ class ImposterGame {
     }
 
     return `
-      <div class="reveal-stage">
+      <div class="reveal-stage ${isRevealed ? 'revealed' : ''}">
         <div class="progress-segments">
           ${this.state.players.map((_, idx) => `
             <span class="progress-seg ${idx < this.state.revealIndex ? 'done' : ''} ${idx === this.state.revealIndex ? 'active' : ''}"></span>
@@ -1040,15 +1095,12 @@ class ImposterGame {
         </div>
 
         <div class="stage-actions">
-          ${isRevealed ? `
-            <button class="btn btn-dark btn-lg" id="next-player-reveal-btn">
-              ${isLast ? 'START GAME' : 'HIDE &amp; PASS'} <span class="arrow">${ICONS.arrowRight}</span>
-            </button>
-          ` : `
-            <button class="btn btn-red btn-lg" id="reveal-now-btn">
-              ${ICONS.lock} TAP TO REVEAL
-            </button>
-          `}
+          <button class="btn btn-red btn-lg reveal-now-action" id="reveal-now-btn">
+            ${ICONS.lock} TAP TO REVEAL
+          </button>
+          <button class="btn btn-dark btn-lg hide-pass-action" id="next-player-reveal-btn">
+            ${isLast ? 'START GAME' : 'HIDE &amp; PASS'} <span class="arrow">${ICONS.arrowRight}</span>
+          </button>
           <button class="btn btn-ghost-quiet" id="quit-reveal-btn">✕ QUIT GAME</button>
         </div>
       </div>
@@ -1064,7 +1116,11 @@ class ImposterGame {
       if (!this.state.isCardRevealed) {
         this.state.isCardRevealed = true;
         sound.cardFlip();
-        this.render();
+        this.buzz(12);
+        // Animate in place so the 3D flip is visible instead of snapping.
+        card?.classList.add('flipped');
+        document.querySelector('.reveal-stage')?.classList.add('revealed');
+        revealBtn?.blur();
       }
     };
 
@@ -1075,6 +1131,7 @@ class ImposterGame {
 
     nextBtn?.addEventListener('click', () => {
       sound.cardHide();
+      this.buzz(8);
       if (this.state.revealIndex + 1 < this.state.players.length) {
         this.state.revealIndex++;
         this.state.isCardRevealed = false;

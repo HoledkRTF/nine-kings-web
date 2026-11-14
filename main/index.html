@@ -15,12 +15,26 @@
     <!-- Top Bar -->
     <header>
       <div class="logo-badge">
-        <div class="logo-icon">🕵️</div>
+        <div class="logo-icon">
+          <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <path d="M11 25.5C11 18 20.5 13 32 13s21 5 21 12.5C53 41 43.5 53 32 53S11 41 11 25.5Z" fill="#180a0a"/>
+            <path d="M18 22c8-3.4 20-3.4 28 0" stroke="#f87171" stroke-width="2" stroke-linecap="round" opacity=".45"/>
+            <ellipse cx="24" cy="28.5" rx="5" ry="3.8" fill="#fff"/>
+            <ellipse cx="40" cy="28.5" rx="5" ry="3.8" fill="#fff"/>
+            <circle cx="24.6" cy="29" r="1.9" fill="#180a0a"/>
+            <circle cx="39.4" cy="29" r="1.9" fill="#180a0a"/>
+            <path d="M25.5 39.5c4.6 3.2 8.4 3.2 13 0" stroke="#f87171" stroke-width="2.6" stroke-linecap="round"/>
+          </svg>
+        </div>
         <span>Find The Imposter</span>
       </div>
       <div class="header-actions">
-        <button class="icon-btn" id="sound-toggle" title="Toggle Sound">🔊</button>
-        <button class="icon-btn" id="rules-btn" title="How to play">❓</button>
+        <button class="icon-btn" id="sound-toggle" title="Toggle Sound" aria-label="Toggle Sound">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        </button>
+        <button class="icon-btn" id="rules-btn" title="How to play" aria-label="How to play">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        </button>
       </div>
     </header>
 
