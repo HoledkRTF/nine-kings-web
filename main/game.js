@@ -1,9 +1,12 @@
 import { WORD_DATABASE, CATEGORY_LABELS, CATEGORY_ICONS, getWordSelection } from './words.js';
 import { sound } from './audio.js';
-import { renderAvatarSvg, getPlayerAvatar } from './avatars.js';
+import { renderAvatarSvg, getPlayerAvatar, setAvatarRoster } from './avatars.js';
 
 // --- Default State ---
 const DEFAULT_PLAYERS = ['Alex', 'Jordan', 'Sam', 'Taylor'];
+
+// Chaos Mode re-rolls the clue format every round, like the site's twists.
+const CHAOS_ROUND_TYPES = ['hint', 'question', 'silent', 'drawing'];
 
 const ICONS = {
   users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -32,13 +35,9 @@ const ICONS = {
 // Masked imposter face used in the header and hero card.
 const LOGO_MARK = `
   <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
-    <path d="M11 25.5C11 18 20.5 13 32 13s21 5 21 12.5C53 41 43.5 53 32 53S11 41 11 25.5Z" fill="#180a0a"/>
-    <path d="M18 22c8-3.4 20-3.4 28 0" stroke="#f87171" stroke-width="2" stroke-linecap="round" opacity=".45"/>
-    <ellipse cx="24" cy="28.5" rx="5" ry="3.8" fill="#fff"/>
-    <ellipse cx="40" cy="28.5" rx="5" ry="3.8" fill="#fff"/>
-    <circle cx="24.6" cy="29" r="1.9" fill="#180a0a"/>
-    <circle cx="39.4" cy="29" r="1.9" fill="#180a0a"/>
-    <path d="M25.5 39.5c4.6 3.2 8.4 3.2 13 0" stroke="#f87171" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M6 25.5C6 20.4 14.6 16.8 32 16.8s26 3.6 26 8.7c0 9.6-5.7 17.2-12 17.2-4.4 0-7.2-3.1-9.5-5.4-1.7-1.7-3.4-2.6-4.5-2.6s-2.8.9-4.5 2.6C25.2 39.6 22.4 42.7 18 42.7 11.7 42.7 6 35.1 6 25.5Z" fill="#ffffff"/>
+    <ellipse cx="22.6" cy="28.4" rx="5.6" ry="4.4" transform="rotate(-8 22.6 28.4)" fill="#1b0d0d"/>
+    <ellipse cx="41.4" cy="28.4" rx="5.6" ry="4.4" transform="rotate(8 41.4 28.4)" fill="#1b0d0d"/>
   </svg>
 `;
 
@@ -50,6 +49,7 @@ class ImposterGame {
       players: DEFAULT_PLAYERS.map(name => ({ name, role: null, isEliminated: false, isMrWhite: false, isGuardian: false })),
       scores: {},
       numImposters: 1,
+      activeImposterCount: 1,
       isChaosMode: false,
       selectedCategories: ['general', 'animals', 'foodDrinks', 'movies', 'videoGames'],
       customWords: [],
@@ -57,7 +57,6 @@ class ImposterGame {
       timeLimit: 300, // seconds, 0 = unlimited
       roundType: 'hint', // 'hint', 'question', 'silent', 'drawing'
       isGuardianEnabled: false,
-      isMrWhiteEnabled: false,
       isImposterHintEnabled: true,
       isLastChanceEnabled: false,
 
@@ -87,6 +86,8 @@ class ImposterGame {
       guardianShieldActivated: false,
       votes: [], // { voter, accused: [] }
       voteResults: null,
+      classicResult: null,
+      isTie: false,
       eliminatedThisRound: [],
       undercoverRound: 1,
       pendingWinner: null,
@@ -229,6 +230,7 @@ class ImposterGame {
     this.state.secretCategory = selection.category;
     this.state.imposterWord = selection.imposterWord;
     this.state.usedWords.push(selection.secretWord);
+    if (selection.imposterWord) this.state.usedWords.push(selection.imposterWord);
 
     // Assign roles
     const shuffled = [...this.state.players].sort(() => Math.random() - 0.5);
@@ -240,23 +242,26 @@ class ImposterGame {
     }
     impCount = Math.min(impCount, Math.max(1, Math.floor(playerCount / 2)));
 
+    // Chaos Mode also randomises the clue format for this round.
+    if (this.state.isChaosMode) {
+      this.state.roundType = CHAOS_ROUND_TYPES[Math.floor(Math.random() * CHAOS_ROUND_TYPES.length)];
+    }
+
+
+    // Mr. White mode is a single wordless player; there are no undercovers.
+    if (this.state.mode === 'mrwhite') impCount = 1;
+
     shuffled.forEach((p, idx) => {
       p.isEliminated = false;
       p.isMrWhite = false;
       p.isGuardian = false;
-
-      if (idx < impCount) {
-        p.role = 'imposter';
-      } else {
-        p.role = 'crew';
-      }
+      p.role = idx < impCount ? 'imposter' : 'crew';
     });
 
-    // Special roles
-    if (this.state.mode === 'undercover' && this.state.isMrWhiteEnabled && impCount > 0) {
-      shuffled[0].isMrWhite = true;
-      shuffled[0].role = 'imposter';
-    }
+    if (this.state.mode === 'mrwhite') shuffled[0].isMrWhite = true;
+
+    // Suspects a ballot can hold.
+    this.state.activeImposterCount = this.state.players.filter(p => p.role === 'imposter').length;
 
     if (this.state.isGuardianEnabled && shuffled.some(p => p.role === 'crew')) {
       const crewMembers = shuffled.filter(p => p.role === 'crew');
@@ -281,6 +286,8 @@ class ImposterGame {
     this.state.winner = null;
     this.state.pendingWinner = null;
     this.state.firstRoundVotes = null;
+    this.state.classicResult = null;
+    this.state.isTie = false;
     this.state.votes = [];
     this.state.guardianProtectedName = null;
     this.state.guardianShieldActivated = false;
@@ -418,6 +425,19 @@ class ImposterGame {
     }
   }
 
+  // The site resolves a ballot by the top vote positions: the highest-voted
+  // players, plus everyone tied at the cutoff for the last imposter slot.
+  getAccusedGroup(voteTallies) {
+    const ranked = Object.entries(voteTallies)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1]);
+    if (!ranked.length) return [];
+
+    const slots = Math.max(1, this.state.activeImposterCount || this.state.numImposters);
+    const cutoff = ranked[Math.min(slots, ranked.length) - 1][1];
+    return ranked.filter(([, count]) => count >= cutoff).map(([name]) => name);
+  }
+
   resolveVotes() {
     sound.suspenseDrone();
     const voteTallies = {};
@@ -429,51 +449,51 @@ class ImposterGame {
       });
     });
 
-    // Find highest vote count
-    let maxVotes = 0;
-    Object.values(voteTallies).forEach(count => {
-      if (count > maxVotes) maxVotes = count;
-    });
+    let accused = this.getAccusedGroup(voteTallies);
 
-    const accused = [];
-    if (maxVotes > 0) {
-      Object.entries(voteTallies).forEach(([name, count]) => {
-        if (count === maxVotes) accused.push(name);
-      });
-    }
-
-    // Check Guardian Shield
+    // Guardian Shield pulls the protected player out of the accused group.
     let shieldSaved = false;
-    let finalEliminated = [];
     if (this.state.guardianProtectedName && accused.includes(this.state.guardianProtectedName)) {
       shieldSaved = true;
       this.state.guardianShieldActivated = true;
-      finalEliminated = accused.filter(n => n !== this.state.guardianProtectedName);
-    } else {
-      finalEliminated = accused;
+      accused = accused.filter(n => n !== this.state.guardianProtectedName);
     }
 
+    const maxVotes = accused.length
+      ? Math.max(...accused.map(n => voteTallies[n] || 0))
+      : 0;
+
     this.state.voteResults = { tallies: voteTallies, maxVotes, accused, shieldSaved };
-    this.state.eliminatedThisRound = finalEliminated;
     if (this.state.undercoverRound === 1 && !this.state.firstRoundVotes) {
       this.state.firstRoundVotes = this.state.votes.map(v => ({ voter: v.voter, accused: [...v.accused] }));
     }
 
-    // Eliminate players
-    finalEliminated.forEach(name => {
-      const p = this.state.players.find(pl => pl.name === name);
-      if (p) p.isEliminated = true;
-    });
+    if (this.state.mode === 'classic') {
+      this.resolveClassicBallot(accused);
+      return;
+    }
 
-    // Check Win Conditions
+    // Undercover keeps the elimination loop, with different win rules.
+    this.state.eliminatedThisRound = accused;
+    this.state.isTie = accused.length > 1;
+
+    if (!this.state.isTie) {
+      accused.forEach(name => {
+        const p = this.state.players.find(pl => pl.name === name);
+        if (p) p.isEliminated = true;
+      });
+    }
+
     const alive = this.state.players.filter(p => !p.isEliminated);
     const aliveImposters = alive.filter(p => p.role === 'imposter');
     const aliveCrew = alive.filter(p => p.role === 'crew');
 
-    if (finalEliminated.some(n => {
-      const p = this.state.players.find(pl => pl.name === n);
+    const caughtMrWhite = !this.state.isTie && accused.some(name => {
+      const p = this.state.players.find(pl => pl.name === name);
       return p && p.isMrWhite;
-    })) {
+    });
+
+    if (caughtMrWhite) {
       this.state.screen = 'mrwhite_guess';
       this.render();
       return;
@@ -491,10 +511,36 @@ class ImposterGame {
       return;
     }
 
-    if (aliveImposters.length >= aliveCrew.length) {
-      this.state.pendingWinner = 'imposters';
+    this.state.pendingWinner = aliveImposters.length >= aliveCrew.length ? 'imposters' : null;
+    this.state.screen = 'voting_results';
+    this.render();
+  }
+
+  // Standard mode: the crew must catch every imposter without an innocent
+  // player in the accused group. Anything else hands the win to the imposters.
+  resolveClassicBallot(accused) {
+    const accusedSet = new Set(accused);
+    const imposters = this.state.players.filter(p => p.role === 'imposter');
+    const innocentAccused = accused.filter(name => {
+      const p = this.state.players.find(pl => pl.name === name);
+      return p && p.role === 'crew';
+    });
+    const missedImposters = imposters.filter(p => !accusedSet.has(p.name)).map(p => p.name);
+    const crewWin = accused.length > 0 && innocentAccused.length === 0 && missedImposters.length === 0;
+
+    this.state.classicResult = { crewWin, innocentAccused, missedImposters };
+    this.state.eliminatedThisRound = [];
+    this.state.isTie = accused.length > 1;
+
+    if (crewWin) {
+      if (this.state.isLastChanceEnabled) {
+        this.state.screen = 'imposter_guess';
+        this.render();
+        return;
+      }
+      this.state.pendingWinner = 'crew';
     } else {
-      this.state.pendingWinner = null;
+      this.state.pendingWinner = 'imposters';
     }
 
     this.state.screen = 'voting_results';
@@ -532,8 +578,15 @@ class ImposterGame {
     const container = document.getElementById('screen-container');
     if (!container) return;
 
+    // Keep one unique character per player for the whole session.
+    setAvatarRoster(this.state.players.map(p => p.name));
+
     const screenChanged = this._lastScreen !== this.state.screen;
     this._lastScreen = this.state.screen;
+
+    // Drop the entrance class before swapping DOM. Leaving it in place makes
+    // every same-screen re-render replay the fade-in, which reads as a flash.
+    container.classList.remove('screen-enter');
 
     switch (this.state.screen) {
       case 'home':
@@ -579,12 +632,18 @@ class ImposterGame {
     }
 
     if (screenChanged) {
-      container.classList.remove('screen-enter');
       // Force a reflow so the animation restarts on every screen change.
       void container.offsetWidth;
       container.classList.add('screen-enter');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // The app shell scrolls, not the document.
+      document.getElementById('app')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  }
+
+  // Keep the categories header summary in sync without re-rendering the screen.
+  updateCategorySummary() {
+    const sub = document.querySelector('.settings-head[data-panel="categories"] .settings-head-sub');
+    if (sub) sub.textContent = `${this.state.selectedCategories.length} selected`;
   }
 
   // --- Shared UI helpers ---
@@ -675,7 +734,14 @@ class ImposterGame {
         </button>
         <button class="btn btn-dark" id="home-quick-btn">Quick start with 4 players</button>
 
-        <p class="home-footnote">3–15 players · 40+ categories · No download</p>
+        <p class="home-footnote">3–15 players · 50 categories · No download</p>
+        <p class="home-credit">
+          Avatars by
+          <a href="https://dribbble.com/micahlanier" target="_blank" rel="noopener noreferrer">Micah Lanier</a>
+          via
+          <a href="https://www.dicebear.com/styles/micah/" target="_blank" rel="noopener noreferrer">DiceBear</a>
+          · CC BY 4.0
+        </p>
       </div>
     `;
   }
@@ -717,9 +783,21 @@ class ImposterGame {
         <input type="text" id="new-player-input" class="input-field" placeholder="Enter player name" maxlength="14" />
         <button class="btn btn-dark btn-compact" id="add-player-btn">+ Add</button>
       </div>
+      ${p.length > 1 ? `<button class="btn btn-dark btn-compact" id="randomize-players-btn">🔀 Randomize player order</button>` : ''}
     `;
 
     const categoriesBody = `
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Difficulty</span>
+          <span class="setting-desc">How familiar the words are</span>
+        </div>
+        <select id="difficulty-select" class="input-field select-compact">
+          <option value="easy" ${this.state.difficulty === 'easy' ? 'selected' : ''}>Easy</option>
+          <option value="medium" ${this.state.difficulty === 'medium' ? 'selected' : ''}>Medium</option>
+          <option value="hard" ${this.state.difficulty === 'hard' ? 'selected' : ''}>Hard</option>
+        </select>
+      </div>
       <div class="category-chips">
         ${Object.keys(CATEGORY_LABELS).map(catKey => {
           const isSelected = this.state.selectedCategories.includes(catKey);
@@ -734,7 +812,9 @@ class ImposterGame {
       <button class="btn btn-dark btn-compact" id="toggle-all-cats-btn">Select All Categories</button>
     `;
 
-    const impostersBody = `
+    const impostersBody = this.state.mode === 'mrwhite' ? `
+      <p class="hint-note">Mr. White mode always has exactly one wordless player — everyone else shares a single word.</p>
+    ` : `
       <div class="setting-row">
         <div class="setting-label">
           <span class="setting-title">Imposter Hint</span>
@@ -753,7 +833,7 @@ class ImposterGame {
           <button class="stepper-btn" id="stepper-imp-add">+</button>
         </div>
       </div>
-      <p class="hint-note">Up to 3 imposters with 6+ players.</p>
+      <p class="hint-note">Up to 3 imposters with 6+ players. Best first game: 4–6 players and 1 imposter.</p>
       <div class="setting-row">
         <div class="setting-label">
           <span class="setting-title">Random Imposters</span>
@@ -770,7 +850,14 @@ class ImposterGame {
       </div>
     `;
 
+    const modeBlurbs = {
+      classic: 'No special words — the imposter has to bluff.',
+      mrwhite: 'One player has no word at all. Catch them and they get one guess.',
+      undercover: 'Everyone gets a word — the imposter gets a related, different one.'
+    };
+
     const roundsBody = `
+      ${this.state.isChaosMode ? `<p class="hint-note">Chaos Mode picks a random round type every round.</p>` : ''}
       <div class="setting-row">
         <div class="setting-label">
           <span class="setting-title">Round Type</span>
@@ -819,27 +906,18 @@ class ImposterGame {
             <div class="undercover-copy">
               <div class="undercover-title">
                 <span class="undercover-icon">${ICONS.mask}</span>
-                <span>Undercover Mode</span>
-                <span class="badge-new">NEW</span>
-                <button type="button" class="info-dot" id="undercover-info-btn" aria-label="About Undercover Mode">i</button>
+                <span>GAME MODE</span>
+                <button type="button" class="info-dot" id="mode-info-btn" aria-label="About game modes">i</button>
               </div>
-              <p class="setting-desc">Everyone gets a word — the imposter gets a related one.</p>
+              <p class="setting-desc">${modeBlurbs[this.state.mode] || modeBlurbs.classic}</p>
             </div>
-            ${this.renderToggle('toggle-undercover', this.state.mode === 'undercover')}
+          </div>
+          <div class="mode-picker" role="group" aria-label="Game mode">
+            ${[['classic', 'Classic'], ['mrwhite', 'Mr. White'], ['undercover', 'Undercover']].map(([key, label]) => `
+              <button type="button" class="mode-opt ${this.state.mode === key ? 'active' : ''}" data-mode="${key}">${label}</button>
+            `).join('')}
           </div>
         </div>
-
-        ${this.state.mode === 'undercover' ? `
-          <div class="settings-card">
-            <div class="setting-row" style="border-bottom:none;padding:4px 0;">
-              <div class="setting-label">
-                <span class="setting-title">Mr. White Role</span>
-                <span class="setting-desc">Has NO word, must bluff &amp; guess</span>
-              </div>
-              ${this.renderToggle('toggle-mrwhite', this.state.isMrWhiteEnabled)}
-            </div>
-          </div>
-        ` : ''}
 
         ${this.renderSettingsCard({
           key: 'categories',
@@ -854,7 +932,7 @@ class ImposterGame {
           key: 'imposters',
           icon: ICONS.sliders,
           title: 'IMPOSTERS',
-          summary: `${this.state.numImposters} imposter${this.state.numImposters > 1 ? 's' : ''}${this.state.isChaosMode ? ' · random' : ''}`,
+          summary: this.state.mode === 'mrwhite' ? '1 · Mr. White' : `${this.state.numImposters} imposter${this.state.numImposters > 1 ? 's' : ''}${this.state.isChaosMode ? ' · random' : ''}`,
           open: this.state.openPanels.imposters,
           body: impostersBody
         })}
@@ -908,6 +986,14 @@ class ImposterGame {
     addBtn?.addEventListener('click', handleAdd);
     input?.addEventListener('keydown', e => { if (e.key === 'Enter') handleAdd(); });
 
+    // Randomize turn order, as the site's player panel offers.
+    document.getElementById('randomize-players-btn')?.addEventListener('click', () => {
+      this.state.players = [...this.state.players].sort(() => Math.random() - 0.5);
+      this.state.openPanels.players = true;
+      sound.voteSelect();
+      this.render();
+    });
+
     // Delete Player
     document.querySelectorAll('.del-player-btn').forEach(btn => {
       btn.addEventListener('click', e => {
@@ -948,13 +1034,16 @@ class ImposterGame {
       this.render();
     });
 
-    // Switches
-    document.getElementById('toggle-undercover')?.addEventListener('change', e => {
-      this.state.mode = e.target.checked ? 'undercover' : 'classic';
-      this.render();
-    });
-    document.getElementById('toggle-mrwhite')?.addEventListener('change', e => {
-      this.state.isMrWhiteEnabled = e.target.checked;
+    // Game mode picker
+    document.querySelectorAll('.mode-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        if (!['classic', 'mrwhite', 'undercover'].includes(mode)) return;
+        this.state.mode = mode;
+        if (mode === 'mrwhite') this.state.numImposters = 1;
+        this.buzz(6);
+        this.render();
+      });
     });
     document.getElementById('toggle-chaos')?.addEventListener('change', e => {
       this.state.isChaosMode = e.target.checked;
@@ -973,19 +1062,28 @@ class ImposterGame {
       this.state.roundType = e.target.value;
     });
 
-    // Categories
+    document.getElementById('difficulty-select')?.addEventListener('change', e => {
+      this.state.difficulty = e.target.value;
+    });
+
+    // Categories toggle in place so the panel keeps its scroll and no screen
+    // fade replays on every tap.
     document.querySelectorAll('.cat-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const cat = chip.dataset.cat;
         if (this.state.selectedCategories.includes(cat)) {
           if (this.state.selectedCategories.length > 1) {
             this.state.selectedCategories = this.state.selectedCategories.filter(c => c !== cat);
+            chip.classList.remove('selected');
           }
         } else {
           this.state.selectedCategories.push(cat);
+          chip.classList.add('selected');
         }
         this.state.openPanels.categories = true;
-        this.render();
+        this.updateCategorySummary();
+        sound.voteSelect();
+        this.buzz(4);
       });
     });
 
@@ -997,13 +1095,18 @@ class ImposterGame {
         this.state.selectedCategories = [...all];
       }
       this.state.openPanels.categories = true;
-      this.render();
+      document.querySelectorAll('.cat-chip').forEach(chip => {
+        chip.classList.toggle('selected', this.state.selectedCategories.includes(chip.dataset.cat));
+      });
+      this.updateCategorySummary();
+      this.buzz(6);
     });
 
-    document.getElementById('undercover-info-btn')?.addEventListener('click', () => {
-      this.showInfoModal('Undercover Mode', `
-        <p>The imposter does <strong>not</strong> know they are the imposter. Everyone receives a word from a related pair — the crew gets one and the imposter gets the other.</p>
-        <p>Optional <strong>Mr. White</strong> role gets no word at all and one last-chance guess if voted out.</p>
+    document.getElementById('mode-info-btn')?.addEventListener('click', () => {
+      this.showInfoModal('Game Modes', `
+        <p><strong>Classic:</strong> one or more imposters get no word and know their role.</p>
+        <p><strong>Mr. White:</strong> everyone shares one word except Mr. White, who has no word at all. If he is voted out he gets one guess to steal the win.</p>
+        <p><strong>Undercover:</strong> the imposter gets a related but different word and does not know they are the imposter.</p>
       `);
     });
 
@@ -1027,20 +1130,18 @@ class ImposterGame {
     let roleIcon = '🗣️';
     let hintDesc = "Don't say the word directly, drop hints.";
 
-    if (this.state.mode === 'undercover') {
-      if (isMrWhite) {
-        roleClass = 'role-mrwhite';
-        roleTitle = 'YOU ARE MR. WHITE';
-        wordToShow = '???';
-        roleIcon = '🎩';
-        hintDesc = 'You have NO word! Listen carefully and bluff your way through.';
-      } else {
-        roleClass = 'role-undercover';
-        roleTitle = 'THE SECRET WORD';
-        wordToShow = isImposter ? (this.state.imposterWord || this.state.secretWord) : this.state.secretWord;
-        roleIcon = '🕵️';
-        hintDesc = "Describe your word without saying it. Someone has a slightly different word!";
-      }
+    if (this.state.mode === 'mrwhite' && isMrWhite) {
+      roleClass = 'role-mrwhite';
+      roleTitle = 'YOU ARE MR. WHITE';
+      wordToShow = '???';
+      roleIcon = '🎩';
+      hintDesc = 'You have NO word! Listen carefully and bluff your way through.';
+    } else if (this.state.mode === 'undercover') {
+      roleClass = 'role-undercover';
+      roleTitle = 'THE SECRET WORD';
+      wordToShow = isImposter ? (this.state.imposterWord || this.state.secretWord) : this.state.secretWord;
+      roleIcon = '🕵️';
+      hintDesc = "Describe your word without saying it. Someone has a slightly different word!";
     } else {
       if (isImposter) {
         roleClass = 'role-imposter';
@@ -1321,7 +1422,7 @@ class ImposterGame {
     const isGuardian = voter === this.state.guardianPlayerName;
     const living = this.state.players.filter(p => !p.isEliminated);
     const candidates = living.filter(p => p.name !== voter);
-    const maxSelect = this.state.numImposters;
+    const maxSelect = Math.max(1, this.state.activeImposterCount || this.state.numImposters);
 
     return `
       <div class="vote-input-wrap">
@@ -1382,7 +1483,8 @@ class ImposterGame {
         if (this.state.currentSelectedAccused.includes(name)) {
           this.state.currentSelectedAccused = this.state.currentSelectedAccused.filter(n => n !== name);
         } else {
-          if (this.state.currentSelectedAccused.length < this.state.numImposters) {
+          const maxSelect = Math.max(1, this.state.activeImposterCount || this.state.numImposters);
+          if (this.state.currentSelectedAccused.length < maxSelect) {
             this.state.currentSelectedAccused.push(name);
           } else {
             this.state.currentSelectedAccused = [name];
@@ -1417,6 +1519,8 @@ class ImposterGame {
     const eliminated = this.state.eliminatedThisRound;
     const sorted = Object.entries(res?.tallies || {}).sort((a, b) => b[1] - a[1]);
     const gameOver = !!this.state.pendingWinner;
+    const classic = this.state.classicResult;
+    const tie = this.state.isTie && !classic;
 
     return `
       <div class="results-wrap">
@@ -1425,6 +1529,24 @@ class ImposterGame {
           <h2>Voting Results</h2>
           <p>See who everyone voted for</p>
         </div>
+
+        ${classic ? `
+          <div class="verdict-card ${classic.crewWin ? 'verdict-crew' : 'verdict-imposters'}">
+            <div class="verdict-icon">${classic.crewWin ? '🛡️' : '💀'}</div>
+            <h3>${classic.crewWin ? 'CREW CAUGHT THE IMPOSTER' : 'IMPOSTERS WIN'}</h3>
+            <p>${classic.crewWin
+              ? `The accused group — ${res.accused.join(', ')} — is the whole imposter team. No innocent player was accused.`
+              : classic.innocentAccused.length
+                ? `${classic.innocentAccused.join(', ')} ${classic.innocentAccused.length > 1 ? 'were' : 'was'} innocent, so the imposters win.`
+                : 'The crew did not catch every imposter, so the imposters win.'}</p>
+          </div>
+        ` : ''}
+
+        ${tie ? `
+          <div class="tie-note">
+            <strong>Tie vote.</strong> No one is eliminated — talk it through and vote again next round.
+          </div>
+        ` : ''}
 
         ${res?.shieldSaved ? `
           <div class="shield-alert">
@@ -1456,7 +1578,7 @@ class ImposterGame {
           }).join('')}
         </div>
 
-        ${eliminated.length > 0 ? `
+        ${eliminated.length > 0 && !tie ? `
           <div class="elimination-note">
             ${eliminated.join(' & ')} ${eliminated.length > 1 ? 'were' : 'was'} eliminated.
           </div>
@@ -1481,6 +1603,9 @@ class ImposterGame {
     document.getElementById('next-round-btn')?.addEventListener('click', () => {
       this.state.undercoverRound++;
       this.state.pendingWinner = null;
+      if (this.state.isChaosMode) {
+        this.state.roundType = CHAOS_ROUND_TYPES[Math.floor(Math.random() * CHAOS_ROUND_TYPES.length)];
+      }
       this.state.screen = 'discussion';
       this.state.remainingSeconds = this.state.timeLimit;
       this.state.timerRunning = false;
@@ -1544,7 +1669,7 @@ class ImposterGame {
         <div class="glass-panel guess-card">
           <div class="guess-icon">🚨</div>
           <h3>Guess the secret word to steal the win!</h3>
-          <p>The imposter was voted out, but has one final chance.</p>
+          <p>The imposter was caught, but gets one final guess.</p>
           <input type="text" id="imposter-guess-input" class="input-field" placeholder="Enter secret word..." />
           <div class="guess-actions">
             <button class="btn btn-dark" id="imposter-surrender-btn">Pass / Surrender</button>
@@ -1651,7 +1776,7 @@ class ImposterGame {
           <div class="reveal-summary-cell imposter-cell">
             <span>THE IMPOSTER WAS:</span>
             <div class="imposter-names">
-              ${this.state.players.filter(p => p.role === 'imposter').map(p => `<span class="imposter-pill">${renderAvatarSvg(p.name, 16)}${p.name}</span>`).join('')}
+              ${this.state.players.filter(p => p.role === 'imposter').map(p => `<span class="imposter-pill">${renderAvatarSvg(p.name, 16)}${p.name}${p.isMrWhite ? ' <em class="mini-tag">Mr. White</em>' : ''}</span>`).join('')}
             </div>
           </div>
         </div>
@@ -1723,10 +1848,12 @@ class ImposterGame {
   showRulesModal() {
     this.showInfoModal('How to Play', `
       <p><strong>1. Secret cards:</strong> Pass the device around. Each player taps to reveal their secret word in private, then hides it before passing.</p>
-      <p><strong>2. Classic vs. Undercover:</strong> In Classic the imposter knows their role and gets no word. In Undercover the imposter gets a related but different word — and doesn't know they're the imposter.</p>
+      <p><strong>2. Game modes:</strong> Classic gives the imposter no word and tells them their role. Mr. White gives everyone the same word except one wordless player. Undercover gives the imposter a related but different word, so nobody can tell from their card which side they are on.</p>
       <p><strong>3. Clues:</strong> Take turns giving a short one-word clue. Listen for someone whose clue sounds slightly off.</p>
       <p><strong>4. Vote:</strong> Pass the device again to cast secret ballots on who has the odd word out.</p>
-      <p><strong>5. Winning:</strong> The Crew wins by voting out all imposters. Imposters win if they survive or reach equal numbers.</p>
+      <p><strong>5. Winning:</strong> In Classic the Crew must catch every imposter without accusing an innocent player — anything else hands the win to the imposters. In Mr. White and Undercover players are voted out instead: the Crew win when every imposter is out, and the imposters win when they match the Crew's numbers.</p>
+      <p><strong>6. Ties:</strong> Votes are read from the top down, including everyone tied at the cutoff. Mr. White and Undercover eliminations skip ties: nobody is voted out and the table discusses again.</p>
+      <p><strong>7. Last chance:</strong> A caught Mr. White gets one guess at the secret word in Mr. White mode; with Last Chance on, a caught imposter gets the same in the other modes.</p>
     `);
   }
 
@@ -1814,7 +1941,7 @@ class ImposterGame {
   showSettingsModal() {
     this.showInfoModal('Game Settings', `
       <p><strong>Players:</strong> 3–15 on one device.</p>
-      <p><strong>Modes:</strong> Classic, Undercover and optional Mr. White.</p>
+      <p><strong>Modes:</strong> Classic, Mr. White and Undercover.</p>
       <p><strong>Modifiers:</strong> Guardian, random imposters, last-chance guess and round type.</p>
       <p>Change these from the setup screen before starting a round.</p>
     `);

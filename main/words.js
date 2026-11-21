@@ -1,3 +1,5 @@
+import { GENERATED_PAIRS } from './words-extra.js';
+
 export const WORD_DATABASE = {
   "general": {
     "easy": [
@@ -7102,8 +7104,530 @@ export const WORD_DATABASE = {
         "imposter": "Vietnam"
       }
     ]
+  },
+  "officeLife": {
+    "easy": [
+      { "crew": "Meeting", "imposter": "Presentation" },
+      { "crew": "Manager", "imposter": "Supervisor" },
+      { "crew": "Coffee Break", "imposter": "Lunch Break" },
+      { "crew": "Office", "imposter": "Classroom" },
+      { "crew": "Resume", "imposter": "Cover Letter" }
+    ],
+    "medium": [
+      { "crew": "Deadline", "imposter": ["Promotion", "Performance Review"] },
+      { "crew": "Team Building", "imposter": "Training Day" },
+      { "crew": "Water Cooler", "imposter": "Vending Machine" },
+      { "crew": "Job Interview", "imposter": "First Day" },
+      { "crew": "Overtime", "imposter": "Night Shift" }
+    ],
+    "hard": [
+      { "crew": "Work From Home", "imposter": "Remote Office" },
+      { "crew": "Annual Review", "imposter": "Salary Negotiation" },
+      { "crew": "Brainstorm", "imposter": "Group Project" },
+      { "crew": "Sick Day", "imposter": "Personal Day" },
+      { "crew": "Cubicle", "imposter": "Break Room" }
+    ]
+  },
+  "internetCulture": {
+    "easy": [
+      { "crew": "Selfie", "imposter": "Portrait" },
+      { "crew": "Meme", "imposter": "Joke" },
+      { "crew": "Emoji", "imposter": "Sticker" },
+      { "crew": "Influencer", "imposter": "Celebrity" },
+      { "crew": "Hashtag", "imposter": "Keyword" }
+    ],
+    "medium": [
+      { "crew": "Livestream", "imposter": "Video Call" },
+      { "crew": "Comment", "imposter": "Like" },
+      { "crew": "Viral", "imposter": "Trending" },
+      { "crew": "Follow", "imposter": "Subscribe" },
+      { "crew": "Group Chat", "imposter": "Forum" }
+    ],
+    "hard": [
+      { "crew": "Algorithm", "imposter": "Recommendation" },
+      { "crew": "Clickbait", "imposter": "Headline" },
+      { "crew": "Unboxing", "imposter": "Review" },
+      { "crew": "Deepfake", "imposter": "Filter" },
+      { "crew": "Viral Challenge", "imposter": "Trend Forecast" }
+    ]
+  },
+  "beach": {
+    "easy": [
+      { "crew": "Beach", "imposter": "Pool" },
+      { "crew": "Sunscreen", "imposter": "Sunglasses" },
+      { "crew": "Sandcastle", "imposter": "Snowman" },
+      { "crew": "Swimsuit", "imposter": "Towel" },
+      { "crew": "Ice Cream", "imposter": "Popsicle" }
+    ],
+    "medium": [
+      { "crew": "Lifeguard", "imposter": "Coach" },
+      { "crew": "Surfboard", "imposter": "Skateboard" },
+      { "crew": "Palm Tree", "imposter": "Pine Tree" },
+      { "crew": "Snorkeling", "imposter": "Scuba Diving" },
+      { "crew": "Beach Ball", "imposter": "Water Balloon" }
+    ],
+    "hard": [
+      { "crew": "Tide", "imposter": "Current" },
+      { "crew": "Seashell", "imposter": "Starfish" },
+      { "crew": "Boardwalk", "imposter": "Pier" },
+      { "crew": "Sunset", "imposter": "Sunrise" },
+      { "crew": "Beach Umbrella", "imposter": "Picnic Blanket" }
+    ]
+  },
+  "musicArtists": {
+    "easy": [
+      { "crew": "Guitar", "imposter": "Violin" },
+      { "crew": "Concert", "imposter": "Festival" },
+      { "crew": "Singer", "imposter": "Actor" },
+      { "crew": "Drums", "imposter": "Piano" },
+      { "crew": "Microphone", "imposter": "Headphones" }
+    ],
+    "medium": [
+      { "crew": "Band", "imposter": "Orchestra" },
+      { "crew": "Album", "imposter": "Playlist" },
+      { "crew": "Rapper", "imposter": "DJ" },
+      { "crew": "Lyrics", "imposter": "Poem" },
+      { "crew": "Stage", "imposter": "Studio" }
+    ],
+    "hard": [
+      { "crew": "Music Festival", "imposter": "Carnival" },
+      { "crew": "Record Label", "imposter": "Publisher" },
+      { "crew": "Encore", "imposter": "Finale" },
+      { "crew": "Soundcheck", "imposter": "Rehearsal" },
+      { "crew": "Vinyl", "imposter": "CD" }
+    ]
+  },
+  "fairyTales": {
+    "easy": [
+      { "crew": "Dragon", "imposter": "Dinosaur" },
+      { "crew": "Castle", "imposter": "Palace" },
+      { "crew": "Prince", "imposter": "Knight" },
+      { "crew": "Witch", "imposter": "Wizard" },
+      { "crew": "Unicorn", "imposter": "Horse" }
+    ],
+    "medium": [
+      { "crew": "Cinderella", "imposter": "Snow White" },
+      { "crew": "Giant", "imposter": "Ogre" },
+      { "crew": "Fairy", "imposter": "Angel" },
+      { "crew": "Magic Wand", "imposter": "Broomstick" },
+      { "crew": "Enchanted Forest", "imposter": "Jungle" }
+    ],
+    "hard": [
+      { "crew": "Sleeping Beauty", "imposter": "Rapunzel" },
+      { "crew": "Glass Slipper", "imposter": "Golden Crown" },
+      { "crew": "Happily Ever After", "imposter": "Happy Ending" },
+      { "crew": "Curse", "imposter": "Spell" },
+      { "crew": "Kingdom", "imposter": "Empire" }
+    ]
   }
 };
+
+// Extra word pairs merged into WORD_DATABASE at load time. Keeping the
+// expansions here leaves the original data block untouched and makes every
+// new batch easy to audit. Duplicate crew words are skipped per tier.
+const WORD_EXPANSION = {
+  officeLife: {
+    easy: [
+      { crew: 'Email', imposter: 'Text Message' },
+      { crew: 'Notebook', imposter: 'Clipboard' },
+      { crew: 'Desk', imposter: 'Table' },
+      { crew: 'Printer', imposter: 'Scanner' },
+      { crew: 'Badge', imposter: 'Keycard' },
+      { crew: 'Folder', imposter: 'Binder' },
+      { crew: 'Sticky Note', imposter: 'Bookmark' }
+    ],
+    medium: [
+      { crew: 'Conference Call', imposter: 'Video Meeting' },
+      { crew: 'Intern', imposter: 'Trainee' },
+      { crew: 'Break Room', imposter: 'Cafeteria' },
+      { crew: 'Paycheck', imposter: 'Invoice' },
+      { crew: 'Memo', imposter: 'Newsletter' },
+      { crew: 'Shift', imposter: 'Roster' },
+      { crew: 'Whiteboard', imposter: 'Chalkboard' }
+    ],
+    hard: [
+      { crew: 'Quarterly Report', imposter: 'Budget Plan' },
+      { crew: 'Onboarding', imposter: 'Orientation' },
+      { crew: 'Downsizing', imposter: 'Reorganization' },
+      { crew: 'Stakeholder', imposter: 'Client' },
+      { crew: 'Burnout', imposter: 'Fatigue' },
+      { crew: 'Freelancer', imposter: 'Contractor' },
+      { crew: 'Severance', imposter: 'Retirement' }
+    ]
+  },
+  internetCulture: {
+    easy: [
+      { crew: 'Username', imposter: 'Nickname' },
+      { crew: 'Password', imposter: 'PIN' },
+      { crew: 'Wi-Fi', imposter: 'Bluetooth' },
+      { crew: 'Browser', imposter: 'Search Engine' },
+      { crew: 'Download', imposter: 'Upload' },
+      { crew: 'Profile Picture', imposter: 'Wallpaper' },
+      { crew: 'Notification', imposter: 'Alarm' }
+    ],
+    medium: [
+      { crew: 'Screenshot', imposter: 'Screen Recording' },
+      { crew: 'Direct Message', imposter: 'Text Thread' },
+      { crew: 'Troll', imposter: 'Bully' },
+      { crew: 'Paywall', imposter: 'Subscription' },
+      { crew: 'Bookmark', imposter: 'Favourites' },
+      { crew: 'Spam', imposter: 'Junk Mail' },
+      { crew: 'Podcast', imposter: 'Radio Show' }
+    ],
+    hard: [
+      { crew: 'Two-Factor Code', imposter: 'Recovery Key' },
+      { crew: 'Bandwidth', imposter: 'Latency' },
+      { crew: 'Cookie', imposter: 'Cache' },
+      { crew: 'Bot', imposter: 'Script' },
+      { crew: 'Shadowban', imposter: 'Timeout' },
+      { crew: 'Thread', imposter: 'Chain' },
+      { crew: 'Metadata', imposter: 'Tag' }
+    ]
+  },
+  beach: {
+    easy: [
+      { crew: 'Bucket', imposter: 'Spade' },
+      { crew: 'Flip-Flops', imposter: 'Sandals' },
+      { crew: 'Sun Hat', imposter: 'Cap' },
+      { crew: 'Sea', imposter: 'Lake' },
+      { crew: 'Shell', imposter: 'Pebble' },
+      { crew: 'Wave', imposter: 'Ripple' },
+      { crew: 'Picnic', imposter: 'Barbecue' }
+    ],
+    medium: [
+      { crew: 'Deck Chair', imposter: 'Hammock' },
+      { crew: 'Beach Towel', imposter: 'Bathrobe' },
+      { crew: 'Coral', imposter: 'Seaweed' },
+      { crew: 'Lighthouse', imposter: 'Watchtower' },
+      { crew: 'Jet Ski', imposter: 'Speedboat' },
+      { crew: 'Tide Pool', imposter: 'Puddle' },
+      { crew: 'Sunburn', imposter: 'Tan' }
+    ],
+    hard: [
+      { crew: 'Sandbar', imposter: 'Shoal' },
+      { crew: 'Undertow', imposter: 'Rip Current' },
+      { crew: 'Dune', imposter: 'Hill' },
+      { crew: 'Estuary', imposter: 'Lagoon' },
+      { crew: 'Coastline', imposter: 'Shoreline' },
+      { crew: 'Seaside Resort', imposter: 'Hotel' },
+      { crew: 'Salt Marsh', imposter: 'Swamp' }
+    ]
+  },
+  musicArtists: {
+    easy: [
+      { crew: 'Piano', imposter: 'Keyboard' },
+      { crew: 'Flute', imposter: 'Recorder' },
+      { crew: 'Saxophone', imposter: 'Trumpet' },
+      { crew: 'Choir', imposter: 'Chorus' },
+      { crew: 'Song', imposter: 'Tune' },
+      { crew: 'Beat', imposter: 'Rhythm' },
+      { crew: 'Melody', imposter: 'Harmony' }
+    ],
+    medium: [
+      { crew: 'Composer', imposter: 'Songwriter' },
+      { crew: 'Producer', imposter: 'Sound Engineer' },
+      { crew: 'Backing Vocalist', imposter: 'Dancer' },
+      { crew: 'Setlist', imposter: 'Tracklist' },
+      { crew: 'Guitar Solo', imposter: 'Drum Solo' },
+      { crew: 'Remix', imposter: 'Cover' },
+      { crew: 'Single', imposter: 'EP' }
+    ],
+    hard: [
+      { crew: 'Metronome', imposter: 'Tuner' },
+      { crew: 'Octave', imposter: 'Scale' },
+      { crew: 'Tempo', imposter: 'Time Signature' },
+      { crew: 'Amplifier', imposter: 'Speaker' },
+      { crew: 'Mixtape', imposter: 'Compilation' },
+      { crew: 'Session Musician', imposter: 'Studio Band' },
+      { crew: 'Royalties', imposter: 'Advance' }
+    ]
+  },
+  fairyTales: {
+    easy: [
+      { crew: 'Elf', imposter: 'Gnome' },
+      { crew: 'Troll', imposter: 'Goblin' },
+      { crew: 'Mermaid', imposter: 'Siren' },
+      { crew: 'Crown', imposter: 'Tiara' },
+      { crew: 'Sword', imposter: 'Dagger' },
+      { crew: 'Spell Book', imposter: 'Diary' },
+      { crew: 'Cottage', imposter: 'Hut' }
+    ],
+    medium: [
+      { crew: 'Stepmother', imposter: 'Godmother' },
+      { crew: 'Talking Mirror', imposter: 'Crystal Ball' },
+      { crew: 'Golden Egg', imposter: 'Golden Apple' },
+      { crew: 'Wolf', imposter: 'Fox' },
+      { crew: 'Tower', imposter: 'Dungeon' },
+      { crew: 'Pumpkin', imposter: 'Melon' },
+      { crew: 'Ball Gown', imposter: 'Wedding Dress' }
+    ],
+    hard: [
+      { crew: 'Prophecy', imposter: 'Omen' },
+      { crew: 'Quest', imposter: 'Journey' },
+      { crew: 'Shapeshifter', imposter: 'Doppelganger' },
+      { crew: 'Enchantment', imposter: 'Illusion' },
+      { crew: 'Heir', imposter: 'Successor' },
+      { crew: 'Banishment', imposter: 'Exile' },
+      { crew: 'Guardian Angel', imposter: 'Spirit Guide' }
+    ]
+  },
+  landmarks: {
+    easy: [
+      { crew: 'Pyramid', imposter: 'Temple' },
+      { crew: 'Bridge', imposter: 'Tunnel' },
+      { crew: 'Fountain', imposter: 'Waterfall' },
+      { crew: 'Palace', imposter: 'Mansion' },
+      { crew: 'Skyscraper', imposter: 'Tower Block' },
+      { crew: 'Windmill', imposter: 'Water Wheel' }
+    ],
+    medium: [
+      { crew: 'Colosseum', imposter: 'Amphitheater' },
+      { crew: 'Great Wall', imposter: 'Fortress' },
+      { crew: 'Opera House', imposter: 'Concert Hall' },
+      { crew: 'Cathedral', imposter: 'Mosque' },
+      { crew: 'Museum', imposter: 'Art Gallery' },
+      { crew: 'Clock Tower', imposter: 'Bell Tower' }
+    ],
+    hard: [
+      { crew: 'Monument', imposter: 'Memorial' },
+      { crew: 'Aqueduct', imposter: 'Canal' },
+      { crew: 'Obelisk', imposter: 'Pillar' },
+      { crew: 'Citadel', imposter: 'Keep' },
+      { crew: 'Ruins', imposter: 'Excavation' },
+      { crew: 'Nature Reserve', imposter: 'National Park' }
+    ]
+  },
+  desserts: {
+    easy: [
+      { crew: 'Cake', imposter: 'Cupcake' },
+      { crew: 'Cookie', imposter: 'Biscuit' },
+      { crew: 'Brownie', imposter: 'Fudge' },
+      { crew: 'Pie', imposter: 'Tart' },
+      { crew: 'Donut', imposter: 'Bagel' },
+      { crew: 'Pudding', imposter: 'Custard' }
+    ],
+    medium: [
+      { crew: 'Cheesecake', imposter: 'Mousse' },
+      { crew: 'Ice Cream', imposter: 'Gelato' },
+      { crew: 'Macaron', imposter: 'Meringue' },
+      { crew: 'Waffle', imposter: 'Pancake' },
+      { crew: 'Trifle', imposter: 'Parfait' },
+      { crew: 'Éclair', imposter: 'Cream Puff' }
+    ],
+    hard: [
+      { crew: 'Soufflé', imposter: 'Fondant' },
+      { crew: 'Crème Brûlée', imposter: 'Panna Cotta' },
+      { crew: 'Tiramisu', imposter: 'Cannoli' },
+      { crew: 'Baklava', imposter: 'Strudel' },
+      { crew: 'Sorbet', imposter: 'Granita' },
+      { crew: 'Profiterole', imposter: 'Churro' }
+    ]
+  },
+  cars: {
+    easy: [
+      { crew: 'Tire', imposter: 'Wheel' },
+      { crew: 'Steering Wheel', imposter: 'Handlebar' },
+      { crew: 'Brake', imposter: 'Clutch' },
+      { crew: 'Horn', imposter: 'Bell' },
+      { crew: 'Trunk', imposter: 'Backpack' },
+      { crew: 'Headlight', imposter: 'Streetlight' }
+    ],
+    medium: [
+      { crew: 'Sedan', imposter: 'Hatchback' },
+      { crew: 'SUV', imposter: 'Pickup Truck' },
+      { crew: 'Convertible', imposter: 'Coupe' },
+      { crew: 'Minivan', imposter: 'Station Wagon' },
+      { crew: 'Hybrid', imposter: 'Electric Car' },
+      { crew: 'Manual Gearbox', imposter: 'Automatic' }
+    ],
+    hard: [
+      { crew: 'Suspension', imposter: 'Chassis' },
+      { crew: 'Turbocharger', imposter: 'Supercharger' },
+      { crew: 'Differential', imposter: 'Gearbox' },
+      { crew: 'Catalytic Converter', imposter: 'Muffler' },
+      { crew: 'Alloy', imposter: 'Rim' },
+      { crew: 'Horsepower', imposter: 'Torque' }
+    ]
+  },
+  techGadgets: {
+    easy: [
+      { crew: 'Smartphone', imposter: 'Tablet' },
+      { crew: 'Laptop', imposter: 'Desktop' },
+      { crew: 'Charger', imposter: 'Adapter' },
+      { crew: 'Camera', imposter: 'Webcam' },
+      { crew: 'Speaker', imposter: 'Microphone' },
+      { crew: 'Smartwatch', imposter: 'Fitness Band' }
+    ],
+    medium: [
+      { crew: 'Drone', imposter: 'Helicopter' },
+      { crew: 'VR Headset', imposter: 'Goggles' },
+      { crew: 'Power Bank', imposter: 'Battery Pack' },
+      { crew: 'Router', imposter: 'Modem' },
+      { crew: 'Earbuds', imposter: 'Headphones' },
+      { crew: 'Game Console', imposter: 'Handheld' }
+    ],
+    hard: [
+      { crew: 'Processor', imposter: 'Graphics Card' },
+      { crew: 'SSD', imposter: 'Hard Drive' },
+      { crew: 'Motherboard', imposter: 'Circuit Board' },
+      { crew: 'Thermal Paste', imposter: 'Glue' },
+      { crew: 'Firmware', imposter: 'Driver' },
+      { crew: 'Fingerprint Sensor', imposter: 'Iris Scanner' }
+    ]
+  },
+  celebrations: {
+    easy: [
+      { crew: 'Birthday', imposter: 'Anniversary' },
+      { crew: 'Wedding', imposter: 'Engagement' },
+      { crew: 'Balloon', imposter: 'Banner' },
+      { crew: 'Gift', imposter: 'Card' },
+      { crew: 'Fireworks', imposter: 'Sparklers' },
+      { crew: 'Party Hat', imposter: 'Crown' }
+    ],
+    medium: [
+      { crew: 'Graduation', imposter: 'Promotion' },
+      { crew: 'Baby Shower', imposter: 'Gender Reveal' },
+      { crew: 'New Year', imposter: 'Christmas' },
+      { crew: 'Thanksgiving', imposter: 'Harvest Festival' },
+      { crew: 'Parade', imposter: 'Procession' },
+      { crew: 'Toast', imposter: 'Speech' }
+    ],
+    hard: [
+      { crew: 'Milestone', imposter: 'Turning Point' },
+      { crew: 'Reunion', imposter: 'Homecoming' },
+      { crew: 'Retirement Party', imposter: 'Farewell' },
+      { crew: 'Housewarming', imposter: 'Open House' },
+      { crew: 'Vow Renewal', imposter: 'Elopement' },
+      { crew: 'Coronation', imposter: 'Inauguration' }
+    ]
+  },
+  bodyHealth: {
+    easy: [
+      { crew: 'Heart', imposter: 'Lungs' },
+      { crew: 'Tooth', imposter: 'Tongue' },
+      { crew: 'Skin', imposter: 'Hair' },
+      { crew: 'Knee', imposter: 'Elbow' },
+      { crew: 'Blood', imposter: 'Sweat' },
+      { crew: 'Fever', imposter: 'Chills' }
+    ],
+    medium: [
+      { crew: 'Muscle', imposter: 'Tendon' },
+      { crew: 'Spine', imposter: 'Ribcage' },
+      { crew: 'Vaccine', imposter: 'Antibiotic' },
+      { crew: 'Allergies', imposter: 'Cold' },
+      { crew: 'Bandage', imposter: 'Cast' },
+      { crew: 'Stethoscope', imposter: 'Thermometer' }
+    ],
+    hard: [
+      { crew: 'Immunity', imposter: 'Resistance' },
+      { crew: 'Metabolism', imposter: 'Digestion' },
+      { crew: 'Cholesterol', imposter: 'Blood Sugar' },
+      { crew: 'Anesthesia', imposter: 'Sedative' },
+      { crew: 'Cartilage', imposter: 'Ligament' },
+      { crew: 'Reflex', imposter: 'Instinct' }
+    ]
+  },
+  kitchen: {
+    easy: [
+      { crew: 'Spoon', imposter: 'Fork' },
+      { crew: 'Knife', imposter: 'Scissors' },
+      { crew: 'Plate', imposter: 'Bowl' },
+      { crew: 'Pan', imposter: 'Pot' },
+      { crew: 'Cup', imposter: 'Glass' },
+      { crew: 'Kettle', imposter: 'Teapot' }
+    ],
+    medium: [
+      { crew: 'Blender', imposter: 'Food Processor' },
+      { crew: 'Toaster', imposter: 'Microwave' },
+      { crew: 'Colander', imposter: 'Strainer' },
+      { crew: 'Whisk', imposter: 'Spatula' },
+      { crew: 'Cutting Board', imposter: 'Countertop' },
+      { crew: 'Apron', imposter: 'Oven Mitt' }
+    ],
+    hard: [
+      { crew: 'Mandoline', imposter: 'Grater' },
+      { crew: 'Stockpot', imposter: 'Saucepan' },
+      { crew: 'Hand Mixer', imposter: 'Immersion Blender' },
+      { crew: 'Kitchen Scale', imposter: 'Measuring Cup' },
+      { crew: 'Marinade', imposter: 'Seasoning' },
+      { crew: 'Tongs', imposter: 'Ladle' }
+    ]
+  },
+  fruitsVegetables: {
+    easy: [
+      { crew: 'Apple', imposter: 'Pear' },
+      { crew: 'Banana', imposter: 'Plantain' },
+      { crew: 'Orange', imposter: 'Lemon' },
+      { crew: 'Carrot', imposter: 'Radish' },
+      { crew: 'Potato', imposter: 'Yam' },
+      { crew: 'Onion', imposter: 'Garlic' }
+    ],
+    medium: [
+      { crew: 'Avocado', imposter: 'Mango' },
+      { crew: 'Pineapple', imposter: 'Coconut' },
+      { crew: 'Broccoli', imposter: 'Cauliflower' },
+      { crew: 'Spinach', imposter: 'Lettuce' },
+      { crew: 'Cucumber', imposter: 'Zucchini' },
+      { crew: 'Cherry', imposter: 'Grape' }
+    ],
+    hard: [
+      { crew: 'Artichoke', imposter: 'Asparagus' },
+      { crew: 'Beetroot', imposter: 'Turnip' },
+      { crew: 'Persimmon', imposter: 'Papaya' },
+      { crew: 'Rhubarb', imposter: 'Celery' },
+      { crew: 'Fig', imposter: 'Date' },
+      { crew: 'Pomegranate', imposter: 'Kiwi' }
+    ]
+  },
+  moroccanCulture: {
+    easy: [
+      { crew: 'Hammam', imposter: 'Sauna' }
+    ]
+  },
+  hobbies: {
+    easy: [
+      { crew: 'Knitting', imposter: 'Crochet' }
+    ]
+  },
+
+};
+
+function mergeExtraPairs(source) {
+  Object.entries(source).forEach(([cat, tiers]) => {
+    const target = WORD_DATABASE[cat];
+    if (!target) return;
+    ['easy', 'medium', 'hard'].forEach(tier => {
+      const extra = tiers[tier];
+      if (!Array.isArray(extra)) return;
+      target[tier] = target[tier] || [];
+      const seen = new Set(target[tier].map(p => p.crew.toLowerCase()));
+      extra.forEach(pair => {
+        if (!seen.has(pair.crew.toLowerCase())) {
+          target[tier].push(pair);
+          seen.add(pair.crew.toLowerCase());
+        }
+      });
+    });
+  });
+}
+
+// Curated additions first, generated pairs second.
+mergeExtraPairs(WORD_EXPANSION);
+mergeExtraPairs(GENERATED_PAIRS);
+
+// Final guard: one crew word per tier, so a category can never show the same
+// secret word twice in the same difficulty.
+Object.values(WORD_DATABASE).forEach(tiers => {
+  ['easy', 'medium', 'hard'].forEach(tier => {
+    const seen = new Set();
+    tiers[tier] = (tiers[tier] || []).filter(pair => {
+      const crew = pair.crew.toLowerCase();
+      if (seen.has(crew)) return false;
+      seen.add(crew);
+      return true;
+    });
+  });
+});
 
 export const CATEGORY_LABELS = {
   general: 'General',
@@ -7150,7 +7674,12 @@ export const CATEGORY_LABELS = {
   colors: 'Colors',
   dailySituations: 'Daily Life',
   egyptianCulture: 'Ancient Egypt',
-  moroccanCulture: 'Culture & Heritage'
+  moroccanCulture: 'Culture & Heritage',
+  officeLife: 'Office Life',
+  internetCulture: 'Internet Culture',
+  beach: 'Beach & Vacation',
+  musicArtists: 'Music & Artists',
+  fairyTales: 'Fairy Tales'
 };
 
 export const CATEGORY_ICONS = {
@@ -7198,7 +7727,12 @@ export const CATEGORY_ICONS = {
   colors: '🎨',
   dailySituations: '☕',
   egyptianCulture: '🏛️',
-  moroccanCulture: '🕌'
+  moroccanCulture: '🕌',
+  officeLife: '🖇️',
+  internetCulture: '🌐',
+  beach: '🏖️',
+  musicArtists: '🎤',
+  fairyTales: '🐉'
 };
 
 export function getWordSelection(selectedCategories, isUndercover, difficulty = 'medium', usedWords = [], customWords = []) {
@@ -7206,12 +7740,16 @@ export function getWordSelection(selectedCategories, isUndercover, difficulty = 
     const available = customWords.filter(w => !usedWords.includes(w));
     const pool = available.length > 0 ? available : customWords;
     const word = pool[Math.floor(Math.random() * pool.length)];
-    return {
-      category: 'Custom Words',
-      categoryKey: 'custom',
-      secretWord: word,
-      imposterWord: isUndercover ? (customWords.find(w => w !== word) || word) : null
-    };
+    // Undercover needs a second, different word; otherwise use the built-in data.
+    const otherWords = customWords.filter(w => w.toLowerCase() !== word.toLowerCase());
+    if (!isUndercover || otherWords.length > 0) {
+      return {
+        category: 'Custom Words',
+        categoryKey: 'custom',
+        secretWord: word,
+        imposterWord: isUndercover ? otherWords[Math.floor(Math.random() * otherWords.length)] : null
+      };
+    }
   }
 
   const validCats = (selectedCategories || []).filter(c => c !== 'custom' && WORD_DATABASE[c]);
@@ -7225,13 +7763,27 @@ export function getWordSelection(selectedCategories, isUndercover, difficulty = 
     pairs = [...(catData.easy || []), ...(catData.medium || []), ...(catData.hard || [])];
   }
 
+  // Undercover only works when the alternate word is genuinely different.
+  if (isUndercover) {
+    const usable = pairs.filter(pair => {
+      const words = Array.isArray(pair.imposter) ? pair.imposter : [pair.imposter];
+      return words.some(w => w && String(w).toLowerCase() !== String(pair.crew).toLowerCase());
+    });
+    if (usable.length) pairs = usable;
+  }
+
   const unusedPairs = pairs.filter(p => !usedWords.includes(p.crew));
   const pool = unusedPairs.length > 0 ? unusedPairs : pairs;
   const selectedPair = pool[Math.floor(Math.random() * pool.length)];
 
   let imposterWord = selectedPair.imposter;
   if (Array.isArray(imposterWord)) {
-    imposterWord = imposterWord[Math.floor(Math.random() * imposterWord.length)];
+    const options = imposterWord.filter(w => String(w).toLowerCase() !== String(selectedPair.crew).toLowerCase());
+    const list = options.length ? options : imposterWord;
+    imposterWord = list[Math.floor(Math.random() * list.length)];
+  }
+  if (isUndercover && String(imposterWord).toLowerCase() === String(selectedPair.crew).toLowerCase()) {
+    imposterWord = null;
   }
 
   return {

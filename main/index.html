@@ -11,19 +11,14 @@
 <body>
   <canvas id="confetti-canvas"></canvas>
 
-  <div id="app">
-    <!-- Top Bar -->
-    <header>
+  <header class="site-header">
+    <div class="site-header-inner">
       <div class="logo-badge">
         <div class="logo-icon">
           <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
-            <path d="M11 25.5C11 18 20.5 13 32 13s21 5 21 12.5C53 41 43.5 53 32 53S11 41 11 25.5Z" fill="#180a0a"/>
-            <path d="M18 22c8-3.4 20-3.4 28 0" stroke="#f87171" stroke-width="2" stroke-linecap="round" opacity=".45"/>
-            <ellipse cx="24" cy="28.5" rx="5" ry="3.8" fill="#fff"/>
-            <ellipse cx="40" cy="28.5" rx="5" ry="3.8" fill="#fff"/>
-            <circle cx="24.6" cy="29" r="1.9" fill="#180a0a"/>
-            <circle cx="39.4" cy="29" r="1.9" fill="#180a0a"/>
-            <path d="M25.5 39.5c4.6 3.2 8.4 3.2 13 0" stroke="#f87171" stroke-width="2.6" stroke-linecap="round"/>
+            <path d="M6 25.5C6 20.4 14.6 16.8 32 16.8s26 3.6 26 8.7c0 9.6-5.7 17.2-12 17.2-4.4 0-7.2-3.1-9.5-5.4-1.7-1.7-3.4-2.6-4.5-2.6s-2.8.9-4.5 2.6C25.2 39.6 22.4 42.7 18 42.7 11.7 42.7 6 35.1 6 25.5Z" fill="#ffffff"/>
+            <ellipse cx="22.6" cy="28.4" rx="5.6" ry="4.4" transform="rotate(-8 22.6 28.4)" fill="#1b0d0d"/>
+            <ellipse cx="41.4" cy="28.4" rx="5.6" ry="4.4" transform="rotate(8 41.4 28.4)" fill="#1b0d0d"/>
           </svg>
         </div>
         <span>Find The Imposter</span>
@@ -36,14 +31,21 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </button>
       </div>
-    </header>
+    </div>
+  </header>
+
+  <div id="app">
 
     <!-- Main Screens Container -->
     <main id="screen-container">
-      <!-- Injected by game.js -->
+      <div class="boot-fallback" id="boot-fallback">
+        <span class="boot-spinner" aria-hidden="true"></span>
+        <p>Loading the game…</p>
+        <p class="boot-error-text">Couldn’t load the game. Refresh the page.</p>
+      </div>
     </main>
   </div>
 
-  <script type="module" src="./game.js"></script>
+  <script type="module" src="./game.js" onerror="document.getElementById('boot-fallback')?.classList.add('is-error')"></script>
 </body>
 </html>
