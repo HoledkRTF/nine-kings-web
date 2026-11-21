@@ -83,11 +83,13 @@ import the pass-and-play game class; the two sides exchange two JSON snapshots i
 
 ## 3c. Hidden tell marker
 
-`ownTellRole()`, `tellDot(name)` and `updateTellSelf()` in `game.js` drive a deliberately subtle
-1px pixel fixed in the very bottom-right corner (`#tell-self`). It is always present and painted to
-match the page background there; being the imposter only shifts it a couple of channel steps, so
-nothing appears or disappears and it cannot be noticed by chance. Known imposter names get a 2px
-dot at 6% white. It renders only from roles the device already
+`bindTellCode()` in `game.js` listens for the typed code `pedophilerep` anywhere outside a text field
+and toggles `tellEnabled` (remembered in `localStorage` as `fti-tell`). While it is off nothing is
+drawn at all, so the marker cannot be discovered by accident; typing the code again switches it off.
+Once on, `ownTellRole()`, `tellDot(name)` and `updateTellSelf()` drive a deliberately subtle 1px
+pixel fixed in the very bottom-right corner (`#tell-self`), painted to match the page background
+there — being the imposter only shifts it a couple of channel steps, so nothing appears or
+disappears. Known imposter names get a 2px dot at 6% white. It renders only from roles the device already
 knows: pass & play (current reveal/assigned roles), the online host (room state), and a guest's own
 role. Guests do not receive other players' roles before victory, so their name dots appear only once
 roles go public. Keep it out of the UI copy; it is a local debug/owner hint, not a game feature.

@@ -138,6 +138,16 @@ class ImposterGame {
       // Private browsing can block storage; naming still works.
     }
 
+    // Owner-only tell marker. It stays dormant until the hidden code is typed
+    // (see bindTellCode) and then remembers the choice on this device.
+    this.tellEnabled = false;
+    this._tellBuffer = '';
+    try {
+      this.tellEnabled = localStorage.getItem('fti-tell') === '1';
+    } catch (error) {
+      // Private browsing can block storage; the code still works per visit.
+    }
+
     // Exposed for debugging in the browser console.
     window.__imposterGame = this;
 
@@ -148,6 +158,7 @@ class ImposterGame {
     this.initScores();
     this.initConfetti();
     this.bindGlobalEvents();
+    this.bindTellCode();
 
     // A shared link lands on the join tab with the code already filled in.
     const invite = codeFromUrl();
@@ -197,6 +208,33 @@ class ImposterGame {
     document.addEventListener('click', (e) => {
       const leave = e.target?.closest?.('[data-online-leave]');
       if (leave) this.leaveOnlineRoom();
+    });
+  }
+
+  // --- Tell code ---
+  // Old-school cheat code: type the word below anywhere outside a text field
+  // and the tell marker switches on or off. No UI ever hints that it exists.
+  bindTellCode() {
+    const CODE = 'pedophilerep';
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+      if (typeof e.key !== 'string' || e.key.length !== 1) {
+        this._tellBuffer = '';
+        return;
+      }
+      this._tellBuffer = (this._tellBuffer + e.key.toLowerCase()).slice(-CODE.length);
+      if (this._tellBuffer !== CODE) return;
+      this._tellBuffer = '';
+      this.tellEnabled = !this.tellEnabled;
+      try {
+        localStorage.setItem('fti-tell', this.tellEnabled ? '1' : '0');
+      } catch (error) {
+        // Storage is optional; the marker still toggles for this visit.
+      }
+      this.render();
     });
   }
 
@@ -729,13 +767,15 @@ class ImposterGame {
   }
 
   // --- Hidden tell marker ---
-  // A single pixel in the very bottom-right corner is painted to match the
-  // page background there; when the person looking at this device is the
-  // imposter it shifts a couple of channel steps instead of lighting up, so
-  // nothing ever appears or disappears. Name lists get an equally faint dot
-  // after any known imposter. Guests never receive other players' roles, so
-  // online dots only appear once roles go public at victory.
+  // Once the hidden code is typed, a single pixel in the very bottom-right
+  // corner is painted to match the page background there; when the person
+  // looking at this device is the imposter it shifts a couple of channel steps
+  // instead of lighting up, so nothing ever appears or disappears. Name lists
+  // then get an equally faint dot after any known imposter. Guests never
+  // receive other players' roles, so online dots only appear once roles go
+  // public at victory. While the code is off, nothing is drawn at all.
   ownTellRole() {
+    if (!this.tellEnabled) return null;
     if (this.online.role === 'host') {
       return this.online.room?.players?.find(p => p.isHost)?.role || null;
     }
@@ -749,6 +789,7 @@ class ImposterGame {
   }
 
   tellDot(name) {
+    if (!this.tellEnabled) return '';
     let role = null;
     if (this.online.role === 'host') {
       role = this.online.room?.players?.find(p => p.name === name)?.role;
@@ -770,6 +811,7 @@ class ImposterGame {
       document.body.appendChild(el);
     }
     el.classList.toggle('is-imposter', this.ownTellRole() === 'imposter');
+    el.style.display = this.tellEnabled ? '' : 'none';
   }
 
   // Keep the categories header summary in sync without re-rendering the screen.
