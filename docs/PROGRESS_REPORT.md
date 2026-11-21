@@ -1,80 +1,65 @@
-# Progress Report: 9 Kings Recreation & Backdrop Overhaul
+# Progress Report: Find The Imposter Emulation
 
-## 1. Executive Summary
-- **Target Experience**: 1:1 authentic recreation of *9 Kings* (Playdigious / Sad Socket iOS & Steam editions), featuring 2.5D isometric tactical combat, 30-year roguelike timeline, 3x3 kingdom grid, and 16-bit pixel-art tabletop aesthetic.
-- **Sprint Focus**: Resolving visual defects in the environment backdrop:
-  1. Fixing the left side of the screen (eliminating the harsh vertical cut, duplicated spruce trees, and chopped cobblestone wall).
-  2. Fixing the central pasture (eliminating the blurry, smudged Gaussian/Poisson inpainting artifact and restoring 100% crisp 16-bit dithered pixel-art grass).
-  3. Establishing a clean GitHub release commit and tag (`Sovereign-Pasture`).
+## 1. Executive summary
 
----
+The workspace now contains a single working product: a Pass & Play imposter game that mirrors the
+flow, rules and visual language of `findtheimposter.com/game`. It is client-only, dependency-free at
+runtime, and builds to a static bundle.
 
-## 2. Root Cause Analysis
+The 9 Kings canvas prototype, its TypeScript engine, its Vitest suite and the planning documents
+that described it no longer exist in the codebase. The documentation in this folder describes only
+the imposter game.
 
-### Why Was the Center Main Part Blurry?
-In prior work, an automated OpenCV Navier-Stokes / Telea inpainting filter was applied over the 3x3 kingdom keep, combat battalions, and card hand from `steam_ss_0.jpg`. 
-- **The Mechanism**: Harmonic inpainting algorithms compute continuous partial differential equations (PDEs) across pixel regions, smoothly diffusing color gradients across neighboring pixels.
-- **The Defect**: While continuous diffusion works well on photographic images, it completely obliterates discrete 16-bit pixel clusters. In *9 Kings*, every texture is rendered using nearest-neighbor 2x2 retro pixel blocks with discrete 3-to-4 color palette ramps. The inpainter replaced these discrete blocks with continuous gradients, producing an oily, smudged green fog with faint ghost outlines of soldiers and numerical badges ("56", "248") that severely clashed with crisp foreground sprites.
+## 2. What works today
 
-### Why Was the Left Side Broken?
-To remove the 4 relic and spell buttons (`cx=52, cy=[140, 235, 330, 425]`) from the original screenshot, an earlier script copied a 100px wide vertical rectangular strip from `x=100..200` directly over `x=0..100`.
-- **The Defect**:
-  - Created a sharp, unnatural vertical seam down the line `x=100`.
-  - Severed the diagonal cobblestone perimeter wall and shifted its stones abruptly.
-  - Duplicated a conifer spruce tree at `x=50`, leaving a half-sliced tree adjacent to it.
+| Area | State |
+| --- | --- |
+| Pass & Play flow | Home → setup → private reveal → discussion → secret ballot → result → victory |
+| Online rooms | Host-authoritative PeerJS rooms: 4-letter code or invite link, private roles, synced reveal/discussion/vote/results, all three modes, Mr. White's guess |
+| Classic mode | Site rule: crew must catch every imposter with no innocent in the accused group |
+| Undercover mode | One shared crew word + one shared related word (always different), undercovers unaware, card faces identical |
+| Mr. White mode | Everyone shares one word but a single wordless player; one final guess when caught |
+| Last Chance | One imposter word guess after being caught (Pass & Play only) |
+| Guardian | Secret shield removes one player from the accused group |
+| Chaos Mode | Random imposter count per game, random round type every round |
+| Ballot reading | Top vote positions including ties at the cutoff |
+| Tie handling | Classic: tie that includes a crew member loses; Undercover: no elimination, replay round |
+| Word bank | 50 categories, 2,200 pairs, at least 12 per difficulty tier, no repeats within a session |
+| Players | 3–15, unique names, avatars, randomize order, persistent session scores |
+| Timer | Off/1–5 min, pause, +30 s, warning states |
+| Polish | 3D card flip, confetti, Web Audio SFX, haptics, match awards, share result |
 
----
+## 3. Landed in this pass
 
-## 3. Surgical Implementation & Fixes
+1. Documentation rewritten for the real app; stale test instructions, 9 Kings design docs and the
+   dead Vitest/branch scripts removed.
+2. Ballot resolution replaced: instead of eliminating every tied player, votes are read by top vote
+   positions with the site's tie outcome, and Classic now resolves the round using the site's
+   "catch every imposter, accuse no innocent" rule.
+3. Category bank expanded from 45 to 50 (Office Life, Internet Culture, Beach & Vacation,
+   Music & Artists, Fairy Tales) with all three difficulty tiers, then filled to at least 12 pairs
+   per tier across all 50 categories (2,200 pairs total) from open word datasets and themed pools.
+4. Chaos Mode now re-rolls the round type each round, not just the imposter count.
+5. Player order randomizer and the site's recommended first-game hint added to setup.
+6. Rules modal updated to state the three game modes, ties and Last Chance explicitly.
 
-```mermaid
-flowchart TD
-    A["Raw Steam 1080p Screenshot (steam_ss_0.jpg)"] --> B["Procedural 16-bit Grass Synthesis"]
-    A --> C["Surgical Left Wall & Tree Donor Healing"]
-    A --> D["Apex & Timeline Reconstruction"]
-    
-    B --> E["Discrete 2x2 Retro Pixel Grid<br/>Colors: #4E7D68, #68A48B, #7EBCAC<br/>Vertical Light Gradient: 0.86 to 1.14"]
-    C --> F["Discrete 2x2 Snapped Disc Masks (r=38px)<br/>Button 1: Flipped Spruce Foliage & Grass<br/>Button 2: Meadow Grass<br/>Button 3: Clean Wall (dx=70, dy=-35)<br/>Button 4: Lower Wall Base + Tree Needles"]
-    D --> G["Left Wall Cloned along Slope (-0.25)<br/>Right Wall Cloned along Slope (+0.18)<br/>YEAR 31 & Currency Inpainted at 1px Text Strokes"]
+## 4. Not emulated
 
-    E --> H["Clean 1920x1080 Backdrop (meadow_clean_backdrop.png)"]
-    F --> H
-    G --> H
-    H --> I["Aspect-Cover Nearest-Neighbor Canvas Render<br/>Live at http://localhost:3000"]
-```
+| Feature | Why | Next step |
+| --- | --- | --- |
+| Public room browser / matchmaking | Rooms are code-only and hosted by a player; a public list needs a central service and moderation | Would need a room directory service |
+| Six-language UI (EN, AR, DE, FR, ES, HI) | Word bank and all copy are English | Requires translation of ~1,200 pairs plus RTL layout work |
+| Word generator page | Separate site page | Small, self-contained page could be added later |
+| Accounts, friends, Discord, ads | Site infrastructure | Not applicable |
+| Other site games (Mafia, Spyfall, Estimation, Timer Imposter…) | Separate products | Not started |
 
-### Key Technical Enhancements:
-1. **Procedural 16-bit Dithered Pasture**:
-   - Synthesizes authentic horizontal runs of 2–5 retro pixels for shadow green (`[78, 125, 104]`), base sage (`[104, 164, 139]`), and highlight mint (`[126, 188, 162]`).
-   - Replaced all dirty areas below the wall while strictly preserving the cyan pond (`x < 450, y > 570`), stone wishing well (`x in 80..270, y in 370..550`), and right conifer forest (`x > 1420`).
-2. **Seamless Disc Healing**:
-   - Replaced all 4 relic buttons using retro 2x2 pixel-snapped disc masks (`radius = 38px`) with donors extracted directly along the cobblestone wall's trajectory vector (`dx=70, dy=-35`).
-   - Completely eliminated the 100px vertical seam and restored original tree placement.
-3. **Timeline & Currency Glyphs Cleanup**:
-   - Cloned the clean cobblestone wall across the top apex from `x=600` to `x=940` and `x=940` to `x=1150`.
-   - Inpainted text stroke glyphs ("YEAR 31" and "✦ 298") using a 1-pixel dilation mask, sampling immediately adjacent needle and stone pixels with zero smudging.
-4. **Canvas Renderer Integration**:
-   - Enhanced `BoardRenderer` in `dev/src/render/board-renderer.ts` with aspect-cover math (`Math.max(width/imgW, height/imgH)`) and `ctx.imageSmoothingEnabled = false`.
-   - Added procedural fallback mode for headless unit tests.
+## 5. Verification
 
----
+- `npm run build` produces `main/dist/` without errors.
+- Manual pass: setup with 4 players → reveal all cards → discussion timer → four ballots →
+  verdict → victory screen.
+- Online pass: three browser tabs create/join a room, receive different private roles, sync reveal →
+  discussion → vote → results → victory, and Mr. White's guess resolves the round. Verify a guest
+  socket receives only its own role in the snapshots.
 
-## 4. Verification & Testing
-
-| Suite | Scope | Tests Run | Result |
-| :--- | :--- | :--- | :--- |
-| `dev/` | Active Development | 15 test files | **163 / 163 Passed** |
-| `staging/` | Dress Rehearsal | 15 test files | **163 / 163 Passed** |
-| `main/` | Production Release | 15 test files | **163 / 163 Passed** |
-| Production Build | Vite Production Bundles | `dev`, `staging`, `main` | **0 errors, all chunks gzip optimized** |
-| Visual Regression | Live Browser Capture (Edge) | Viewport 1280x720 | **Verified via active `read_file` inspection** |
-
----
-
-## 5. Deployment & Release State
-
-- **Branch**: `master`
-- **Remote**: `https://github.com/HoledkRTF/nine-kings-web.git`
-- **Release Commit**: `73744c8`
-- **Git Tag**: `Sovereign-Pasture`
-- **Backup Archive**: `main_backup_20261106.zip`
+No automated tests exist, by design: the previous suite tested the removed canvas game.

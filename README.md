@@ -1,109 +1,126 @@
-# 9 Kings: Digital Tabletop Web Remake
+# Find The Imposter — Pass & Play
 
-[![Version Codename: Sovereign-Pasture](https://img.shields.io/badge/Version%20Codename-Sovereign--Pasture-success.svg)](#recent-codenames)
-[![Tests: 163/163 Passing](https://img.shields.io/badge/Unit%20Tests-163%2F163%20Passed-brightgreen.svg)](#testing)
-[![TypeScript](https://img.shields.io/badge/Language-TypeScript%205.x-blue.svg)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Bundler-Vite%205.x-646CFF.svg)](https://vitejs.dev/)
+A zero-dependency browser party game: one secret word, one hidden imposter, one phone passed
+around the table. A local recreation of the Pass & Play mode on
+[findtheimposter.com](https://findtheimposter.com/game).
 
-An authentic 1:1 web recreation of the tactical tabletop roguelike **9 Kings** (Playdigious / Sad Socket iOS & Steam editions). Built with zero runtime bloat using high-performance HTML5 Canvas 2D and deterministic TypeScript state machines.
-
----
-
-## Direct Documentation Links
-
-For external tools, web crawlers, or direct terminal reading, the core documentation files are tracked under `docs/`:
-
-- **Operations & Run Manual**: [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md)  
-  *Raw Link*: `https://raw.githubusercontent.com/HoledkRTF/nine-kings-web/master/docs/WALKTHROUGH.md`
-- **Surgical Backdrop Progress Report**: [`docs/PROGRESS_REPORT.md`](docs/PROGRESS_REPORT.md)  
-  *Raw Link*: `https://raw.githubusercontent.com/HoledkRTF/nine-kings-web/master/docs/PROGRESS_REPORT.md`
-- **Developer Architecture & Handoff**: [`docs/HANDOFF.md`](docs/HANDOFF.md)  
-  *Raw Link*: `https://raw.githubusercontent.com/HoledkRTF/nine-kings-web/master/docs/HANDOFF.md`
+Built with plain HTML, CSS and ES modules. Vite is only used as a dev server and bundler — no
+framework and no backend. Online rooms connect browsers directly with PeerJS, using its public
+signalling server; the host's tab is the room.
 
 ---
 
-## Highlights & Features
+## Word bank
 
-- **Discrete 16-bit Dithered Pasture**: 1920x1080 native meadow environment reconstructed with discrete 2x2 retro pixel dither clusters and vertical lighting gradients (`#4E7D68`, `#68A48B`, `#7EBCAC`), eliminating continuous Gaussian/Poisson blur and ghost artifacts.
-- **Surgical Perimeter Wall**: Seamless disc healing along cobblestone wall trajectory vectors (`dx=70, dy=-35`), restoring authentic pine trees and continuous masonry.
-- **2.5D Isometric Diamond Grid**: Mathematical 2:1 isometric projection (`tileW = 120px`, `tileH = 68px`) with exact subpixel diamond hit testing.
-- **Tarot Card Hand Engine**: 12 specialization cards, 3D cursor-hover tilt physics, and the core "Leave Two" placement rule.
-- **30-Year Roguelike Timeline**: Full campaign pacing with invasion waves, boss encounters (Years 8, 23, 30), and merchant draft phases.
-- **Local Folder Branching Protocol**: Strict git simulation across `main/`, `staging/`, `dev/`, and `features/`.
-
----
+50 categories, three difficulty tiers, **2,200 crew/imposter pairs** — at least 12 per tier in every
+category, so a full game on one category never repeats a word.
 
 ## Quickstart
 
-### Prerequisites
-- Node.js 18+ and npm 9+
-- Python 3.10+ (for background image processing pipelines)
+Requires Node.js 18+ and npm 9+.
 
-### Setup & Run
 ```bash
-# Clone the repository
-git clone https://github.com/HoledkRTF/nine-kings-web.git
-cd nine-kings-web
-
-# Install dependencies
 npm install
-
-# Launch local dev server (default port 3000)
-npx vite dev dev --port 3000
+npm run dev
 ```
-Open your browser to `http://localhost:3000`.
 
----
-
-## Testing & Verification
-
-The project enforces deterministic unit tests for every core system (rendering, timeline, cards, combat, math):
+Open `http://localhost:3000`. For a production bundle:
 
 ```bash
-# Full test suite (163 tests)
-npx vitest run dev/
-
-# Targeted renderer unit test
-npx vitest run dev/src/render/board-renderer.test.ts
-
-# Production build test
-npx vite build dev
+npm run build     # writes main/dist/
 ```
 
----
-
-## Architecture
-
-```mermaid
-graph TD
-    Engine["NineKingsGame (main.ts)"]
-    Engine --> Grid["KingdomGrid (3x3 Isometric Plots)"]
-    Engine --> Deck["DeckManager (12 Tarot Cards + Drafting)"]
-    Engine --> Combat["CombatEngine (Wave Resolution & Invaders)"]
-    Engine --> Timeline["TimelineManager (30-Year Roguelike Arc)"]
-    Engine --> Renderer["BoardRenderer (Canvas 2D / Aspect Cover)"]
-    Engine --> UI["CardHandUI + MerchantUI + HUD"]
-    
-    Renderer --> Backdrop["meadow_clean_backdrop.png (1920x1080)"]
-    Renderer --> Sprites["16-bit Sprites (Keep, Battalions, Pond, Wall)"]
-    Renderer --> Ambient["Atmospheric Water Ripples & Pollen VFX"]
-```
+`vite.config.ts` sets `root: 'main'`, so `npm run dev` always serves the live version.
 
 ---
 
-## Branching & Release Strategy
+## How a game runs
 
-1. `main/`: Sacred production release. Untouchable during development.
-2. `staging/`: Dress rehearsal testing ground for pre-production verification.
-3. `dev/`: Active development integration branch.
-4. `features/`: Isolated task folders (e.g. `features/nine-kings-ios-background/`).
+1. **Setup** — add 3 to 15 players (or randomize the order), pick categories and modifiers, choose
+   Classic, Mr. White or Undercover.
+2. **Reveal** — pass the device around; each player taps their card to see their role privately and
+   hides it before passing on.
+3. **Discussion** — a speaking order and countdown timer keep the table moving.
+4. **Voting** — the device goes round again for a secret ballot. Each voter picks as many suspects
+   as there are imposters.
+5. **Result** — the ballot is read from the top down and scored against the real roles.
 
 ---
 
-## Recent Codenames
+## Online rooms
 
-- `Sovereign-Pasture`: Authentic 1:1 9 Kings meadow environment, surgical removal of blur artifacts with discrete 16-bit dithered pixel grass, healed left wall and spruce forest, and aspect-cover canvas scaling.
-- `Verdant-Sovereign`: 1920x1080 Steam-extracted pasture with cobblestone wall, 12 authentic 16-bit Tarot cards, Royal Keep, and battalion count badges.
-- `Pine-Dominion`: Authentic 9 Kings official environment recreation with diagonal cobblestone wall, conifer spruce pine trees, cyan pond, and stone well.
-- `Crown-Diorama`: 2.5D isometric tabletop diorama overhaul with extruded cliffside depth, 16-bit pixel buildings, and Web Audio synthesis.
-- `Shadow-Glide`: Camera jitter fix and fast-action dash physics.
+Home → **Online** creates a host-authoritative room. Players join with a 4-letter code or the invite
+link, and everything syncs over a peer-to-peer data channel:
+
+- the host picks the mode, imposter count, difficulty and discussion timer in the lobby;
+- roles and words are sent only to the player they belong to — nobody's browser receives the full
+  assignment before the reveal;
+- reveal → discussion → voting → results → victory all run from the host's snapshot, so every device
+  sees the same round and the same timer;
+- Mr. White mode includes his final guess, and Classic uses the same one-ballot, no-innocent rule as
+  Pass & Play.
+
+3 to 15 players. The host's tab is the server: if it closes, the room ends. There are no accounts, no
+public room list and nothing stored on a server.
+
+## Rules the app enforces
+
+- **Classic** — the crew must catch *every* imposter without an innocent player in the accused
+  group. An innocent in the group, a missed imposter, or a tie that leaves a crew member at the top
+  hands the win to the imposters. There is no automatic word-guess win unless Last Chance is on.
+- **Undercover** — everyone gets a word: the crew share one and the undercovers share a related but
+  different one, so nobody can tell their side from their card. Accusations eliminate players until
+  one side wins; a tie eliminates nobody and the table discusses again.
+- **Mr. White** — a separate mode: the table shares one word and a single wordless player bluffs.
+  If caught, he gets one guess at that word; accusations eliminate players until one side wins.
+- **Last Chance** (Pass & Play only) — a caught imposter gets one guess at the secret word.
+- **Guardian** — secretly shields one player from the accused group.
+- **Chaos Mode** — random imposter count each game and a random round type every round.
+- **Round types** — Hint, Question, Silent, Drawing.
+
+Votes are counted the way the site does it: the accused group is the top vote positions, including
+everyone tied at the cutoff for the last imposter slot.
+
+---
+
+## Project layout
+
+| Path | Purpose |
+| --- | --- |
+| `main/index.html` | Shell: header, sound/rules buttons, confetti canvas |
+| `main/game.js` | `ImposterGame` — state, screen machine, ballots, rendering |
+| `main/words.js` | Word database (50 categories × easy/medium/hard pairs) + selection logic |
+| `main/words-extra.js` | Generated pair bank (2,200 pairs total) merged into the database at load |
+| `main/audio.js` | Synthesized Web Audio sound engine (no audio files) |
+| `main/avatars.js` | Deterministic per-player avatar assignment |
+| `main/assets/avatars/` | 16 DiceBear "Micah" SVGs, served locally |
+| `main/style.css` | Dark site-matched theme and all screen layouts |
+| `main/dist/` | Last production build |
+
+`dev/`, `staging/` and `features/imposter-game/` are older promotions of the same game, kept as the
+project's folder-branching record. `main/` is the live version.
+
+---
+
+## Docs
+
+- [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) — install, run, play and troubleshoot
+- [`docs/HANDOFF.md`](docs/HANDOFF.md) — architecture, state model, extension points
+- [`docs/PROGRESS_REPORT.md`](docs/PROGRESS_REPORT.md) — what is emulated and what is not
+- [`docs/SITE_NOTES.md`](docs/SITE_NOTES.md) — teardown of the original site's flows
+
+---
+
+## Notes
+
+- There is no test suite. The previous Vitest setup and its fixtures were removed along with the
+  game they tested; verify changes with `npm run build` and by playing a round.
+- The word generator page, a public room browser, the six-language UI and the site's other games
+  are **not** implemented. See `docs/PROGRESS_REPORT.md`.
+- Avatars are Micah style by [Micah Lanier](https://dribbble.com/micahlanier) via
+  [DiceBear](https://www.dicebear.com/styles/micah/), CC BY 4.0.
+- The word bank holds **2,200 crew/imposter pairs** across 50 categories, with at least 12 pairs in
+  every difficulty tier. Generated pairs come from
+  [himehatsumi/impostor](https://github.com/himehatsumi/impostor) (public domain) and
+  [GameSketchers/Game-WordList](https://github.com/GameSketchers/Game-WordList) (MIT), plus themed
+  pools for categories those lists do not cover.

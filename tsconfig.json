@@ -3,10 +3,12 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": false,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["main/src/**/*", "dev/src/**/*", "staging/src/**/*", "features/silky-smooth-camera-and-dash/src/**/*"]
+  "include": ["main/**/*.js"]
 }

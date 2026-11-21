@@ -1,9 +1,19 @@
 import { WORD_DATABASE, CATEGORY_LABELS, CATEGORY_ICONS, getWordSelection } from './words.js';
 import { sound } from './audio.js';
 import { renderAvatarSvg, getPlayerAvatar, setAvatarRoster } from './avatars.js';
+import { HostRoom, GuestClient, makeRoomCode, normalizeCode, roomLink, codeFromUrl, cleanName } from './online.js';
 
 // --- Default State ---
 const DEFAULT_PLAYERS = ['Alex', 'Jordan', 'Sam', 'Taylor'];
+
+// Player names travel over the network, so never trust them as HTML.
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+}[ch]));
 
 // Chaos Mode re-rolls the clue format every round, like the site's twists.
 const CHAOS_ROUND_TYPES = ['hint', 'question', 'silent', 'drawing'];
@@ -102,6 +112,32 @@ class ImposterGame {
     this.confettiAnimationId = null;
     this._lastScreen = null;
 
+    // Online room state. The host's browser owns the real game; this object
+    // only mirrors the last snapshot so both sides can render the same screens.
+    this.online = {
+      role: null, // 'host' | 'guest'
+      room: null,
+      client: null,
+      code: '',
+      joinCode: '',
+      name: '',
+      entryTab: 'create',
+      status: 'idle',
+      error: '',
+      state: null,
+      you: null,
+      isRevealed: false,
+      selectedVote: null,
+      ticker: null,
+      copied: '',
+      savedTickerState: null
+    };
+    try {
+      this.online.name = localStorage.getItem('fti-name') || '';
+    } catch (error) {
+      // Private browsing can block storage; naming still works.
+    }
+
     // Exposed for debugging in the browser console.
     window.__imposterGame = this;
 
@@ -112,6 +148,15 @@ class ImposterGame {
     this.initScores();
     this.initConfetti();
     this.bindGlobalEvents();
+
+    // A shared link lands on the join tab with the code already filled in.
+    const invite = codeFromUrl();
+    if (invite) {
+      this.online.joinCode = invite;
+      this.online.entryTab = 'join';
+      this.state.screen = 'online_entry';
+    }
+
     this.render();
   }
 
@@ -147,6 +192,12 @@ class ImposterGame {
     if (rulesBtn) {
       rulesBtn.addEventListener('click', () => this.showRulesModal());
     }
+
+    // Shared "Leave room" control used by the online waiting screens.
+    document.addEventListener('click', (e) => {
+      const leave = e.target?.closest?.('[data-online-leave]');
+      if (leave) this.leaveOnlineRoom();
+    });
   }
 
   // --- Confetti FX ---
@@ -309,6 +360,7 @@ class ImposterGame {
 
   goHome() {
     this.pauseTimer();
+    this.state.playMode = 'pass';
     this.state.screen = 'home';
     this.render();
   }
@@ -579,7 +631,8 @@ class ImposterGame {
     if (!container) return;
 
     // Keep one unique character per player for the whole session.
-    setAvatarRoster(this.state.players.map(p => p.name));
+    const rosterNames = this.online.state?.players?.map(p => p.name) || this.state.players.map(p => p.name);
+    setAvatarRoster(rosterNames);
 
     const screenChanged = this._lastScreen !== this.state.screen;
     this._lastScreen = this.state.screen;
@@ -629,7 +682,42 @@ class ImposterGame {
         container.innerHTML = this.renderVictoryScreen();
         this.bindVictoryEvents();
         break;
+      case 'online_entry':
+        container.innerHTML = this.renderOnlineEntry();
+        this.bindOnlineEntryEvents();
+        break;
+      case 'online_lobby':
+        container.innerHTML = this.renderOnlineLobby();
+        this.bindOnlineLobbyEvents();
+        break;
+      case 'online_reveal':
+        container.innerHTML = this.renderOnlineReveal();
+        this.bindOnlineRevealEvents();
+        break;
+      case 'online_discussion':
+        container.innerHTML = this.renderOnlineDiscussion();
+        this.bindOnlineDiscussionEvents();
+        break;
+      case 'online_vote':
+        container.innerHTML = this.renderOnlineVote();
+        this.bindOnlineVoteEvents();
+        break;
+      case 'online_guess':
+        container.innerHTML = this.renderOnlineGuess();
+        this.bindOnlineGuessEvents();
+        break;
+      case 'online_results':
+        container.innerHTML = this.renderOnlineResults();
+        this.bindOnlineResultsEvents();
+        break;
+      case 'online_victory':
+        container.innerHTML = this.renderOnlineVictory();
+        this.bindOnlineVictoryEvents();
+        break;
     }
+
+    this.syncOnlineTicker();
+    this.updateTellSelf();
 
     if (screenChanged) {
       // Force a reflow so the animation restarts on every screen change.
@@ -638,6 +726,50 @@ class ImposterGame {
       // The app shell scrolls, not the document.
       document.getElementById('app')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  }
+
+  // --- Hidden tell marker ---
+  // A single pixel in the very bottom-right corner is painted to match the
+  // page background there; when the person looking at this device is the
+  // imposter it shifts a couple of channel steps instead of lighting up, so
+  // nothing ever appears or disappears. Name lists get an equally faint dot
+  // after any known imposter. Guests never receive other players' roles, so
+  // online dots only appear once roles go public at victory.
+  ownTellRole() {
+    if (this.online.role === 'host') {
+      return this.online.room?.players?.find(p => p.isHost)?.role || null;
+    }
+    if (this.online.role === 'guest') {
+      return this.online.you?.role || null;
+    }
+    if (this.state.screen === 'reveal') {
+      return this.state.players[this.state.revealIndex]?.role || null;
+    }
+    return null;
+  }
+
+  tellDot(name) {
+    let role = null;
+    if (this.online.role === 'host') {
+      role = this.online.room?.players?.find(p => p.name === name)?.role;
+    } else if (this.online.role === 'guest') {
+      role = this.online.state?.players?.find(p => p.name === name)?.role;
+    } else {
+      role = this.state.players.find(p => p.name === name)?.role;
+    }
+    return role === 'imposter' ? '<span class="tell-dot" aria-hidden="true"></span>' : '';
+  }
+
+  updateTellSelf() {
+    let el = document.getElementById('tell-self');
+    if (!el) {
+      el = document.createElement('span');
+      el.id = 'tell-self';
+      el.className = 'tell-self';
+      el.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(el);
+    }
+    el.classList.toggle('is-imposter', this.ownTellRole() === 'imposter');
   }
 
   // Keep the categories header summary in sync without re-rendering the screen.
@@ -1310,7 +1442,7 @@ class ImposterGame {
               <div class="speaker-chip ${idx === 0 ? 'active' : ''}">
                 <span class="speaker-num">${idx + 1}</span>
                 ${renderAvatarSvg(p.name, 22)}
-                <span>${p.name}</span>
+                <span>${p.name}${this.tellDot(p.name)}</span>
               </div>
             `).join('')}
           </div>
@@ -1448,7 +1580,7 @@ class ImposterGame {
             return `
               <button type="button" class="vote-list-item ${isSelected ? 'selected' : ''}" data-player="${p.name}">
                 ${renderAvatarSvg(p.name, 44)}
-                <span class="vote-list-name">${p.name}</span>
+                <span class="vote-list-name">${p.name}${this.tellDot(p.name)}</span>
                 <span class="vote-radio">${isSelected ? ICONS.check : ''}</span>
               </button>
             `;
@@ -1843,6 +1975,1046 @@ class ImposterGame {
     });
   }
 
+  openOnlineEntry() {
+    this.state.playMode = 'online';
+    this.online.entryTab = this.online.joinCode ? 'join' : 'create';
+    this.online.error = '';
+    this.state.screen = 'online_entry';
+    this.render();
+  }
+
+  saveOnlineName(name) {
+    this.online.name = name;
+    try { localStorage.setItem('fti-name', name); } catch (error) { /* storage is optional */ }
+  }
+
+  statusLabel(status) {
+    return {
+      idle: 'Not connected',
+      connecting: 'Connecting…',
+      online: 'Connected',
+      reconnecting: 'Reconnecting…',
+      offline: 'Connection lost',
+      closed: 'Room closed',
+      error: 'Connection problem'
+    }[status] || 'Connecting…';
+  }
+
+  renderOnlineEntry() {
+    const tab = this.online.entryTab === 'join' ? 'join' : 'create';
+    const name = escapeHtml(this.online.name || '');
+    const code = escapeHtml(this.online.joinCode || '');
+    return `
+      <div class="online-wrap">
+        <div class="online-head">
+          <button class="hero-back" id="online-back-btn" aria-label="Back">‹</button>
+          <div class="online-head-copy">
+            <span class="online-overline">ONLINE MULTIPLAYER</span>
+            <h2>Play with friends</h2>
+            <p>Create a room and share the code, or join a room someone sent you.</p>
+          </div>
+        </div>
+
+        <div class="online-tabs" role="tablist">
+          <button class="online-tab ${tab === 'create' ? 'active' : ''}" data-tab="create" role="tab">Create room</button>
+          <button class="online-tab ${tab === 'join' ? 'active' : ''}" data-tab="join" role="tab">Join room</button>
+        </div>
+
+        <div class="online-panel" data-panel="create" ${tab === 'create' ? '' : 'hidden'}>
+          <label class="online-label" for="online-name-input">Your name</label>
+          <input id="online-name-input" class="input-field" maxlength="14" value="${name}" placeholder="e.g. Alex" autocomplete="nickname" />
+          <button class="btn btn-red btn-lg" id="online-create-btn">Create room</button>
+          <p class="online-hint">You’ll get a 4-letter code and a link to share. Keep this tab open — your device hosts the game.</p>
+        </div>
+
+        <div class="online-panel" data-panel="join" ${tab === 'join' ? '' : 'hidden'}>
+          <label class="online-label" for="online-code-input">Room code or invite link</label>
+          <input id="online-code-input" class="input-field online-code-input" maxlength="64" value="${code}" placeholder="ABCD" autocomplete="off" spellcheck="false" />
+          <label class="online-label" for="online-join-name-input">Your name</label>
+          <input id="online-join-name-input" class="input-field" maxlength="14" value="${name}" placeholder="e.g. Sam" autocomplete="nickname" />
+          <button class="btn btn-red btn-lg" id="online-join-btn">Join room</button>
+          <p class="online-hint">Paste the 4-letter code or the full invite link — either works.</p>
+        </div>
+
+        <div class="online-error ${this.online.error ? 'show' : ''}" id="online-error">${escapeHtml(this.online.error)}</div>
+        <p class="online-hint online-hint-centered">Rooms are peer-to-peer. The host’s tab must stay open while you play.</p>
+      </div>
+    `;
+  }
+
+  bindOnlineEntryEvents() {
+    document.getElementById('online-back-btn')?.addEventListener('click', () => {
+      this.online.error = '';
+      this.goHome();
+    });
+
+    const tabs = [...document.querySelectorAll('.online-tab')];
+    const panels = [...document.querySelectorAll('.online-panel')];
+    const showTab = (next) => {
+      this.online.entryTab = next;
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === next));
+      panels.forEach(p => { p.hidden = p.dataset.panel !== next; });
+      document.getElementById(next === 'join' ? 'online-code-input' : 'online-name-input')?.focus();
+    };
+    tabs.forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
+
+    const showError = (message) => {
+      this.online.error = message;
+      const box = document.getElementById('online-error');
+      if (box) {
+        box.textContent = message;
+        box.classList.add('show');
+      }
+    };
+
+    document.getElementById('online-create-btn')?.addEventListener('click', () => {
+      const name = cleanName(document.getElementById('online-name-input')?.value);
+      if (!name) return showError('Enter your name first.');
+      this.createOnlineRoom(name);
+    });
+
+    document.getElementById('online-join-btn')?.addEventListener('click', () => {
+      const raw = document.getElementById('online-code-input')?.value || '';
+      const fromLink = raw.match(/[?&]room=([A-Za-z0-9]+)/);
+      const code = normalizeCode(fromLink ? fromLink[1] : raw);
+      const name = cleanName(document.getElementById('online-join-name-input')?.value);
+      if (code.length < 4) return showError('Enter the 4-letter room code or paste the invite link.');
+      if (!name) return showError('Enter your name first.');
+      this.joinOnlineRoom(name, code);
+    });
+
+    document.getElementById('online-name-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('online-create-btn')?.click();
+    });
+    ['online-code-input', 'online-join-name-input'].forEach(id => {
+      document.getElementById(id)?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('online-join-btn')?.click();
+      });
+    });
+
+    setTimeout(() => {
+      document.getElementById(this.online.entryTab === 'join' ? 'online-code-input' : 'online-name-input')?.focus();
+    }, 60);
+  }
+
+  createOnlineRoom(name) {
+    this.cleanupOnline();
+    this.saveOnlineName(name);
+    this.online.role = 'host';
+    this.online.code = makeRoomCode(4);
+    this.online.joinCode = this.online.code;
+    this.online.status = 'connecting';
+    this.online.error = '';
+    this.state.playMode = 'online';
+    this.state.screen = 'online_lobby';
+
+    try {
+      const room = new HostRoom({
+        code: this.online.code,
+        name,
+        onState: (state, you) => this.applyOnlineState(state, you),
+        onStatus: (status) => this.handleOnlineStatus(status),
+        onError: (error) => this.handleOnlineError(error)
+      });
+      this.online.room = room;
+      room.publish();
+    } catch (error) {
+      this.online.error = 'Could not create a room. Check your connection and try again.';
+      this.state.screen = 'online_entry';
+    }
+    this.render();
+  }
+
+  joinOnlineRoom(name, code) {
+    this.cleanupOnline();
+    this.saveOnlineName(name);
+    this.online.role = 'guest';
+    this.online.code = code;
+    this.online.joinCode = code;
+    this.online.status = 'connecting';
+    this.online.error = '';
+    this.state.playMode = 'online';
+    this.state.screen = 'online_lobby';
+
+    try {
+      const client = new GuestClient({
+        code,
+        name,
+        onState: (state, you) => this.applyOnlineState(state, you),
+        onYou: (you) => {
+          this.online.you = you;
+          if (this.online.role === 'guest' && this.online.state) this.render();
+        },
+        onStatus: (status) => this.handleOnlineStatus(status),
+        onError: (error) => this.handleOnlineError(error)
+      });
+      this.online.client = client;
+    } catch (error) {
+      this.online.error = 'Could not join that room. Check the code and try again.';
+      this.state.screen = 'online_entry';
+    }
+    this.render();
+  }
+
+  handleOnlineStatus(status) {
+    if (!this.online.role) return;
+    this.online.status = status;
+    this.updateOnlineStatusDom();
+  }
+
+  updateOnlineStatusDom() {
+    const dot = document.getElementById('online-status-dot');
+    const text = document.getElementById('online-status-text');
+    if (dot) dot.className = `status-dot ${this.online.status}`;
+    if (text) text.textContent = this.statusLabel(this.online.status);
+  }
+
+  handleOnlineError(error) {
+    if (!error) return;
+    const message = error.message || 'Connection problem.';
+    const code = error.code || '';
+    const backToEntry = ['not-found', 'id-taken', 'name-taken', 'room-full', 'in-progress', 'name-required'].includes(code);
+
+    if (code === 'host-left') {
+      this.cleanupOnline();
+      this.state.screen = 'home';
+      this.render();
+      this.showAlert('Room closed', message);
+      return;
+    }
+
+    if (backToEntry) {
+      this.cleanupOnline();
+      this.online.error = message;
+      this.state.screen = 'online_entry';
+      this.render();
+      return;
+    }
+
+    if (code === 'need-players') {
+      this.showAlert('Not enough players', message);
+      return;
+    }
+
+    // Transient signalling trouble: keep the room alive and show the message.
+    this.showAlert('Connection problem', message);
+  }
+
+  applyOnlineState(state, you) {
+    if (!this.online.role || !state) return;
+    const previous = this.online.state;
+    this.online.state = state;
+    if (you) this.online.you = you;
+    if (state.code) this.online.code = state.code;
+
+    const screens = {
+      lobby: 'online_lobby',
+      reveal: 'online_reveal',
+      discussion: 'online_discussion',
+      vote: 'online_vote',
+      guess: 'online_guess',
+      results: 'online_results',
+      victory: 'online_victory'
+    };
+    const nextScreen = screens[state.screen];
+    if (!nextScreen) return;
+
+    const prevPhase = previous?.screen;
+    if (nextScreen !== this.state.screen) {
+      this.online.isRevealed = false;
+      this.online.selectedVote = null;
+    }
+    this.state.screen = nextScreen;
+
+    if (prevPhase !== state.screen) {
+      if (state.screen === 'vote') sound.voteSelect();
+      if (state.screen === 'results') sound.voteSubmit();
+      if (state.screen === 'victory') {
+        if (state.winner === 'crew') sound.crewVictory();
+        else sound.imposterVictory();
+        this.launchConfetti();
+        this.buzz([14, 40, 14, 40, 22]);
+      }
+    }
+
+    this.render();
+  }
+
+  syncOnlineTicker() {
+    const active = this.state.screen === 'online_discussion' && Number(this.online.state?.deadline) > 0;
+    if (active && !this.online.ticker) {
+      this.online.ticker = setInterval(() => this.updateOnlineTimer(), 250);
+      this.updateOnlineTimer();
+    } else if (!active && this.online.ticker) {
+      clearInterval(this.online.ticker);
+      this.online.ticker = null;
+    }
+  }
+
+  stopOnlineTicker() {
+    if (this.online.ticker) {
+      clearInterval(this.online.ticker);
+      this.online.ticker = null;
+    }
+  }
+
+  updateOnlineTimer() {
+    const val = document.getElementById('online-timer-val');
+    const bar = document.getElementById('online-timer-bar');
+    if (!val && !bar) return;
+    const deadline = Number(this.online.state?.deadline) || 0;
+    const total = (Number(this.online.state?.settings?.timeLimit) || 0) * 1000;
+    const left = Math.max(0, deadline - Date.now());
+    if (val) {
+      const seconds = Math.ceil(left / 1000);
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      val.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      val.classList.toggle('warning', seconds <= 15);
+    }
+    if (bar && total) bar.style.width = `${Math.max(0, Math.min(1, left / total)) * 100}%`;
+  }
+
+  cleanupOnline() {
+    this.stopOnlineTicker();
+    try { this.online.room?.close(); } catch (error) { /* ignore */ }
+    try { this.online.client?.close(); } catch (error) { /* ignore */ }
+    this.online.role = null;
+    this.online.room = null;
+    this.online.client = null;
+    this.online.state = null;
+    this.online.you = null;
+    this.online.status = 'idle';
+    this.online.error = '';
+    this.online.isRevealed = false;
+    this.online.selectedVote = null;
+    this.online.code = '';
+    this.state.playMode = 'pass';
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('room')) {
+        url.searchParams.delete('room');
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch (error) { /* ignore */ }
+  }
+
+  leaveOnlineRoom() {
+    const wasHost = this.online.role === 'host';
+    this.showConfirmModal(
+      wasHost ? 'Close this room?' : 'Leave this room?',
+      wasHost ? 'Everyone in the room will be disconnected.' : 'You can rejoin later with the same code.',
+      () => {
+        this.cleanupOnline();
+        this.state.screen = 'home';
+        this.render();
+      }
+    );
+  }
+
+  async copyToClipboard(text) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (error) { /* fall through */ }
+    try {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      area.remove();
+      return ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  renderOnlineWaiting(message) {
+    return `
+      <div class="online-wrap">
+        <div class="online-connect-card">
+          <span class="boot-spinner" aria-hidden="true"></span>
+          <p class="online-connect-text">${escapeHtml(message)}</p>
+          <button class="btn btn-dark btn-compact" data-online-leave>Leave room</button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderOnlineLobby() {
+    const st = this.online.state;
+    const isHost = this.online.role === 'host';
+    const code = escapeHtml(this.online.code || st?.code || '----');
+    const players = st?.players || [];
+    const connected = players.filter(p => p.connected);
+    const settings = st?.settings || {};
+    const modeLabel = { undercover: 'Undercover', mrwhite: 'Mr. White' }[settings.mode] || 'Classic';
+    const isMrWhiteMode = settings.mode === 'mrwhite';
+    const difficultyLabel = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }[settings.difficulty] || 'Medium';
+    const timerLabel = !settings.timeLimit ? 'No limit' : `${Math.round(settings.timeLimit / 60)} min`;
+
+    if (!st) {
+      return `
+        <div class="online-wrap">
+          <div class="online-head">
+            <div class="online-head-copy">
+              <span class="online-overline">JOINING ROOM</span>
+              <h2>${code}</h2>
+              <p>Connecting you to the host…</p>
+            </div>
+            <button class="online-leave" id="online-leave-btn">Cancel</button>
+          </div>
+          <div class="online-connect-card">
+            <span class="boot-spinner" aria-hidden="true"></span>
+            <p class="online-connect-text">${this.statusLabel(this.online.status)}</p>
+            <p class="online-hint">If this takes more than a few seconds, check the code and that the host still has the game open.</p>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="online-wrap">
+        <div class="online-head">
+          <div class="online-head-copy">
+            <span class="online-overline">${isHost ? 'HOSTING' : 'JOINED ROOM'}</span>
+            <h2>Room lobby</h2>
+            <p>${isHost ? 'Share the code or link so friends can join.' : 'Waiting for the host to start the game.'}</p>
+          </div>
+          <button class="online-leave" id="online-leave-btn">Leave</button>
+        </div>
+
+        <div class="online-code-card">
+          <span class="online-code-label">ROOM CODE</span>
+          <div class="online-code">${code}</div>
+          <div class="online-code-actions">
+            <button class="btn btn-dark btn-compact" id="online-copy-code-btn">Copy code</button>
+            <button class="btn btn-dark btn-compact" id="online-copy-link-btn">Copy link</button>
+            ${typeof navigator !== 'undefined' && navigator.share ? '<button class="btn btn-dark btn-compact" id="online-share-btn">Share</button>' : ''}
+          </div>
+          <p class="online-status"><span class="status-dot ${this.online.status}" id="online-status-dot"></span><span id="online-status-text">${this.statusLabel(this.online.status)}</span></p>
+        </div>
+
+        <div class="online-players">
+          <div class="online-players-head"><span>PLAYERS</span><span>${connected.length} / ${st.maxPlayers || 15}</span></div>
+          ${players.map(p => `
+            <div class="online-player ${p.connected ? '' : 'is-offline'}">
+              ${renderAvatarSvg(p.name, 34)}
+              <span class="online-player-name">${escapeHtml(p.name)}</span>
+              ${p.isHost ? '<span class="online-tag">Host</span>' : ''}
+              ${!p.connected ? '<span class="online-tag muted">Offline</span>' : ''}
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="online-settings-card">
+          <div class="online-settings-head">GAME SETTINGS</div>
+          ${isHost ? `
+            <div class="online-setting-row">
+              <label for="online-mode-select">Mode</label>
+              <select id="online-mode-select" class="input-field select-compact">
+                <option value="classic" ${!['undercover', 'mrwhite'].includes(settings.mode) ? 'selected' : ''}>Classic</option>
+                <option value="mrwhite" ${settings.mode === 'mrwhite' ? 'selected' : ''}>Mr. White</option>
+                <option value="undercover" ${settings.mode === 'undercover' ? 'selected' : ''}>Undercover</option>
+              </select>
+            </div>
+            <div class="online-setting-row">
+              <label for="online-imposters-select">Imposters</label>
+              <select id="online-imposters-select" class="input-field select-compact" ${isMrWhiteMode ? 'disabled' : ''}>
+                ${[1, 2, 3].map(n => `<option value="${n}" ${Number(settings.numImposters) === n ? 'selected' : ''}>${n}</option>`).join('')}
+              </select>
+            </div>
+            <div class="online-setting-row">
+              <label for="online-difficulty-select">Difficulty</label>
+              <select id="online-difficulty-select" class="input-field select-compact">
+                ${['easy', 'medium', 'hard'].map(d => `<option value="${d}" ${settings.difficulty === d ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="online-setting-row">
+              <label for="online-timer-select">Discussion timer</label>
+              <select id="online-timer-select" class="input-field select-compact">
+                ${[[0, 'No limit'], [120, '2 min'], [180, '3 min'], [300, '5 min'], [420, '7 min']].map(([value, label]) => `<option value="${value}" ${Number(settings.timeLimit) === value ? 'selected' : ''}>${label}</option>`).join('')}
+              </select>
+            </div>
+          ` : `
+            <div class="online-summary-chips">
+              <span class="online-summary-chip">${modeLabel}</span>
+              <span class="online-summary-chip">${isMrWhiteMode ? '1 wordless player' : `${Number(settings.numImposters) || 1} imposter${Number(settings.numImposters) === 1 ? '' : 's'}`}</span>
+              <span class="online-summary-chip">${difficultyLabel}</span>
+              <span class="online-summary-chip">${timerLabel}</span>
+            </div>
+          `}
+        </div>
+
+        ${isHost ? `
+          <button class="btn btn-red btn-lg" id="online-start-btn" ${connected.length < 3 ? 'disabled' : ''}>
+            ${ICONS.play}<span>${connected.length < 3 ? `Start game (${connected.length}/3)` : 'Start game'}</span>
+          </button>
+          ${connected.length < 3 ? `<p class="online-hint">At least 3 players are needed. Share the link to fill the room.</p>` : ''}
+        ` : `
+          <div class="online-waiting-card">Waiting for the host to start…</div>
+        `}
+      </div>
+    `;
+  }
+
+  bindOnlineLobbyEvents() {
+    document.getElementById('online-leave-btn')?.addEventListener('click', () => this.leaveOnlineRoom());
+
+    const code = this.online.code || this.online.state?.code || '';
+    const flash = (btn, label) => {
+      if (!btn) return;
+      const original = label || btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    };
+
+    document.getElementById('online-copy-code-btn')?.addEventListener('click', async (e) => {
+      const ok = await this.copyToClipboard(code);
+      flash(e.currentTarget, 'Copy code');
+      if (!ok) this.showAlert('Copy failed', `Room code: ${code}`);
+    });
+
+    document.getElementById('online-copy-link-btn')?.addEventListener('click', async (e) => {
+      const ok = await this.copyToClipboard(roomLink(code));
+      flash(e.currentTarget, 'Copy link');
+      if (!ok) this.showAlert('Copy failed', roomLink(code));
+    });
+
+    document.getElementById('online-share-btn')?.addEventListener('click', async () => {
+      try {
+        await navigator.share({
+          title: 'Find The Imposter',
+          text: `Join my room with code ${code}`,
+          url: roomLink(code)
+        });
+      } catch (error) {
+        // Sharing was cancelled; nothing to do.
+      }
+    });
+
+    if (this.online.role !== 'host') return;
+
+    document.getElementById('online-start-btn')?.addEventListener('click', () => {
+      sound.voteSubmit();
+      this.online.room?.startGame();
+    });
+
+    const apply = (patch) => this.online.room?.setSettings(patch);
+    document.getElementById('online-mode-select')?.addEventListener('change', (e) => apply({ mode: e.target.value }));
+    document.getElementById('online-imposters-select')?.addEventListener('change', (e) => apply({ numImposters: Number(e.target.value) }));
+    document.getElementById('online-difficulty-select')?.addEventListener('change', (e) => apply({ difficulty: e.target.value }));
+    document.getElementById('online-timer-select')?.addEventListener('change', (e) => apply({ timeLimit: Number(e.target.value) }));
+  }
+
+  renderOnlineReveal() {
+    const st = this.online.state;
+    const you = this.online.you;
+    const isHost = this.online.role === 'host';
+    if (!st || !you) return this.renderOnlineWaiting('Getting your role…');
+
+    const settings = st.settings || {};
+    const isUndercover = settings.mode === 'undercover';
+    const isImposter = you.role === 'imposter';
+    const isMrWhite = settings.mode === 'mrwhite' && isImposter;
+    const isRevealed = this.online.isRevealed;
+    const connected = st.players.filter(p => p.connected);
+    const readyCount = connected.filter(p => p.ready).length;
+    const remaining = Math.max(0, connected.length - readyCount);
+
+    let roleClass = 'role-crew';
+    let roleTitle = 'THE SECRET WORD';
+    let word = you.word || '';
+    let roleIcon = '🗣️';
+    let hintDesc = 'Don’t say the word directly — drop a one-word hint.';
+
+    if (isMrWhite) {
+      roleClass = 'role-mrwhite';
+      roleTitle = 'YOU ARE MR. WHITE';
+      word = '';
+      roleIcon = '🎩';
+      hintDesc = 'You have NO word! Listen carefully and bluff your way through.';
+    } else if (isUndercover) {
+      roleClass = isImposter ? 'role-undercover' : 'role-crew';
+      roleIcon = isImposter ? '🕵️' : '🗣️';
+      hintDesc = isImposter
+        ? 'Your word is slightly different. Describe it without giving it away.'
+        : 'Describe your word without saying it. One player has a different word!';
+    } else if (isImposter) {
+      roleClass = 'role-imposter';
+      roleTitle = 'YOU ARE THE IMPOSTER!';
+      roleIcon = '💀';
+      word = you.word || '???';
+      hintDesc = 'You don’t know the word. Use the category to bluff your way through.';
+    }
+
+    return `
+      <div class="online-stage">
+        <div class="online-round-pill">ROUND ${st.round || 1} · ${({ undercover: 'UNDERCOVER', mrwhite: 'MR. WHITE' })[settings.mode] || 'CLASSIC'}</div>
+        <div class="pass-label">${ICONS.eyeOff} ONLY YOU CAN SEE THIS</div>
+
+        <div class="avatar-ring">
+          ${renderAvatarSvg(you.name, 96)}
+        </div>
+        <h2 class="player-hero-name">${escapeHtml(you.name)}</h2>
+        <p class="player-hero-sub">${readyCount} of ${connected.length} players ready</p>
+
+        <div class="reveal-card ${isRevealed ? 'flipped' : ''}" id="online-reveal-card">
+          <div class="card-face card-front">
+            <div class="card-lock">${ICONS.lock}</div>
+            <span class="card-front-title">TAP TO REVEAL</span>
+            <span class="card-front-sub">Keep your screen away from the other players.</span>
+          </div>
+          <div class="card-face card-back ${roleClass}">
+            <div class="card-role-icon">${roleIcon}</div>
+            <span class="role-badge">${roleTitle}</span>
+            ${word ? `<div class="secret-word-display">${escapeHtml(word)} <span class="word-dot"></span></div>` : ''}
+            <div class="category-pill">CATEGORY: <strong>${escapeHtml(you.category || st.category || '')}</strong></div>
+            <p class="role-instructions">${hintDesc}</p>
+          </div>
+        </div>
+
+        <div class="stage-actions">
+          ${!isRevealed ? `
+            <button class="btn btn-red btn-lg" id="online-reveal-btn">${ICONS.lock} TAP TO REVEAL</button>
+          ` : you.ready ? `
+            <div class="online-waiting-card">
+              You’re ready.${remaining > 0 ? ` Waiting for ${remaining} more player${remaining === 1 ? '' : 's'}…` : ' Starting…'}
+            </div>
+          ` : `
+            <button class="btn btn-red btn-lg" id="online-ready-btn">I’M READY</button>
+          `}
+          ${isHost ? `<button class="btn btn-ghost-quiet" id="online-force-discussion-btn">Start discussion now</button>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  bindOnlineRevealEvents() {
+    const card = document.getElementById('online-reveal-card');
+    const flip = () => {
+      if (this.online.isRevealed) return;
+      this.online.isRevealed = true;
+      sound.cardFlip();
+      this.buzz(12);
+      card?.classList.add('flipped');
+      document.querySelector('.online-stage')?.classList.add('revealed');
+      const btn = document.getElementById('online-reveal-btn');
+      if (btn) {
+        const ready = document.createElement('button');
+        ready.className = 'btn btn-red btn-lg';
+        ready.id = 'online-ready-btn';
+        ready.textContent = 'I’M READY';
+        btn.replaceWith(ready);
+        this.bindOnlineReadyButton();
+      }
+    };
+
+    card?.addEventListener('click', flip);
+    document.getElementById('online-reveal-btn')?.addEventListener('click', flip);
+    this.bindOnlineReadyButton();
+
+    document.getElementById('online-force-discussion-btn')?.addEventListener('click', () => {
+      this.online.room?.forceDiscussion();
+    });
+  }
+
+  bindOnlineReadyButton() {
+    document.getElementById('online-ready-btn')?.addEventListener('click', () => {
+      sound.voteSubmit();
+      this.buzz(10);
+      if (this.online.role === 'host') {
+        this.online.room?.setReady();
+      } else {
+        this.online.client?.send({ type: 'ready' });
+        if (this.online.you) this.online.you.ready = true;
+        this.render();
+      }
+    }, { once: true });
+  }
+
+  renderOnlineDiscussion() {
+    const st = this.online.state;
+    const isHost = this.online.role === 'host';
+    if (!st) return this.renderOnlineWaiting('Loading the round…');
+
+    const settings = st.settings || {};
+    const timersOn = Number(settings.timeLimit) > 0;
+    const order = st.turnOrder?.length
+      ? st.turnOrder
+      : st.players.filter(p => p.connected && !p.eliminated).map(p => p.name);
+    const names = order.length ? order : ['—'];
+
+    return `
+      <div class="online-stage">
+        <div class="online-round-pill">DISCUSSION · ROUND ${st.round || 1}</div>
+
+        <div class="timer-card online-timer-card">
+          <div class="timer-head">
+            <span>DISCUSSION TIMER</span>
+            <span class="online-live-dot">LIVE</span>
+          </div>
+          <div class="timer-big" id="online-timer-val">${timersOn ? '--:--' : '∞'}</div>
+          <div class="timer-bar"><div class="timer-bar-fill" id="online-timer-bar" style="width:${timersOn ? '100%' : '0%'}"></div></div>
+        </div>
+
+        <div class="speakers-card">
+          <div class="speakers-head">
+            <span>SPEAKERS WILL BE IN THIS ORDER:</span>
+            <span>${names.length} Players</span>
+          </div>
+          <div class="speaker-now">
+            ${renderAvatarSvg(names[0], 52)}
+            <div class="speaker-now-copy">
+              <span class="speaker-now-label">NOW SPEAKING · 1/${names.length}</span>
+              <span class="speaker-now-name">${escapeHtml(names[0])}</span>
+            </div>
+            <button class="btn btn-light-pill" id="online-next-speaker-btn">Next ${ICONS.arrowRight}</button>
+          </div>
+          <div class="speaker-chips">
+            ${names.map((name, idx) => `
+              <div class="speaker-chip ${idx === 0 ? 'active' : ''}">
+                <span class="speaker-num">${idx + 1}</span>
+                ${renderAvatarSvg(name, 22)}
+                <span>${escapeHtml(name)}${this.tellDot(name)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="round-block">
+          <h3>Give a clue</h3>
+          <p>Go around the table and each say one short clue about your word. Don’t say the word itself.</p>
+        </div>
+
+        <div class="stage-actions">
+          ${isHost ? `
+            <button class="btn btn-red btn-lg" id="online-start-voting-btn">VOTE SOMEONE OUT</button>
+          ` : `
+            <div class="online-waiting-card">The host will start the vote when everyone has had a turn.</div>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
+  bindOnlineDiscussionEvents() {
+    const order = this.online.state?.turnOrder || [];
+    let idx = 0;
+    document.getElementById('online-next-speaker-btn')?.addEventListener('click', () => {
+      if (!order.length) return;
+      idx = (idx + 1) % order.length;
+      const nameEl = document.querySelector('.speaker-now-name');
+      const labelEl = document.querySelector('.speaker-now-label');
+      if (nameEl) nameEl.textContent = order[idx];
+      if (labelEl) labelEl.textContent = `NOW SPEAKING · ${idx + 1}/${order.length}`;
+      document.querySelectorAll('.speaker-chip').forEach((chip, i) => chip.classList.toggle('active', i === idx));
+    });
+    document.getElementById('online-start-voting-btn')?.addEventListener('click', () => {
+      sound.voteSubmit();
+      this.online.room?.startVoting();
+    });
+  }
+
+  renderOnlineVote() {
+    const st = this.online.state;
+    const you = this.online.you;
+    if (!st || !you) return this.renderOnlineWaiting('Loading the vote…');
+
+    const isHost = this.online.role === 'host';
+    const candidates = st.players.filter(p => !p.eliminated && p.connected && p.id !== you.id);
+    const selected = this.online.selectedVote;
+    const needed = st.votesNeeded || 0;
+    const votesIn = st.votesIn || 0;
+
+    return `
+      <div class="online-stage online-vote-stage">
+        <div class="online-round-pill">VOTE · ROUND ${st.round || 1}</div>
+        <div class="results-head">
+          <h2>Who is the imposter?</h2>
+          <p>${votesIn} of ${needed} votes in</p>
+        </div>
+
+        <div class="online-vote-progress">
+          ${st.players.filter(p => !p.eliminated).map(p => `<span class="online-vote-dot ${p.hasVoted ? 'done' : ''}" title="${escapeHtml(p.name)}"></span>`).join('')}
+        </div>
+
+        ${you.eliminated ? `
+          <div class="online-waiting-card">
+            You were eliminated. Sit tight and watch the rest of the vote…
+          </div>
+        ` : you.vote ? `
+          <div class="online-waiting-card">
+            Vote locked in for <strong>${escapeHtml(you.vote)}</strong>. Waiting for the other players…
+          </div>
+        ` : `
+          <div class="vote-list">
+            ${candidates.map(p => `
+              <button type="button" class="vote-list-item ${selected === p.name ? 'selected' : ''}" data-online-vote="${escapeHtml(p.name)}">
+                ${renderAvatarSvg(p.name, 44)}
+                <span class="vote-list-name">${escapeHtml(p.name)}${this.tellDot(p.name)}</span>
+                <span class="vote-radio">${selected === p.name ? ICONS.check : ''}</span>
+              </button>
+            `).join('')}
+          </div>
+          <button class="btn btn-red btn-lg" id="online-vote-submit-btn" ${selected ? '' : 'disabled'}>LOCK IN VOTE</button>
+        `}
+
+        ${isHost ? `<button class="btn btn-ghost-quiet" id="online-force-votes-btn">End voting now</button>` : ''}
+      </div>
+    `;
+  }
+
+  bindOnlineVoteEvents() {
+    document.querySelectorAll('[data-online-vote]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.getAttribute('data-online-vote');
+        this.online.selectedVote = this.online.selectedVote === name ? null : name;
+        document.querySelectorAll('[data-online-vote]').forEach(other => {
+          const on = other.getAttribute('data-online-vote') === this.online.selectedVote;
+          other.classList.toggle('selected', on);
+          const radio = other.querySelector('.vote-radio');
+          if (radio) radio.innerHTML = on ? ICONS.check : '';
+        });
+        const submit = document.getElementById('online-vote-submit-btn');
+        if (submit) submit.disabled = !this.online.selectedVote;
+        sound.voteSelect();
+      });
+    });
+
+    document.getElementById('online-vote-submit-btn')?.addEventListener('click', () => {
+      const name = this.online.selectedVote;
+      if (!name) return;
+      sound.voteSubmit();
+      this.buzz(10);
+      if (this.online.role === 'host') {
+        this.online.room?.castVote(name);
+      } else {
+        this.online.client?.send({ type: 'vote', accused: name });
+        if (this.online.you) this.online.you.vote = name;
+        this.render();
+      }
+    });
+
+    document.getElementById('online-force-votes-btn')?.addEventListener('click', () => {
+      this.online.room?.forceResolveVotes();
+    });
+  }
+
+  renderOnlineGuess() {
+    const st = this.online.state;
+    const you = this.online.you;
+    if (!st || !you) return this.renderOnlineWaiting('Loading the guess…');
+
+    const result = st.result || {};
+    const mrWhite = st.players.find(p => p.isMrWhite) || result.roles?.find(r => r.isMrWhite);
+    const name = mrWhite?.name || 'Mr. White';
+    const canGuess = !!you.canGuess;
+
+    return `
+      <div class="online-stage">
+        <div class="online-round-pill">MR. WHITE · ROUND ${st.round || 1}</div>
+        <div class="results-head">
+          <span class="guess-overline">Mr. White Caught!</span>
+          <h2>Final Guess</h2>
+          <p>${canGuess ? 'You were voted out. One correct guess steals the win.' : `${escapeHtml(name)} has one guess at the secret word.`}</p>
+        </div>
+
+        ${canGuess ? `
+          <div class="glass-panel guess-card">
+            <div class="guess-icon">🎩</div>
+            <h3>Name the secret word</h3>
+            <input type="text" id="online-guess-input" class="input-field" placeholder="Enter your guess…" maxlength="40" autocomplete="off" />
+            <div class="guess-actions">
+              <button class="btn btn-red" id="online-guess-submit-btn">Submit Guess</button>
+            </div>
+          </div>
+        ` : `
+          <div class="online-waiting-card">Waiting for the guess…</div>
+        `}
+
+        ${this.online.role === 'host' ? `<button class="btn btn-ghost-quiet" id="online-guess-skip-btn">Skip guess</button>` : ''}
+      </div>
+    `;
+  }
+
+  bindOnlineGuessEvents() {
+    const submit = () => {
+      const input = document.getElementById('online-guess-input');
+      const value = input?.value?.trim();
+      if (!value) return;
+      sound.voteSubmit();
+      if (this.online.role === 'host') {
+        this.online.room?.submitGuess(value);
+      } else {
+        this.online.client?.send({ type: 'guess', word: value });
+      }
+      if (input) input.disabled = true;
+    };
+    document.getElementById('online-guess-submit-btn')?.addEventListener('click', submit);
+    document.getElementById('online-guess-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submit();
+    });
+    document.getElementById('online-guess-skip-btn')?.addEventListener('click', () => {
+      this.online.room?.skipGuess();
+    });
+    setTimeout(() => document.getElementById('online-guess-input')?.focus(), 60);
+  }
+
+  renderOnlineResults() {
+    const st = this.online.state;
+    if (!st) return this.renderOnlineWaiting('Counting votes…');
+
+    const isHost = this.online.role === 'host';
+    const result = st.result || { tallies: {}, eliminated: [], tie: false, roles: [] };
+    const sorted = Object.entries(result.tallies || {}).sort((a, b) => b[1] - a[1]);
+    const roleFor = (name) => result.roles?.find(r => r.name === name)?.role;
+    const winner = st.winner;
+    const guess = result.guess;
+    const verdictCopy = winner === 'crew'
+      ? (result.classic
+        ? 'The accused group was exactly the imposter team.'
+        : guess
+          ? (guess.skipped ? 'Mr. White did not guess. The crew wins.' : `Mr. White guessed “${guess.word}” — wrong. The crew wins.`)
+          : 'Every imposter has been voted out.')
+      : (result.classic
+        ? 'An innocent was accused, or an imposter slipped through.'
+        : guess
+          ? `Mr. White guessed “${guess.word}” and stole the win.`
+          : 'The imposters now match the crew. Game over.');
+
+    return `
+      <div class="online-stage">
+        <div class="results-head">
+          <div class="results-icon">${ICONS.trophy}</div>
+          <h2>Voting Results</h2>
+          <p>Round ${st.round || 1}</p>
+        </div>
+
+        ${result.tie ? `<div class="tie-note"><strong>Tie vote.</strong> No one is eliminated — talk it through and vote again.</div>` : ''}
+
+        ${winner ? `
+          <div class="verdict-card ${winner === 'crew' ? 'verdict-crew' : 'verdict-imposters'}">
+            <div class="verdict-icon">${winner === 'crew' ? '🛡️' : '💀'}</div>
+            <h3>${winner === 'crew' ? 'CREW CAUGHT THE IMPOSTER' : 'IMPOSTERS WIN'}</h3>
+            <p>${verdictCopy}</p>
+          </div>
+        ` : ''}
+
+        <div class="results-list">
+          ${sorted.map(([name, count], idx) => {
+            const role = roleFor(name);
+            return `
+              <div class="result-card ${idx === 0 && count > 0 ? 'top' : ''}">
+                <div class="result-row">
+                  <span class="result-rank">#${idx + 1}</span>
+                  ${renderAvatarSvg(name, 40)}
+                  <span class="result-name">${escapeHtml(name)}</span>
+                  ${role ? `<span class="online-role-chip ${role === 'imposter' ? 'imposter' : ''}">${role === 'imposter' ? 'Imposter' : 'Crew'}</span>` : ''}
+                  <span class="result-votes"><strong>${count}</strong> VOTE${count === 1 ? '' : 'S'}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        ${result.eliminated?.length ? `<div class="elimination-note">${escapeHtml(result.eliminated.join(' & '))} ${result.eliminated.length > 1 ? 'were' : 'was'} eliminated.</div>` : ''}
+
+
+        <div class="stage-actions">
+          ${isHost ? `
+            ${winner
+              ? `<button class="btn btn-red btn-lg" id="online-reveal-winner-btn">${ICONS.skull} REVEAL IMPOSTERS</button>`
+              : `<button class="btn btn-red btn-lg" id="online-next-round-btn">CONTINUE TO NEXT ROUND ${ICONS.arrowRight}</button>`}
+          ` : `<div class="online-waiting-card">Waiting for the host…</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  bindOnlineResultsEvents() {
+    document.getElementById('online-next-round-btn')?.addEventListener('click', () => {
+      sound.voteSubmit();
+      this.online.room?.nextRound();
+    });
+    document.getElementById('online-reveal-winner-btn')?.addEventListener('click', () => {
+      this.online.room?.showVictory();
+    });
+  }
+
+  renderOnlineVictory() {
+    const st = this.online.state;
+    if (!st) return this.renderOnlineWaiting('Loading results…');
+
+    const isHost = this.online.role === 'host';
+    const winner = st.winner || 'crew';
+    const isCrew = winner === 'crew';
+    const players = st.players || [];
+    const imposters = players.filter(p => p.role === 'imposter');
+    const tallies = Object.entries(st.result?.tallies || {}).sort((a, b) => b[1] - a[1]);
+
+    return `
+      <div class="online-stage">
+        <div class="victory-card">
+          <div class="victory-avatar">
+            ${renderAvatarSvg((isCrew ? players.find(p => p.role === 'crew')?.name : imposters[0]?.name) || 'Player', 96)}
+            <span class="victory-badge">${isCrew ? '🛡️' : '💀'}</span>
+          </div>
+          <span class="victory-overline">VICTORY</span>
+          <h2 class="${isCrew ? 'crew-win' : 'imposter-win'}">${isCrew ? 'CREW WINS!' : 'IMPOSTERS WIN!'}</h2>
+        </div>
+
+        <div class="reveal-summary">
+          <div class="reveal-summary-cell">
+            <span>THE SECRET WORD WAS:</span>
+            <strong>${escapeHtml(st.secretWord || '—')}</strong>
+            ${st.imposterWord ? `<em>Undercover word: ${escapeHtml(st.imposterWord)}</em>` : ''}
+          </div>
+          <div class="reveal-summary-cell imposter-cell">
+            <span>THE IMPOSTER${imposters.length === 1 ? ' WAS' : 'S WERE'}:</span>
+            <div class="imposter-names">
+              ${imposters.map(p => `<span class="imposter-pill">${renderAvatarSvg(p.name, 16)}${escapeHtml(p.name)}${p.isMrWhite ? ' <em class="mini-tag">Mr. White</em>' : ''}</span>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        ${tallies.length ? `
+          <div class="results-card-compact">
+            <div class="results-head-small">VOTING RESULTS</div>
+            ${tallies.map(([name, count]) => {
+              const p = players.find(pl => pl.name === name);
+              return `
+                <div class="compact-row">
+                  <span>${escapeHtml(name)}${p?.role === 'imposter' ? ' <span class="mini-tag">Imposter</span>' : ''}</span>
+                  <strong>${count} VOTE${count === 1 ? '' : 'S'}</strong>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
+
+        <div class="stage-actions">
+          ${isHost
+            ? `<button class="btn btn-red btn-lg" id="online-play-again-btn">PLAY AGAIN</button>`
+            : `<div class="online-waiting-card">Waiting for the host to start another round…</div>`}
+          <button class="btn btn-dark" id="online-leave-final-btn">Leave room</button>
+        </div>
+      </div>
+    `;
+  }
+
+  bindOnlineVictoryEvents() {
+    document.getElementById('online-play-again-btn')?.addEventListener('click', () => {
+      this.online.room?.playAgain();
+    });
+    document.getElementById('online-leave-final-btn')?.addEventListener('click', () => this.leaveOnlineRoom());
+  }
+
   // --- Modals ---
 
   showRulesModal() {
@@ -1931,11 +3103,7 @@ class ImposterGame {
   }
 
   showOnlineModal() {
-    this.showInfoModal('Online mode', `
-      <p>Online rooms need a live server, which this local build doesn't include.</p>
-      <p>Use <strong>Pass &amp; Play</strong> to play together on one device — all roles, voting and scoring work the same way.</p>
-    `);
-    this.state.playMode = 'pass';
+    this.openOnlineEntry();
   }
 
   showSettingsModal() {

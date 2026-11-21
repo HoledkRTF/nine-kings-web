@@ -27,7 +27,7 @@ Sections:
    - Discussion Timer (Off/1/2/3/4/5 min)
    - Chaos Mode (random twists: random imposter count, Silent rounds, Question rounds)
    - Guardian Role (shields a player)
-   - Undercover Mode: Mr. White Role (no word, last-chance guess)
+   - Game mode: Classic / Mr. White (one wordless player) / Undercover (related word)
    - Classic Mode: Imposter Hint (category shown to imposter)
    - Last Chance Guess (caught imposter guesses word)
    - Round type: Hint / Question / Silent / Drawing
@@ -38,7 +38,7 @@ Sections:
 1. Create room (private or public) or join via 6-digit code / link / QR.
 2. Lobby: players join, host starts when ready (up to 15).
 3. Each player sees role on own device; clues given on turn; live voting.
-4. Classic mode: crew must catch ALL imposters without accusing an innocent; no automatic word-guess win (Last Chance is Pass & Play only; Mr. White's guess is Undercover-only).
+4. Classic mode: crew must catch ALL imposters without accusing an innocent; no automatic word-guess win (Last Chance is Pass & Play only; Mr. White mode has its own guess).
 
 ## Imposter Game Generator (`/imposter-game-generator`)
 - Free sample: 25 words, 10 generations/day/browser.
@@ -48,7 +48,8 @@ Sections:
 
 ## Modes & variants
 - **Classic**: imposter gets no word (optional category hint).
-- **Undercover**: imposter gets a related but different word; Mr. White sub-role gets no word and a last-chance guess.
+- **Mr. White**: everyone shares one word except a single wordless player, who gets one guess at it if voted out.
+- **Undercover**: imposter gets a related but different word and does not know their role.
 - **Football Imposter**: football-player categories.
 - **Timer Imposter**: secret time instead of word.
 - **Chaos Mode**: random imposter count, silent/question rounds.
@@ -58,7 +59,7 @@ Sections:
 - 50+ categories, 6 languages (EN, AR, ES, FR, HI, DE).
 - Free, no sign-up, no subscription.
 - Tie rule (online, 1 imposter, optional roles off): crew wins if imposter is among highest-voted AND no crew member is also among highest-voted.
-- Mr. White: only in Undercover; gets one guess at secret word if voted out.
+- Mr. White: its own mode; gets one guess at the secret word if voted out.
 - Last Chance Guess: optional, Pass & Play only.
 - Imposter Hint: category only, not a clue word.
 
@@ -77,11 +78,28 @@ Sections:
 - `/timer-imposter`, `/estimation-game`, `/mafiagame`, etc. (variants)
 - `/blog/*` articles/guides
 
-## Emulation priorities for our app
-1. Match Pass & Play flow (already mostly present).
-2. Align Classic-mode win condition with site: no automatic word guess unless Last Chance enabled; Mr. White guess only in Undercover.
-3. Tie handling per site's rule.
-4. Category list expansion to 50+ and 6 languages (currently 5 cats, English only).
-5. Online mode is out of scope for static version but could be added later.
-6. Keep Chaos Mode semantics (random imposters, silent/question rounds).
-7. Settings labels/wording should mirror site (e.g., "Imposter Hint", "Last Chance Guess", "Random Imposters").
+## Emulation status for our app
+
+1. **Pass & Play flow** — done: home (Online/Pass tabs), setup panels, private reveal, discussion
+   with speaking order and timer, pass-the-device ballot, ranked results, victory and leaderboard.
+2. **Classic win condition** — done: crew must include every imposter in the accused group with no
+   innocent player. No automatic word guess unless Last Chance is on; Mr. White mode always carries
+   its own guess.
+3. **Tie handling** — done: the accused group is the top vote positions including ties at the
+   cutoff, so a tie that leaves an innocent at the top loses for the crew. Undercover ties eliminate
+   nobody and replay the round.
+4. **Categories** — done: 50 categories, three difficulty tiers. **Open:** the site's six languages
+   (EN, AR, DE, FR, ES, HI) and RTL layout.
+5. **Online mode** — done: host-authoritative peer-to-peer rooms over PeerJS with 4-letter codes
+   and invite links. Roles are delivered privately, and reveal, discussion timer, voting, results
+   and Mr. White's guess stay in sync. No public room browser or matchmaking.
+6. **Chaos Mode** — done: random imposter count per game, random round type (hint / question /
+   silent / drawing) every round, plus Guardian, Imposter Hint and Last Chance, with Mr. White as its
+   own mode.
+7. **Wording** — done: labels mirror the site ("Imposter Hint", "Last Chance Guess", "Random
+   Imposters", "Select All Categories", "Game Mode").
+
+### Not planned here
+- Word generator page (`/imposter-game-generator`) and the six-language UI.
+- The site's other games (Mafia, Spyfall, Timer Imposter, Estimation, football titles).
+- Accounts, friends, Discord, ads.

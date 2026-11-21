@@ -16,3 +16,5 @@ tree_sample_*.png
 
 .vercel
 .env*
+
+main/dist/

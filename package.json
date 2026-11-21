@@ -1,18 +1,17 @@
 {
-  "name": "ossuary-citadel",
+  "name": "find-the-imposter",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite main",
-    "dev:9kings": "vite features/nine-kings-prototype",
-    "build": "vite build main",
-    "build:9kings": "vite build features/nine-kings-prototype",
-    "test": "vitest run"
+    "dev": "vite",
+    "build": "vite build"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
-    "vite": "^5.2.0",
-    "vitest": "^1.4.0"
+    "vite": "^5.2.0"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.5"
   }
 }

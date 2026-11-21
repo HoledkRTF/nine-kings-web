@@ -1,100 +1,158 @@
-# Developer Handoff: 9 Kings Digital Tabletop Remake
+# Developer Handoff: Find The Imposter
 
-## 1. System Architecture Overview
+## 1. What this is
 
-```mermaid
-graph TD
-    Engine["NineKingsGame (main.ts)"]
-    Engine --> Grid["KingdomGrid (3x3 Isometric Plots)"]
-    Engine --> Deck["DeckManager (12 Tarot Cards + Drafting)"]
-    Engine --> Combat["CombatEngine (Wave Resolution & Invaders)"]
-    Engine --> Timeline["TimelineManager (30-Year Roguelike Arc)"]
-    Engine --> Renderer["BoardRenderer (Canvas 2D / Aspect Cover)"]
-    Engine --> UI["CardHandUI + MerchantUI + HUD"]
-    
-    Renderer --> Backdrop["meadow_clean_backdrop.png (1920x1080)"]
-    Renderer --> Sprites["16-bit Sprites (Keep, Battalions, Pond, Wall)"]
-    Renderer --> Ambient["Atmospheric Water Ripples & Pollen VFX"]
+A client-only Pass & Play imposter game. Plain ES modules, HTML and CSS; Vite is a dev server and
+bundler only. All game state lives in memory for the session — nothing is persisted, and there is no
+server, account or network call at runtime.
+
+```
+main/index.html
+  ├── main/game.js      ImposterGame: state, screen machine, ballots, all rendering
+  ├── main/words.js     WORD_DATABASE, CATEGORY_LABELS, CATEGORY_ICONS, getWordSelection()
+  ├── main/audio.js     sound singleton (Web Audio synthesis)
+  ├── main/avatars.js   stable per-roster avatar assignment
+  ├── main/style.css    theme tokens + screen layouts
+  └── main/assets/avatars/*.svg
 ```
 
-The game is structured as a zero-dependency, high-performance HTML5 Canvas & TypeScript application built on Vite. State management is strictly deterministic and test-driven.
+## 2. State model
 
----
+Everything hangs off `ImposterGame.state` (`main/game.js`, constructor):
 
-## 2. Local Folder Branching Strategy
+| Group | Fields |
+| --- | --- |
+| Setup | `mode` (`classic`/`mrwhite`/`undercover`), `playMode` (`pass`/`online`), `players[]`, `numImposters`, `isChaosMode`, `selectedCategories`, `customWords`, `difficulty`, `timeLimit`, `roundType`, `isGuardianEnabled`, `isImposterHintEnabled`, `isLastChanceEnabled` |
+| Session | `screen`, `revealIndex`, `isCardRevealed`, `scores`, `usedWords` |
+| Round | `secretWord`, `secretCategory`, `imposterWord`, `startingPlayerName`, `remainingSeconds`, `timerRunning`, `timerInterval`, `undercoverRound` |
+| Ballot | `votingQueue`, `currentVoterIndex`, `currentSelectedAccused`, `votes[]`, `voteResults`, `eliminatedThisRound`, `classicResult`, `isTie`, `pendingWinner`, `firstRoundVotes`, `winner` |
+| Roles | each player: `{ name, role: 'crew'|'imposter'|null, isEliminated, isMrWhite, isGuardian }` |
+| Online | `online.{ role, room, client, code, status, state, you, isRevealed, selectedVote }` mirrors the latest host snapshot; the truth lives in `HostRoom` in `main/online.js` |
 
-To simulate Git branching locally without dirtying production code:
-- `main/`: Sacred production release. Untouchable during development.
-- `staging/`: Dress rehearsal testing ground for pre-production builds.
-- `dev/`: Active development integration branch.
-- `features/`: Isolated feature branches (e.g. `features/nine-kings-ios-background/`).
+`player.role` is authoritative for outcomes. `isMrWhite` and `isGuardian` are overlaid on top of a
+role; Mr. White is always an imposter. `mode` chooses how the odd player is worded:
 
-### Promotion Protocol:
-1. Work in `features/<feature-name>/`.
-2. When complete, copy feature over `dev/`.
-3. Verify all 163 unit tests pass (`npx vitest run dev/`).
-4. Copy `dev/` over `staging/`, build and verify tests.
-5. Create a `.zip` backup of `main/` (`main_backup_<date>.zip`).
-6. Copy `staging/` over `main/`, build and run full test suite.
-7. Assign a memorable **Codename** tag (e.g., `git tag Sovereign-Pasture`).
+- `classic` — the imposter(s) get no word and know their role.
+- `mrwhite` — exactly one imposter, flagged `isMrWhite`, with no word; everyone else shares
+  `secretWord`.
+- `undercover` — one shared crew word (`secretWord`) plus one shared related word (`imposterWord`)
+  held by the undercovers; no Mr. White.
 
----
+`state.activeImposterCount` is the number of players actually dealt an imposter role, and it sizes
+ballots and the accused-group cutoff.
 
-## 3. Rendering Pipeline & Math
+## 3. Screen machine
 
-### Isometric Coordinate Math
-The kingdom uses standard 2.5D isometric diamond projection:
-- **Tile Dimensions**: `tileW = 120px`, `tileH = 68px` (2:1 aspect ratio).
-- **Cartesian to Screen**:
-  $$\text{pixelX} = \text{originX} + (gx - gy) \cdot \frac{\text{tileW}}{2}$$
-  $$\text{pixelY} = \text{originY} + (gx + gy) \cdot \frac{\text{tileH}}{2}$$
-- **Screen to Cartesian (Hit-Testing)**:
-  $$dx = \text{screenX} - \text{originX}$$
-  $$dy = \text{screenY} - \text{originY}$$
-  $$gx = \left\lfloor \frac{dx}{\text{tileW}} + \frac{dy}{\text{tileH}} + 0.5 \right\rfloor$$
-  $$gy = \left\lfloor \frac{dy}{\text{tileH}} - \frac{dx}{\text{tileW}} + 0.5 \right\rfloor$$
+`render()` switches on `state.screen` and calls a matching `renderXScreen()` + `bindXEvents()` pair,
+replacing `#screen-container`'s HTML:
 
-### Background Aspect-Cover Scaling
-To ensure pixel-perfect rendering across varying browser aspect ratios without letterboxing:
-```typescript
-const scale = Math.max(width / imgW, height / imgH);
-const drawW = imgW * scale;
-const drawH = imgH * scale;
-const drawX = (width - drawW) / 2;
-const drawY = (height - drawH) / 2;
+```
+home → setup → reveal → discussion → voting_pass → voting_input
+     → voting_results → (mrwhite_guess | imposter_guess) → victory
 
-ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling
-ctx.drawImage(this.bgImage, drawX, drawY, drawW, drawH);
+online_entry → online_lobby → online_reveal → online_discussion → online_vote
+             → online_guess → online_results → online_victory
 ```
 
----
+Every state change is `this.state.x = …; this.render();` — there is no virtual DOM and no partial
+update layer. Screens that need to keep in-page identity (`reveal` card flip, timer polling) mutate
+DOM nodes directly inside their bind function instead of re-rendering.
 
-## 4. Key Subsystems
+`render()` also calls `setAvatarRoster()` on each paint so avatar assignment stays stable per name,
+and retriggers the `screen-enter` animation when `_lastScreen` changes.
 
-### 4.1 Deck & Card Slinging (`src/cards/deck.ts` & `src/ui/card-hand-ui.ts`)
-- **Starter Deck**: 12 cards tailored to King specialization (default: King of Nothing).
-- **Rule of Hand ("Leave Two")**: The player draws cards each year and must place cards on the 3x3 grid until exactly **2 cards remain in hand** before the battle can begin.
-- **Card Aspect Ratio**: Fixed 1:1.45 Tarot proportion with 3D cursor-hover tilt physics.
+## 3b. Online rooms
 
-### 4.2 Timeline Progression (`src/battle/timeline.ts`)
-- **30-Year Roguelike Campaign**:
-  - Year 8: War Milestone (Boss Invasion).
-  - Year 23: Peace Milestone / Diplomatic Choice.
-  - Year 30: Final Boss Confrontation.
-  - Merchant Visits: Triggered at predetermined milestone years.
+`main/online.js` is a second, host-authoritative engine used only by the online screens. It does not
+import the pass-and-play game class; the two sides exchange two JSON snapshots instead.
 
-### 4.3 Combat & Battalions (`src/battle/combat-engine.ts`)
-- Invaders march from perimeter perimeter towards the central Royal Keep.
-- Defensive towers (Trebuchet, Scout Tower, Dispenser) acquire targets using Chebyshev / Manhattan distance.
-- Troop count badges update in real-time with combat damage floating numbers.
+- `HostRoom` creates a PeerJS peer with the id `fti-v1-<CODE>` and owns players, roles, words, votes,
+  the timer and the winner. Guests connect to that id and send `hello`, `ready`, `vote` and `guess`;
+  `isHostIntent()` rejects anything that would let a guest drive the room.
+- `publish()` sends a public snapshot (`publicState()`) plus a per-player private snapshot
+  (`privateFor()`), so roles and the secret word are never broadcast. Public roles appear only at
+  victory, so a guest's devtools cannot reveal the imposter early.
+- Host actions come from the same UI: `startGame`, `startVoting`, `nextRound`, `showVictory`,
+  `playAgain`, `submitGuess`, `skipGuess`.
+- Classic resolves as one ballot: the accused group is the top vote positions including ties at the
+  cutoff, and the crew win only if that group is exactly the imposter team. Mr. White and Undercover
+  eliminate one player per round; catching Mr. White moves the room to `guess`, where only his
+  client gets a guess box.
+- The host's browser is the server. There is no persistence, matchmaking or moderation; closing the
+  host tab ends the room.
 
----
+## 3c. Hidden tell marker
 
-## 5. Next Sprint Milestones
+`ownTellRole()`, `tellDot(name)` and `updateTellSelf()` in `game.js` drive a deliberately subtle
+1px pixel fixed in the very bottom-right corner (`#tell-self`). It is always present and painted to
+match the page background there; being the imposter only shifts it a couple of channel steps, so
+nothing appears or disappears and it cannot be noticed by chance. Known imposter names get a 2px
+dot at 6% white. It renders only from roles the device already
+knows: pass & play (current reveal/assigned roles), the online host (room state), and a guest's own
+role. Guests do not receive other players' roles before victory, so their name dots appear only once
+roles go public. Keep it out of the UI copy; it is a local debug/owner hint, not a game feature.
 
-1. **Card Hand UI Physics Polish**:
-   - Enhance the card-slinging gesture with drag-and-drop spline trajectories and tactile release snapping onto the 3x3 grid.
-2. **Battalion Swarm Boids & Combat Juice**:
-   - Implement localized flocking/boids separation for troop swarms with screenshake decay on impact and particle death bursts.
-3. **King Active Spells Implementation**:
-   - Wire up the 4 left relic buttons (`Rally Horn`, `Frost Ward`, `Arcane Surge`, `War March`) to trigger board-wide tactical buffs with animated screen overlays.
+## 4. Ballot resolution (the part to read before touching rules)
+
+`resolveVotes()` builds `voteTallies`, then `getAccusedGroup()` selects the accused group: the highest
+vote positions, including everyone tied at the cutoff for the last imposter slot. The Guardian's
+protected player is removed from that group (with `shieldSaved`).
+
+- **Classic** → `resolveClassicBallot()` decides immediately. Crew win requires the accused group to
+  be exactly the imposter team: no crew member in it and no imposter missing from it. Otherwise the
+  imposters win. Last Chance diverts to `imposter_guess` first.
+- **Undercover** → accused players are eliminated (unless it is a tie), then survival counts decide:
+  zero living imposters = crew win, imposters ≥ living crew = imposter win, otherwise next round.
+  A caught Mr. White (Mr. White mode) triggers `mrwhite_guess`, and a correct guess wins for the
+  imposters before the crew-win check.
+- Ballots read the top `activeImposterCount` positions — one for each player dealt an imposter role.
+
+Scores: crew member +5 on a crew win, imposter +10 on an imposter win. `firstRoundVotes` is kept for
+the victory screen's "Sharp eye" award.
+
+## 5. Word selection
+
+`getWordSelection(selectedCategories, isUndercover, difficulty, usedWords, customWords)` in
+`words.js` picks a random category from the selection, then a random pair of the chosen difficulty,
+preferring words not in `usedWords`. A pair is `{ crew, imposter }`, where `imposter` may be a string
+or an array of options. Undercover returns the imposter word; Classic returns `null` and the app
+shows the category instead.
+
+Two expansion layers sit on top of the base data and are merged at module load by
+`mergeExtraPairs()` before a final pass that keeps one crew word per tier:
+
+- `WORD_EXPANSION` in `words.js` — hand-curated pairs.
+- `GENERATED_PAIRS` in `words-extra.js` — pairs built from open word lists
+  ([himehatsumi/impostor](https://github.com/himehatsumi/impostor), public domain;
+  [GameSketchers/Game-WordList](https://github.com/GameSketchers/Game-WordList), MIT) plus themed
+  word pools. The generator picked distinct crew words per tier and avoided pairs already present.
+
+Adding a category means three edits in `words.js`: the entry in `WORD_DATABASE` (with `easy`,
+`medium`, `hard` arrays), a label in `CATEGORY_LABELS`, and an emoji in `CATEGORY_ICONS`. The setup
+screen and selection logic pick it up automatically.
+
+## 6. Audio, haptics, avatars
+
+- `audio.js` exposes a `sound` singleton that synthesizes every effect (tones, noise bursts, drones)
+  with oscillators. `sound.toggleMute()` is wired to the header speaker button.
+- `buzz()` wraps `navigator.vibrate` defensively; unsupported devices are ignored.
+- `avatars.js` hashes names into 16 palettes, then resolves collisions across the sorted roster, so a
+  player keeps the same character all session.
+
+## 7. Conventions
+
+- No build-time dependencies in game code — import only sibling modules.
+- Escape user-supplied names when adding new HTML interpolation; the current templates interpolate
+  player names directly into a handful of attributes.
+- All timers must be cleared through `pauseTimer()`; `timerInterval` is the only live interval.
+- `window.__imposterGame` is exposed for console poking (`__imposterGame.state`) — useful for
+  jumping to a screen while developing: set `state.screen` then call `render()`.
+
+## 8. Known gaps
+
+- Online rooms are stubbed (`showOnlineModal`) — they need a realtime backend.
+- UI is English-only; the original site ships six languages.
+- No automated tests; `vitest` was removed with the previous game. Verify with `npm run build` plus
+  a played-through round.
+- `dev/`, `staging/` and `features/imposter-game/` hold older copies of the same files; they are
+  not built and will drift.
