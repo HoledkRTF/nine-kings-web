@@ -78,8 +78,22 @@ import the pass-and-play game class; the two sides exchange two JSON snapshots i
   cutoff, and the crew win only if that group is exactly the imposter team. Mr. White and Undercover
   eliminate one player per round; catching Mr. White moves the room to `guess`, where only his
   client gets a guess box.
-- The host's browser is the server. There is no persistence, matchmaking or moderation; closing the
-  host tab ends the room.
+- **Seats survive a drop.** A guest that disconnects keeps their row in the room (marked offline);
+  `GuestClient` retries with backoff (8 attempts, then gives up) and re-sends
+  `hello { resume: true }`. `HostRoom.addGuest` adopts an offline seat with the same name, so the
+  player lands back on the current phase with the same role — including after a full page reload
+  and a manual rejoin with the same name. A *connected* player with that name still gets
+  `name-taken`, so a stranger cannot take a live seat.
+- **Moderation:** guests are shown with an Offline tag and the host can remove them
+  (`kick(name)` → `data-kick` button). A deliberate leave sends `{type:'leave'}` and frees the seat.
+- **Host closes the room:** `HostRoom.close()` broadcasts `{type:'closed'}` before tearing down, so
+  guests land on the `online_closed` screen with the last roster/vote rather than a bare error.
+  That screen offers a rejoin attempt for the same code and name.
+- `game.js` loads this module with a dynamic `import()` (`loadOnline()`); PeerJS and the room layer
+  never ship in the Pass & Play bundle. The pure helpers live in `main/online-shared.js`.
+- The lobby renders a join QR on demand (`main/vendor/qr.mjs`, `qrcode-generator`, MIT) for the
+  invite link.
+- The host's browser is the server. There is no matchmaking and no server-side persistence.
 
 ## 3c. Hidden tell marker
 
@@ -93,6 +107,23 @@ disappears. Known imposter names get a 2px dot at 6% white. It renders only from
 knows: pass & play (current reveal/assigned roles), the online host (room state), and a guest's own
 role. Guests do not receive other players' roles before victory, so their name dots appear only once
 roles go public. Keep it out of the UI copy; it is a local debug/owner hint, not a game feature.
+
+## 3d. Device-local memory
+
+All optional, all best-effort writes wrapped in `try`:
+
+| Key | Contents |
+| --- | --- |
+| `fti-name` | Last online display name |
+| `fti-tell` | Tell marker armed (`'1'`) |
+| `fti-players` / `fti-scores` | Pass & play roster and running scoreboard, restored on load |
+| `fti-prefs` | Mode, difficulty, round type, imposters, timer, categories and toggles |
+| `fti-stats` | `{ games, crewWins, imposterWins, imposters: { name: count } }`, shown on the victory screen |
+| `fti-banned-pairs` | `crew::imposter` pairs flagged "too similar" (victory screen button); `getWordSelection` skips them |
+| `fti-muted` | Sound preference, owned by `audio.js` |
+
+`getWordSelection(selected, isUndercover, difficulty, usedWords, customWords, bannedPairs)` takes the
+ban list as its sixth argument; `HostRoom` receives the host device's list at construction.
 
 ## 4. Ballot resolution (the part to read before touching rules)
 
@@ -152,7 +183,10 @@ screen and selection logic pick it up automatically.
 
 ## 8. Known gaps
 
-- Online rooms are stubbed (`showOnlineModal`) — they need a realtime backend.
+- No host migration: if the host tab closes, the room is over (guests get the closed screen).
+- A 1-pixel tell marker matches the page gradient by computation only; it has not been eyeballed on
+  a physical screen.
+- The tell code is keyboard-only, so it cannot be typed on a phone.
 - UI is English-only; the original site ships six languages.
 - No automated tests; `vitest` was removed with the previous game. Verify with `npm run build` plus
   a played-through round.

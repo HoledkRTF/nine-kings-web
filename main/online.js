@@ -13,64 +13,17 @@
 // "peerjs" specifier would fail to resolve there.
 import Peer from './vendor/peerjs.mjs';
 import { WORD_DATABASE, getWordSelection } from './words.js';
+import {
+  ID_PREFIX,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  DEFAULT_ONLINE_SETTINGS,
+  normalizeCode,
+  cleanName
+} from './online-shared.js';
 
-const ID_PREFIX = 'fti-v1-';
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const MAX_PLAYERS = 15;
-const MIN_PLAYERS = 3;
-const NAME_LIMIT = 14;
-
-export const DEFAULT_ONLINE_SETTINGS = {
-  mode: 'classic', // classic | mrwhite | undercover
-  numImposters: 1,
-  difficulty: 'medium',
-  timeLimit: 300,
-  categoryIds: ['general', 'animals', 'foodDrinks', 'movies', 'videoGames'],
-  isImposterHintEnabled: true
-};
-
-export function makeRoomCode(length = 4) {
-  const values = new Uint32Array(length);
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(values);
-  } else {
-    for (let i = 0; i < length; i++) values[i] = Math.floor(Math.random() * 4294967296);
-  }
-  let out = '';
-  for (let i = 0; i < length; i++) out += CODE_CHARS[values[i] % CODE_CHARS.length];
-  return out;
-}
-
-export function normalizeCode(value) {
-  return String(value || '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '')
-    .slice(0, 6);
-}
-
-export function roomLink(code) {
-  const url = new URL(window.location.href);
-  url.search = '';
-  url.hash = '';
-  url.searchParams.set('room', normalizeCode(code));
-  return url.toString();
-}
-
-export function codeFromUrl() {
-  try {
-    return normalizeCode(new URLSearchParams(window.location.search).get('room'));
-  } catch (error) {
-    return '';
-  }
-}
-
-export function cleanName(value) {
-  return String(value || '')
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, NAME_LIMIT);
-}
+// Re-exported so existing importers keep working after the split.
+export { DEFAULT_ONLINE_SETTINGS, makeRoomCode, normalizeCode, roomLink, codeFromUrl, cleanName } from './online-shared.js';
 
 function shuffle(list) {
   const out = [...list];
@@ -84,6 +37,8 @@ function shuffle(list) {
 function isHostIntent(type) {
   return ['start', 'startVoting', 'nextRound', 'playAgain', 'settings', 'kick'].includes(type);
 }
+
+const REJOIN_DELAYS = [800, 1500, 3000, 5000, 8000, 8000, 8000, 8000];
 
 function cleanGuess(value) {
   return String(value || '')
@@ -103,9 +58,10 @@ function normalizeWord(value) {
 // ---------------------------------------------------------------- host room
 
 export class HostRoom {
-  constructor({ code, name, settings, onState, onStatus, onError }) {
+  constructor({ code, name, settings, bannedPairs, onState, onStatus, onError }) {
     this.code = normalizeCode(code);
     this.hostName = cleanName(name) || 'Host';
+    this.bannedPairs = Array.isArray(bannedPairs) ? bannedPairs : [];
     this.settings = { ...DEFAULT_ONLINE_SETTINGS, ...(settings || {}) };
     if (!Array.isArray(this.settings.categoryIds) || !this.settings.categoryIds.length) {
       this.settings.categoryIds = Object.keys(WORD_DATABASE);
@@ -196,7 +152,16 @@ export class HostRoom {
     if (!msg || typeof msg !== 'object') return;
 
     if (msg.type === 'hello') {
-      this.addGuest(conn, msg.name);
+      this.addGuest(conn, msg.name, !!msg.resume);
+      return;
+    }
+
+    if (msg.type === 'leave') {
+      if (this.screen === 'lobby') {
+        this.conns.delete(conn.peer);
+        this.players = this.players.filter((p) => p.id !== conn.peer);
+        this.publish();
+      }
       return;
     }
 
@@ -229,11 +194,32 @@ export class HostRoom {
     }
   }
 
-  addGuest(conn, rawName) {
+  addGuest(conn, rawName, resume = false) {
     const name = cleanName(rawName);
 
     // One player per peer: a duplicate hello from the same connection is ignored.
     if (this.players.some((p) => p.id === conn.peer)) return;
+
+    // A reconnecting guest keeps their seat (and their role) when the name
+    // matches a player who dropped out. This works mid-game too.
+    if (resume) {
+      const seat = this.players.find(
+        (p) => !p.isHost && !p.connected && p.name.toLowerCase() === name.toLowerCase()
+      );
+      if (seat) {
+        this.conns.forEach((existing, peerId) => {
+          if (peerId === seat.id) this.conns.delete(peerId);
+        });
+        this.conns.set(conn.peer, conn);
+        seat.id = conn.peer;
+        seat.connected = true;
+        seat.ready = false;
+        seat.vote = null;
+        conn.send({ type: 'welcome', code: this.code, resumed: true });
+        this.publish();
+        return;
+      }
+    }
 
     if (this.screen !== 'lobby') {
       conn.send({ type: 'denied', reason: 'in-progress' });
@@ -260,20 +246,34 @@ export class HostRoom {
     this.publish();
   }
 
+  // A dropped guest keeps their seat so they can rejoin with the same name.
+  // The host decides whether to remove them, and the lobby shows them offline.
   drop(peerId) {
     this.conns.delete(peerId);
     const player = this.players.find((p) => p.id === peerId);
     if (!player) return;
 
-    if (this.screen === 'lobby') {
-      this.players = this.players.filter((p) => p.id !== peerId);
-    } else {
-      player.connected = false;
-      player.ready = false;
-      player.vote = null;
-      this.maybeStartDiscussion();
-      this.maybeResolveVotes();
+    player.connected = false;
+    player.ready = false;
+    player.vote = null;
+    this.maybeStartDiscussion();
+    this.maybeResolveVotes();
+    this.publish();
+  }
+
+  kick(name) {
+    if (this.screen !== 'lobby') return;
+    const player = this.players.find(
+      (p) => !p.isHost && p.name.toLowerCase() === String(name || '').toLowerCase()
+    );
+    if (!player) return;
+    const conn = this.conns.get(player.id);
+    if (conn?.open) {
+      try { conn.send({ type: 'denied', reason: 'kicked' }); } catch (error) { /* ignore */ }
+      setTimeout(() => { try { conn.close(); } catch (error) { /* ignore */ } }, 100);
     }
+    this.conns.delete(player.id);
+    this.players = this.players.filter((p) => p !== player);
     this.publish();
   }
 
@@ -307,7 +307,8 @@ export class HostRoom {
       this.settings.mode === 'undercover',
       this.settings.difficulty,
       this.usedWords,
-      []
+      [],
+      this.bannedPairs
     );
 
     this.secretWord = selection.secretWord;
@@ -654,6 +655,8 @@ export class HostRoom {
     this.destroyed = true;
     this.clearDiscussionTimer();
     this.conns.forEach((conn) => {
+      // Tell guests this was deliberate, so they do not sit in a retry loop.
+      try { if (conn?.open) conn.send({ type: 'closed' }); } catch (e) { /* ignore */ }
       try { conn.close(); } catch (e) { /* ignore */ }
     });
     this.conns.clear();
@@ -675,8 +678,16 @@ export class GuestClient {
     this.lastYou = null;
     this.conn = null;
     this.destroyed = false;
+    this.attempts = 0;
+    this.retryTimer = null;
+    this.rejoinable = false;
+    this.stopped = false;
 
     this.onStatus?.('connecting');
+    this.openPeer();
+  }
+
+  openPeer() {
     const peer = new Peer(undefined, { debug: 0 });
     this.peer = peer;
 
@@ -684,6 +695,13 @@ export class GuestClient {
     peer.on('error', (error) => {
       const type = error?.type;
       if (type === 'peer-unavailable') {
+        // While retrying, a missing host id means the room is gone, not a typo.
+        if (this.attempts > 0) {
+          this.stopped = true;
+          this.onStatus?.('closed');
+          this.onError?.({ code: 'host-left', message: 'The host closed the room.' });
+          return;
+        }
         this.onError?.({ code: 'not-found', message: 'No room found with that code.' });
         this.onStatus?.('error');
         return;
@@ -701,21 +719,69 @@ export class GuestClient {
     });
   }
 
+  // Returns true when a live peer is ready to dial the host; a destroyed peer
+  // is replaced (it fires 'open' and reconnects on its own).
+  ensurePeer() {
+    if (!this.peer || this.peer.destroyed) {
+      this.openPeer();
+      return false;
+    }
+    if (this.peer.disconnected) {
+      try { this.peer.reconnect(); } catch (error) { /* ignore */ }
+    }
+    return true;
+  }
+
   connect() {
+    if (this.destroyed) return;
     const conn = this.peer.connect(ID_PREFIX + this.code, { reliable: true });
     this.conn = conn;
 
     conn.on('open', () => {
       this.onStatus?.('online');
-      conn.send({ type: 'hello', name: this.name });
+      // Always offer to resume: the host only reuses a seat that is offline,
+      // so a live player with the same name still gets "name taken".
+      conn.send({ type: 'hello', name: this.name, resume: true });
     });
     conn.on('data', (msg) => this.handleMessage(msg));
     conn.on('close', () => {
       if (this.destroyed) return;
-      this.onStatus?.('closed');
-      this.onError?.({ code: 'host-left', message: 'The host closed the room.' });
+      this.scheduleReconnect();
     });
-    conn.on('error', () => this.onStatus?.('error'));
+    conn.on('error', () => {
+      if (this.destroyed) return;
+      this.scheduleReconnect();
+    });
+  }
+
+  // A phone that sleeps or walks out of Wi-Fi range should come back into the
+  // same seat instead of ending the game for that player.
+  scheduleReconnect() {
+    if (this.destroyed || this.stopped || this.retryTimer) return;
+    this.onStatus?.('reconnecting');
+    if (this.attempts >= REJOIN_DELAYS.length) {
+      this.onStatus?.('closed');
+      this.onError?.({ code: 'host-left', message: 'Lost the room. The host may have closed it.' });
+      return;
+    }
+    const delay = REJOIN_DELAYS[this.attempts];
+    this.attempts += 1;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      if (this.destroyed || this.stopped) return;
+      if (this.ensurePeer()) this.connect();
+    }, delay);
+  }
+
+  reconnectNow() {
+    if (this.destroyed) return;
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    this.onStatus?.('reconnecting');
+    this.attempts = 0;
+    if (this.ensurePeer()) this.connect();
   }
 
   handleMessage(msg) {
@@ -736,13 +802,26 @@ export class GuestClient {
         'name-taken': 'That name is already in the room. Try another one.',
         'room-full': 'This room is full.',
         'in-progress': 'That game has already started.',
-        'name-required': 'Enter a name first.'
+        'name-required': 'Enter a name first.',
+        'kicked': 'The host removed you from the room.'
       };
+      // Refusals are final: stop retrying so the message stays on screen.
+      this.rejoinable = false;
+      this.stopped = true;
       this.onError?.({ code: msg.reason, message: messages[msg.reason] || 'The host refused the connection.' });
       return;
     }
+    if (msg.type === 'closed') {
+      this.stopped = true;
+      this.onStatus?.('closed');
+      this.onError?.({ code: 'host-left', message: 'The host closed the room.' });
+      return;
+    }
     if (msg.type === 'welcome') {
+      this.attempts = 0;
+      this.rejoinable = true;
       this.onStatus?.('online');
+      this.onResumed?.(!!msg.resumed);
     }
   }
 
@@ -758,6 +837,12 @@ export class GuestClient {
 
   close() {
     this.destroyed = true;
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    // Tell the host this is a deliberate exit so the seat is freed straight away.
+    try { if (this.conn?.open) this.conn.send({ type: 'leave' }); } catch (e) { /* ignore */ }
     try { this.conn?.close(); } catch (e) { /* ignore */ }
     try { this.peer?.destroy(); } catch (e) { /* ignore */ }
   }

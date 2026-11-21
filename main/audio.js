@@ -5,6 +5,15 @@ class SoundEngine {
     this.ctx = null;
     this.muted = false;
     this.volume = 0.8;
+    try {
+      this.muted = localStorage.getItem('fti-muted') === '1';
+    } catch (error) {
+      // Storage can be blocked; sound stays on for this visit.
+    }
+  }
+
+  persistMuted() {
+    try { localStorage.setItem('fti-muted', this.muted ? '1' : '0'); } catch (error) { /* ignore */ }
   }
 
   init() {
@@ -21,10 +30,12 @@ class SoundEngine {
 
   setMuted(muted) {
     this.muted = muted;
+    this.persistMuted();
   }
 
   toggleMute() {
     this.muted = !this.muted;
+    this.persistMuted();
     return this.muted;
   }
 
@@ -127,6 +138,12 @@ class SoundEngine {
     this.playTone(150, 0.35, 'sawtooth', 0.25, 0, 100);
     this.playTone(120, 0.45, 'sawtooth', 0.28, 0.15, 80);
     this.playNoise(0.3, 0.1, 0, 400);
+  }
+
+  // Soft two-note chime when the speaking spotlight moves to the next player.
+  turnChange() {
+    this.playTone(520, 0.09, 'sine', 0.1);
+    this.playTone(700, 0.11, 'sine', 0.08, 0.06);
   }
 
   voteSelect() {

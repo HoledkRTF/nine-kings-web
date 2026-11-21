@@ -2437,3 +2437,87 @@ input:checked + .slider:before { transform: translateX(20px); background-color: 
   vertical-align: middle;
   flex: none;
 }
+
+/* --- Follow-up pass: QR join, lobby moderation, session stats --- */
+
+.online-qr {
+  display: flex;
+  justify-content: center;
+  margin: 14px auto 4px;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 14px;
+  width: fit-content;
+  line-height: 0;
+}
+
+.online-qr[hidden] { display: none; }
+
+.online-qr svg {
+  width: 168px;
+  height: 168px;
+  display: block;
+}
+
+.online-qr-hint {
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim, #8a93a6);
+  margin-top: 6px;
+}
+
+.online-kick {
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: var(--text-dim, #9aa3b5);
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.online-kick:hover,
+.online-kick:focus-visible {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.stats-line {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-dim, #8a93a6);
+  margin: 6px 0 2px;
+  padding: 0 12px;
+}
+
+/* --- Accessibility: visible focus and calmer motion --- */
+
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible,
+.cat-chip:focus-visible,
+.mode-opt:focus-visible {
+  outline: 3px solid rgba(120, 190, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.reveal-card:focus-visible { outline-offset: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  #confetti-canvas { display: none; }
+}

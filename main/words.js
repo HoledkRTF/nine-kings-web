@@ -7735,7 +7735,17 @@ export const CATEGORY_ICONS = {
   fairyTales: '🐉'
 };
 
-export function getWordSelection(selectedCategories, isUndercover, difficulty = 'medium', usedWords = [], customWords = []) {
+function pairIsBanned(pair, banned) {
+  if (!banned || !banned.size || !pair) return false;
+  const crew = String(pair.crew || '').toLowerCase();
+  const options = Array.isArray(pair.imposter) ? pair.imposter : [pair.imposter];
+  const keys = options.map((word) => `${crew}::${String(word || '').toLowerCase()}`);
+  return keys.length > 0 && keys.every((key) => banned.has(key));
+}
+
+export function getWordSelection(selectedCategories, isUndercover, difficulty = 'medium', usedWords = [], customWords = [], bannedPairs = []) {
+  // Pairs the table flagged as "too similar" are skipped on this device.
+  const banned = new Set((Array.isArray(bannedPairs) ? bannedPairs : []).map((key) => String(key).toLowerCase()));
   if (selectedCategories.includes('custom') && customWords.length >= 3) {
     const available = customWords.filter(w => !usedWords.includes(w));
     const pool = available.length > 0 ? available : customWords;
@@ -7771,6 +7781,9 @@ export function getWordSelection(selectedCategories, isUndercover, difficulty = 
     });
     if (usable.length) pairs = usable;
   }
+
+  const cleanPairs = pairs.filter((pair) => !pairIsBanned(pair, banned));
+  if (cleanPairs.length) pairs = cleanPairs;
 
   const unusedPairs = pairs.filter(p => !usedWords.includes(p.crew));
   const pool = unusedPairs.length > 0 ? unusedPairs : pairs;

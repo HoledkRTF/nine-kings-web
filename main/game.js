@@ -1,10 +1,48 @@
 import { WORD_DATABASE, CATEGORY_LABELS, CATEGORY_ICONS, getWordSelection } from './words.js';
 import { sound } from './audio.js';
 import { renderAvatarSvg, getPlayerAvatar, setAvatarRoster } from './avatars.js';
-import { HostRoom, GuestClient, makeRoomCode, normalizeCode, roomLink, codeFromUrl, cleanName } from './online.js';
+import { makeRoomCode, normalizeCode, roomLink, codeFromUrl, cleanName } from './online-shared.js';
+
+// Online rooms pull in the vendored PeerJS build (~115 kB), so they are loaded
+// on demand: Pass & Play never pays for the room layer.
+let onlineModulePromise = null;
+function loadOnline() {
+  if (!onlineModulePromise) onlineModulePromise = import('./online.js');
+  return onlineModulePromise;
+}
 
 // --- Default State ---
 const DEFAULT_PLAYERS = ['Alex', 'Jordan', 'Sam', 'Taylor'];
+
+// Device-local storage. Everything here is optional and safe to lose.
+const STORAGE = {
+  name: 'fti-name',
+  tell: 'fti-tell',
+  players: 'fti-players',
+  scores: 'fti-scores',
+  prefs: 'fti-prefs',
+  stats: 'fti-stats',
+  banned: 'fti-banned-pairs'
+};
+
+function readStored(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const value = JSON.parse(raw);
+    return value ?? fallback;
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function writeStored(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) { /* storage is optional */ }
+}
+
+function pairKey(crew, imposter) {
+  return `${String(crew || '').toLowerCase()}::${String(imposter || '').toLowerCase()}`;
+}
 
 // Player names travel over the network, so never trust them as HTML.
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
@@ -148,6 +186,41 @@ class ImposterGame {
       // Private browsing can block storage; the code still works per visit.
     }
 
+    // The roster and scoreboard survive a refresh, so an evening's series can
+    // continue without setting everyone up again.
+    const savedPlayers = readStored(STORAGE.players, null);
+    if (Array.isArray(savedPlayers)) {
+      const names = savedPlayers
+        .map((name) => String(name || '').trim().slice(0, 14))
+        .filter(Boolean);
+      if (names.length) {
+        this.state.players = [...new Set(names)].map((name) => ({
+          name, role: null, isEliminated: false, isMrWhite: false, isGuardian: false
+        }));
+      }
+    }
+    const savedScores = readStored(STORAGE.scores, null);
+    if (savedScores && typeof savedScores === 'object' && !Array.isArray(savedScores)) {
+      Object.entries(savedScores).forEach(([name, score]) => {
+        const value = Number(score);
+        if (Number.isFinite(value) && value >= 0) this.state.scores[name] = value;
+      });
+    }
+
+    // Local-only session stats, shown on the victory screen.
+    const stats = readStored(STORAGE.stats, null);
+    this.stats = {
+      games: Number(stats?.games) || 0,
+      crewWins: Number(stats?.crewWins) || 0,
+      imposterWins: Number(stats?.imposterWins) || 0,
+      imposters: stats && typeof stats.imposters === 'object' && !Array.isArray(stats.imposters)
+        ? stats.imposters
+        : {}
+    };
+
+    this.online.lastClosed = null;
+    this.applyStoredPrefs();
+
     // Exposed for debugging in the browser console.
     window.__imposterGame = this;
 
@@ -177,6 +250,89 @@ class ImposterGame {
         this.state.scores[p.name] = 0;
       }
     });
+    this.persistSession();
+  }
+
+  // --- Device-local memory ---
+
+  persistSession() {
+    writeStored(STORAGE.players, this.state.players.map(p => p.name));
+    writeStored(STORAGE.scores, this.state.scores);
+  }
+
+  applyStoredPrefs() {
+    const prefs = readStored(STORAGE.prefs, null);
+    if (!prefs || typeof prefs !== 'object') return;
+
+    if (['classic', 'mrwhite', 'undercover'].includes(prefs.mode)) this.state.mode = prefs.mode;
+    if (['easy', 'medium', 'hard'].includes(prefs.difficulty)) this.state.difficulty = prefs.difficulty;
+    if (['hint', 'question', 'silent', 'drawing'].includes(prefs.roundType)) this.state.roundType = prefs.roundType;
+    if (Number.isFinite(Number(prefs.numImposters))) {
+      this.state.numImposters = Math.max(1, Math.min(3, Number(prefs.numImposters)));
+    }
+    if ([0, 60, 120, 180, 240, 300].includes(Number(prefs.timeLimit))) {
+      this.state.timeLimit = Number(prefs.timeLimit);
+    }
+    if (Array.isArray(prefs.selectedCategories) && prefs.selectedCategories.length) {
+      const valid = prefs.selectedCategories.filter(c => c === 'custom' || CATEGORY_LABELS[c]);
+      if (valid.length) this.state.selectedCategories = valid;
+    }
+    ['isChaosMode', 'isGuardianEnabled', 'isImposterHintEnabled', 'isLastChanceEnabled'].forEach(key => {
+      if (typeof prefs[key] === 'boolean') this.state[key] = prefs[key];
+    });
+  }
+
+  savePrefs() {
+    writeStored(STORAGE.prefs, {
+      mode: this.state.mode,
+      difficulty: this.state.difficulty,
+      roundType: this.state.roundType,
+      numImposters: this.state.numImposters,
+      timeLimit: this.state.timeLimit,
+      selectedCategories: this.state.selectedCategories,
+      isChaosMode: this.state.isChaosMode,
+      isGuardianEnabled: this.state.isGuardianEnabled,
+      isImposterHintEnabled: this.state.isImposterHintEnabled,
+      isLastChanceEnabled: this.state.isLastChanceEnabled
+    });
+  }
+
+  bannedPairs() {
+    const list = readStored(STORAGE.banned, []);
+    return Array.isArray(list) ? list.filter(k => typeof k === 'string') : [];
+  }
+
+  banPair(crew, imposter) {
+    if (!crew) return;
+    const key = pairKey(crew, imposter || crew);
+    const list = this.bannedPairs();
+    if (!list.includes(key)) list.push(key);
+    writeStored(STORAGE.banned, list.slice(-300));
+    this.showAlert('Noted', 'That word pair will be skipped on this device from now on.');
+  }
+
+  recordGame(winner) {
+    if (winner !== 'crew' && winner !== 'imposters') return;
+    this.stats.games += 1;
+    if (winner === 'crew') this.stats.crewWins += 1;
+    else this.stats.imposterWins += 1;
+    this.state.players.forEach(p => {
+      if (p.role !== 'imposter') return;
+      this.stats.imposters[p.name] = (Number(this.stats.imposters[p.name]) || 0) + 1;
+    });
+    writeStored(STORAGE.stats, this.stats);
+  }
+
+  renderStatsLine() {
+    if (!this.stats.games) return '';
+    const most = Object.entries(this.stats.imposters).sort((a, b) => b[1] - a[1])[0];
+    const parts = [
+      `${this.stats.games} game${this.stats.games === 1 ? '' : 's'} played`,
+      `crew ${this.stats.crewWins}`,
+      `imposters ${this.stats.imposterWins}`
+    ];
+    if (most) parts.push(`most impostering: ${escapeHtml(most[0])} (${most[1]})`);
+    return `<p class="stats-line">On this device — ${parts.join(' · ')}</p>`;
   }
 
   // Light haptic tap on supported devices. Never throws.
@@ -192,6 +348,7 @@ class ImposterGame {
   bindGlobalEvents() {
     const soundToggle = document.getElementById('sound-toggle');
     if (soundToggle) {
+      if (sound.muted) soundToggle.innerHTML = ICONS.volumeOff;
       soundToggle.addEventListener('click', () => {
         const isMuted = sound.toggleMute();
         soundToggle.innerHTML = isMuted ? ICONS.volumeOff : ICONS.volume;
@@ -208,6 +365,9 @@ class ImposterGame {
     document.addEventListener('click', (e) => {
       const leave = e.target?.closest?.('[data-online-leave]');
       if (leave) this.leaveOnlineRoom();
+      if (e.target?.closest?.('[data-online-retry]')) this.online.client?.reconnectNow?.();
+      const kick = e.target?.closest?.('[data-kick]');
+      if (kick) this.online.room?.kick?.(kick.dataset.kick);
     });
   }
 
@@ -307,12 +467,15 @@ class ImposterGame {
       return;
     }
 
+    this.savePrefs();
+
     const selection = getWordSelection(
       this.state.selectedCategories,
       this.state.mode === 'undercover',
       this.state.difficulty,
       this.state.usedWords,
-      this.state.customWords
+      this.state.customWords,
+      this.bannedPairs()
     );
 
     this.state.secretWord = selection.secretWord;
@@ -390,6 +553,7 @@ class ImposterGame {
   quickStart() {
     this.state.players = DEFAULT_PLAYERS.map(name => ({ name, role: null, isEliminated: false, isMrWhite: false, isGuardian: false }));
     this.initScores();
+    this.savePrefs();
     this.state.numImposters = 1;
     this.state.mode = 'classic';
     this.state.timeLimit = 300;
@@ -651,6 +815,9 @@ class ImposterGame {
       }
     });
 
+    this.recordGame(winner);
+    this.persistSession();
+
     if (winner === 'crew') {
       sound.crewVictory();
     } else {
@@ -715,6 +882,10 @@ class ImposterGame {
       case 'imposter_guess':
         container.innerHTML = this.renderImposterGuessScreen();
         this.bindImposterGuessEvents();
+        break;
+      case 'online_closed':
+        container.innerHTML = this.renderOnlineClosed();
+        this.bindOnlineClosedEvents();
         break;
       case 'victory':
         container.innerHTML = this.renderVictoryScreen();
@@ -1154,6 +1325,7 @@ class ImposterGame {
         if (this.state.scores[name] === undefined) this.state.scores[name] = 0;
         input.value = '';
         this.state.openPanels.players = true;
+        this.persistSession();
         this.render();
       }
     };
@@ -1164,6 +1336,7 @@ class ImposterGame {
     document.getElementById('randomize-players-btn')?.addEventListener('click', () => {
       this.state.players = [...this.state.players].sort(() => Math.random() - 0.5);
       this.state.openPanels.players = true;
+      this.persistSession();
       sound.voteSelect();
       this.render();
     });
@@ -1179,6 +1352,7 @@ class ImposterGame {
             this.state.numImposters = maxPossible;
           }
           this.state.openPanels.players = true;
+          this.persistSession();
           this.render();
         }
       });
@@ -1187,24 +1361,27 @@ class ImposterGame {
     // Steppers
     document.getElementById('stepper-imp-sub')?.addEventListener('click', () => {
       this.state.numImposters = Math.max(1, this.state.numImposters - 1);
+      this.savePrefs();
       this.render();
     });
     document.getElementById('stepper-imp-add')?.addEventListener('click', () => {
       const maxPossible = Math.max(1, Math.min(3, Math.floor(this.state.players.length / 2)));
       this.state.numImposters = Math.min(maxPossible, this.state.numImposters + 1);
+      this.savePrefs();
       this.render();
     });
 
+    const timerOptions = [0, 60, 120, 180, 240, 300];
     document.getElementById('stepper-timer-sub')?.addEventListener('click', () => {
-      const options = [0, 60, 120, 180, 240, 300];
-      const curIdx = options.indexOf(this.state.timeLimit);
-      if (curIdx > 0) this.state.timeLimit = options[curIdx - 1];
+      const curIdx = timerOptions.indexOf(this.state.timeLimit);
+      if (curIdx > 0) this.state.timeLimit = timerOptions[curIdx - 1];
+      this.savePrefs();
       this.render();
     });
     document.getElementById('stepper-timer-add')?.addEventListener('click', () => {
-      const options = [0, 60, 120, 180, 240, 300];
-      const curIdx = options.indexOf(this.state.timeLimit);
-      if (curIdx < options.length - 1) this.state.timeLimit = options[curIdx + 1];
+      const curIdx = timerOptions.indexOf(this.state.timeLimit);
+      if (curIdx < timerOptions.length - 1) this.state.timeLimit = timerOptions[curIdx + 1];
+      this.savePrefs();
       this.render();
     });
 
@@ -1215,29 +1392,36 @@ class ImposterGame {
         if (!['classic', 'mrwhite', 'undercover'].includes(mode)) return;
         this.state.mode = mode;
         if (mode === 'mrwhite') this.state.numImposters = 1;
+        this.savePrefs();
         this.buzz(6);
         this.render();
       });
     });
     document.getElementById('toggle-chaos')?.addEventListener('change', e => {
       this.state.isChaosMode = e.target.checked;
+      this.savePrefs();
     });
     document.getElementById('toggle-guardian')?.addEventListener('change', e => {
       this.state.isGuardianEnabled = e.target.checked;
+      this.savePrefs();
     });
     document.getElementById('toggle-imphint')?.addEventListener('change', e => {
       this.state.isImposterHintEnabled = e.target.checked;
+      this.savePrefs();
     });
     document.getElementById('toggle-lastchance')?.addEventListener('change', e => {
       this.state.isLastChanceEnabled = e.target.checked;
+      this.savePrefs();
     });
 
     document.getElementById('round-type-select')?.addEventListener('change', e => {
       this.state.roundType = e.target.value;
+      this.savePrefs();
     });
 
     document.getElementById('difficulty-select')?.addEventListener('change', e => {
       this.state.difficulty = e.target.value;
+      this.savePrefs();
     });
 
     // Categories toggle in place so the panel keeps its scroll and no screen
@@ -1256,6 +1440,7 @@ class ImposterGame {
         }
         this.state.openPanels.categories = true;
         this.updateCategorySummary();
+        this.savePrefs();
         sound.voteSelect();
         this.buzz(4);
       });
@@ -1273,6 +1458,7 @@ class ImposterGame {
         chip.classList.toggle('selected', this.state.selectedCategories.includes(chip.dataset.cat));
       });
       this.updateCategorySummary();
+      this.savePrefs();
       this.buzz(6);
     });
 
@@ -1349,7 +1535,7 @@ class ImposterGame {
         <h2 class="player-hero-name">${curPlayer.name}</h2>
         <p class="player-hero-sub">Player ${this.state.revealIndex + 1} of ${this.state.players.length}</p>
 
-        <div class="reveal-card ${isRevealed ? 'flipped' : ''}" id="reveal-card-element">
+        <div class="reveal-card ${isRevealed ? 'flipped' : ''}" id="reveal-card-element" role="button" tabindex="0" aria-label="Reveal your secret role">
           <div class="card-face card-front">
             <div class="card-lock">${ICONS.lock}</div>
             <span class="card-front-title">TAP TO REVEAL</span>
@@ -1401,6 +1587,12 @@ class ImposterGame {
 
     card?.addEventListener('click', () => {
       if (!this.state.isCardRevealed) doFlip();
+    });
+    card?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        doFlip();
+      }
     });
     revealBtn?.addEventListener('click', doFlip);
 
@@ -1521,6 +1713,7 @@ class ImposterGame {
       const living = this.state.players.filter(p => !p.isEliminated);
       if (!living.length) return;
       speakerIdx = (speakerIdx + 1) % living.length;
+      sound.turnChange();
       const current = document.querySelector('.speaker-now');
       const nameEl = current?.querySelector('.speaker-now-name');
       const labelEl = current?.querySelector('.speaker-now-label');
@@ -1980,10 +2173,15 @@ class ImposterGame {
           `).join('')}
         </div>
 
+        ${this.renderStatsLine()}
+
         <div class="stage-actions">
           <button class="btn btn-red btn-lg" id="play-again-btn">Play Again</button>
           <div class="victory-secondary">
             <button class="btn btn-dark" id="share-result-btn">${ICONS.share} Share result</button>
+            ${this.state.secretWord && this.state.imposterWord && this.state.imposterWord !== this.state.secretWord
+              ? '<button class="btn btn-dark" id="flag-pair-btn">Words too similar</button>'
+              : ''}
             <button class="btn btn-dark" id="back-home-btn">Main Menu</button>
           </div>
         </div>
@@ -1999,6 +2197,10 @@ class ImposterGame {
     document.getElementById('back-home-btn')?.addEventListener('click', () => {
       this.state.screen = 'home';
       this.render();
+    });
+
+    document.getElementById('flag-pair-btn')?.addEventListener('click', () => {
+      this.banPair(this.state.secretWord, this.state.imposterWord);
     });
 
     document.getElementById('share-result-btn')?.addEventListener('click', async () => {
@@ -2139,21 +2341,28 @@ class ImposterGame {
     }, 60);
   }
 
-  createOnlineRoom(name) {
+  async createOnlineRoom(name) {
     this.cleanupOnline();
     this.saveOnlineName(name);
     this.online.role = 'host';
+    this.online.name = name;
     this.online.code = makeRoomCode(4);
+    const code = this.online.code;
     this.online.joinCode = this.online.code;
     this.online.status = 'connecting';
     this.online.error = '';
     this.state.playMode = 'online';
     this.state.screen = 'online_lobby';
+    this.render();
 
     try {
+      const { HostRoom } = await loadOnline();
+      // The player may have backed out while the room layer was loading.
+      if (this.online.role !== 'host' || this.online.code !== code) return;
       const room = new HostRoom({
-        code: this.online.code,
+        code,
         name,
+        bannedPairs: this.bannedPairs(),
         onState: (state, you) => this.applyOnlineState(state, you),
         onStatus: (status) => this.handleOnlineStatus(status),
         onError: (error) => this.handleOnlineError(error)
@@ -2167,18 +2376,22 @@ class ImposterGame {
     this.render();
   }
 
-  joinOnlineRoom(name, code) {
+  async joinOnlineRoom(name, code) {
     this.cleanupOnline();
     this.saveOnlineName(name);
     this.online.role = 'guest';
+    this.online.name = name;
     this.online.code = code;
     this.online.joinCode = code;
     this.online.status = 'connecting';
     this.online.error = '';
     this.state.playMode = 'online';
     this.state.screen = 'online_lobby';
+    this.render();
 
     try {
+      const { GuestClient } = await loadOnline();
+      if (this.online.role !== 'guest' || this.online.code !== code) return;
       const client = new GuestClient({
         code,
         name,
@@ -2215,13 +2428,18 @@ class ImposterGame {
     if (!error) return;
     const message = error.message || 'Connection problem.';
     const code = error.code || '';
-    const backToEntry = ['not-found', 'id-taken', 'name-taken', 'room-full', 'in-progress', 'name-required'].includes(code);
+    const backToEntry = ['not-found', 'id-taken', 'name-taken', 'room-full', 'in-progress', 'name-required', 'kicked'].includes(code);
 
     if (code === 'host-left') {
+      // Keep the last snapshot so the guest still sees the final scoreboard
+      // instead of being dumped on the home screen empty-handed.
+      const lastState = this.online.state;
+      const lastCode = this.online.code;
+      const name = this.online.name;
       this.cleanupOnline();
-      this.state.screen = 'home';
+      this.online.lastClosed = { code: lastCode, name, state: lastState, message };
+      this.state.screen = 'online_closed';
       this.render();
-      this.showAlert('Room closed', message);
       return;
     }
 
@@ -2376,12 +2594,72 @@ class ImposterGame {
     }
   }
 
+  renderOnlineClosed() {
+    const closed = this.online.lastClosed || {};
+    const st = closed.state;
+    const players = st?.players || [];
+    const results = Object.entries(st?.result?.tallies || {}).sort((a, b) => b[1] - a[1]);
+    return `
+      <div class="online-wrap">
+        <div class="online-head">
+          <div class="online-head-copy">
+            <span class="online-overline">ROOM CLOSED</span>
+            <h2>${escapeHtml(closed.code || 'Room')}</h2>
+            <p>${escapeHtml(closed.message || 'The host left the room.')}</p>
+          </div>
+        </div>
+
+        ${st ? `
+          <div class="online-players">
+            <div class="online-players-head"><span>WHO WAS IN THE ROOM</span><span>${players.length}</span></div>
+            ${players.map(p => `
+              <div class="online-player">
+                ${renderAvatarSvg(p.name, 30)}
+                <span class="online-player-name">${escapeHtml(p.name)}</span>
+                ${p.role ? `<span class="online-tag">${p.role === 'imposter' ? 'Imposter' : 'Crew'}</span>` : ''}
+              </div>
+            `).join('')}
+          </div>
+          ${results.length ? `
+            <div class="results-card-compact">
+              <div class="results-head-small">LAST VOTE</div>
+              ${results.map(([name, count]) => `
+                <div class="compact-row"><span>${escapeHtml(name)}</span><strong>${count} VOTE${count === 1 ? '' : 'S'}</strong></div>
+              `).join('')}
+            </div>
+          ` : ''}
+        ` : ''}
+
+        <div class="stage-actions">
+          ${closed.code && closed.name ? '<button class="btn btn-red btn-lg" id="online-rejoin-btn">Try to rejoin</button>' : ''}
+          <button class="btn btn-dark" id="online-closed-home-btn">Main menu</button>
+        </div>
+      </div>
+    `;
+  }
+
+  bindOnlineClosedEvents() {
+    document.getElementById('online-rejoin-btn')?.addEventListener('click', () => {
+      const closed = this.online.lastClosed || {};
+      if (!closed.code) return;
+      this.online.lastClosed = null;
+      this.joinOnlineRoom(closed.name, closed.code);
+    });
+    document.getElementById('online-closed-home-btn')?.addEventListener('click', () => {
+      this.online.lastClosed = null;
+      this.goHome();
+    });
+  }
+
   renderOnlineWaiting(message) {
+    const retryable = ['reconnecting', 'closed', 'offline', 'error'].includes(this.online.status);
     return `
       <div class="online-wrap">
         <div class="online-connect-card">
           <span class="boot-spinner" aria-hidden="true"></span>
           <p class="online-connect-text">${escapeHtml(message)}</p>
+          ${retryable ? '<p class="online-hint">Connection lost. Retrying automatically…</p>' : ''}
+          ${retryable ? '<button class="btn btn-dark btn-compact" data-online-retry>Retry now</button>' : ''}
           <button class="btn btn-dark btn-compact" data-online-leave>Leave room</button>
         </div>
       </div>
@@ -2440,6 +2718,8 @@ class ImposterGame {
             ${typeof navigator !== 'undefined' && navigator.share ? '<button class="btn btn-dark btn-compact" id="online-share-btn">Share</button>' : ''}
           </div>
           <p class="online-status"><span class="status-dot ${this.online.status}" id="online-status-dot"></span><span id="online-status-text">${this.statusLabel(this.online.status)}</span></p>
+          <div class="online-qr" id="online-qr" hidden></div>
+          <p class="online-qr-hint">Or scan to join</p>
         </div>
 
         <div class="online-players">
@@ -2450,6 +2730,7 @@ class ImposterGame {
               <span class="online-player-name">${escapeHtml(p.name)}</span>
               ${p.isHost ? '<span class="online-tag">Host</span>' : ''}
               ${!p.connected ? '<span class="online-tag muted">Offline</span>' : ''}
+              ${isHost && !p.isHost ? `<button class="online-kick" data-kick="${escapeHtml(p.name)}" title="Remove ${escapeHtml(p.name)}" aria-label="Remove ${escapeHtml(p.name)} from the room">✕</button>` : ''}
             </div>
           `).join('')}
         </div>
@@ -2507,6 +2788,7 @@ class ImposterGame {
 
   bindOnlineLobbyEvents() {
     document.getElementById('online-leave-btn')?.addEventListener('click', () => this.leaveOnlineRoom());
+    this.renderJoinQr();
 
     const code = this.online.code || this.online.state?.code || '';
     const flash = (btn, label) => {
@@ -2552,6 +2834,24 @@ class ImposterGame {
     document.getElementById('online-imposters-select')?.addEventListener('change', (e) => apply({ numImposters: Number(e.target.value) }));
     document.getElementById('online-difficulty-select')?.addEventListener('change', (e) => apply({ difficulty: e.target.value }));
     document.getElementById('online-timer-select')?.addEventListener('change', (e) => apply({ timeLimit: Number(e.target.value) }));
+  }
+
+  // Generated on demand so the QR library never loads for Pass & Play.
+  async renderJoinQr() {
+    const box = document.getElementById('online-qr');
+    const code = this.online.code || this.online.state?.code;
+    if (!box || !code) return;
+    try {
+      const { qrcode } = await import('./vendor/qr.mjs');
+      if (!document.body.contains(box)) return;
+      const qr = qrcode(0, 'M');
+      qr.addData(roomLink(code));
+      qr.make();
+      box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      box.hidden = false;
+    } catch (error) {
+      // A QR code is a convenience; the code and link still work without it.
+    }
   }
 
   renderOnlineReveal() {
@@ -2751,6 +3051,7 @@ class ImposterGame {
     document.getElementById('online-next-speaker-btn')?.addEventListener('click', () => {
       if (!order.length) return;
       idx = (idx + 1) % order.length;
+      sound.turnChange();
       const nameEl = document.querySelector('.speaker-now-name');
       const labelEl = document.querySelector('.speaker-now-label');
       if (nameEl) nameEl.textContent = order[idx];
