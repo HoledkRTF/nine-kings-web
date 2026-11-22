@@ -22,7 +22,8 @@ const STORAGE = {
   scores: 'fti-scores',
   prefs: 'fti-prefs',
   stats: 'fti-stats',
-  banned: 'fti-banned-pairs'
+  banned: 'fti-banned-pairs',
+  seat: 'fti-seat'
 };
 
 function readStored(key, fallback) {
@@ -254,6 +255,30 @@ class ImposterGame {
   }
 
   // --- Device-local memory ---
+
+  // The host hands each guest a seat token so a reload can reclaim the same
+  // seat (and role) even if the host has not noticed the old link die yet.
+  readSeat(code) {
+    const seat = readStored(STORAGE.seat, null);
+    if (!seat || typeof seat !== 'object' || !seat.seatKey) return null;
+    if (normalizeCode(seat.code) !== normalizeCode(code)) return null;
+    return seat;
+  }
+
+  saveSeat(info) {
+    if (!info?.seatKey) return;
+    writeStored(STORAGE.seat, {
+      code: normalizeCode(info.code),
+      name: info.name,
+      seatKey: info.seatKey
+    });
+  }
+
+  clearSeat(code) {
+    const seat = readStored(STORAGE.seat, null);
+    if (seat && code && normalizeCode(seat.code) !== normalizeCode(code)) return;
+    try { localStorage.removeItem(STORAGE.seat); } catch (error) { /* ignore */ }
+  }
 
   persistSession() {
     writeStored(STORAGE.players, this.state.players.map(p => p.name));
@@ -2392,15 +2417,18 @@ class ImposterGame {
     try {
       const { GuestClient } = await loadOnline();
       if (this.online.role !== 'guest' || this.online.code !== code) return;
+      const seat = this.readSeat(code);
       const client = new GuestClient({
         code,
         name,
+        seatKey: seat?.seatKey || '',
         onState: (state, you) => this.applyOnlineState(state, you),
         onYou: (you) => {
           this.online.you = you;
           if (this.online.role === 'guest' && this.online.state) this.render();
         },
         onStatus: (status) => this.handleOnlineStatus(status),
+        onSeat: (info) => this.saveSeat(info),
         onError: (error) => this.handleOnlineError(error)
       });
       this.online.client = client;
@@ -2444,6 +2472,7 @@ class ImposterGame {
     }
 
     if (backToEntry) {
+      if (code === 'kicked') this.clearSeat(this.online.code);
       this.cleanupOnline();
       this.online.error = message;
       this.state.screen = 'online_entry';
@@ -2565,6 +2594,7 @@ class ImposterGame {
       wasHost ? 'Close this room?' : 'Leave this room?',
       wasHost ? 'Everyone in the room will be disconnected.' : 'You can rejoin later with the same code.',
       () => {
+        this.clearSeat(this.online.code);
         this.cleanupOnline();
         this.state.screen = 'home';
         this.render();

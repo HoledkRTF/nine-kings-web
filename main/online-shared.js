@@ -29,6 +29,12 @@ export function makeRoomCode(length = 4) {
   return out;
 }
 
+// A secret kept by one guest device so it can reclaim its seat after a reload,
+// even if the host has not noticed the old connection die yet.
+export function makeSeatKey() {
+  return makeRoomCode(12);
+}
+
 export function normalizeCode(value) {
   return String(value || '')
     .toUpperCase()

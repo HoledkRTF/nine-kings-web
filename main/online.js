@@ -18,6 +18,7 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   DEFAULT_ONLINE_SETTINGS,
+  makeSeatKey,
   normalizeCode,
   cleanName
 } from './online-shared.js';
@@ -86,6 +87,7 @@ export class HostRoom {
     this.destroyed = false;
     this.peer = null;
     this.discussionTimer = null;
+    this.seatSweep = setInterval(() => this.sweepSeats(), 15000);
     this.openPeer();
   }
 
@@ -99,7 +101,9 @@ export class HostRoom {
       eliminated: false,
       role: null,
       isGuardian: false,
-      vote: null
+      vote: null,
+      seatKey: makeSeatKey(),
+      lastSeen: Date.now()
     };
   }
 
@@ -152,7 +156,7 @@ export class HostRoom {
     if (!msg || typeof msg !== 'object') return;
 
     if (msg.type === 'hello') {
-      this.addGuest(conn, msg.name, !!msg.resume);
+      this.addGuest(conn, msg.name, !!msg.resume, msg.seatKey || '');
       return;
     }
 
@@ -167,6 +171,11 @@ export class HostRoom {
 
     const player = this.players.find((p) => p.id === conn.peer);
     if (!player) return;
+    player.lastSeen = Date.now();
+    if (msg.type === 'ping') {
+      try { if (conn.open) conn.send({ type: 'pong' }); } catch (error) { /* ignore */ }
+      return;
+    }
     if (isHostIntent(msg.type)) return; // guests cannot drive the room
 
     if (msg.type === 'ready') {
@@ -194,29 +203,18 @@ export class HostRoom {
     }
   }
 
-  addGuest(conn, rawName, resume = false) {
+  addGuest(conn, rawName, resume = false, seatKey = '') {
     const name = cleanName(rawName);
 
     // One player per peer: a duplicate hello from the same connection is ignored.
     if (this.players.some((p) => p.id === conn.peer)) return;
 
-    // A reconnecting guest keeps their seat (and their role) when the name
-    // matches a player who dropped out. This works mid-game too.
+    // A reconnecting guest keeps their seat (and their role). Works mid-game,
+    // and works before the host has noticed the old connection die.
     if (resume) {
-      const seat = this.players.find(
-        (p) => !p.isHost && !p.connected && p.name.toLowerCase() === name.toLowerCase()
-      );
+      const seat = this.seatFor(name, seatKey);
       if (seat) {
-        this.conns.forEach((existing, peerId) => {
-          if (peerId === seat.id) this.conns.delete(peerId);
-        });
-        this.conns.set(conn.peer, conn);
-        seat.id = conn.peer;
-        seat.connected = true;
-        seat.ready = false;
-        seat.vote = null;
-        conn.send({ type: 'welcome', code: this.code, resumed: true });
-        this.publish();
+        this.adoptSeat(conn, seat);
         return;
       }
     }
@@ -241,8 +239,57 @@ export class HostRoom {
     }
 
     this.conns.set(conn.peer, conn);
-    this.players.push(this.makePlayer(conn.peer, name));
-    conn.send({ type: 'welcome', code: this.code });
+    const player = this.makePlayer(conn.peer, name);
+    this.players.push(player);
+    conn.send({ type: 'welcome', code: this.code, seat: player.seatKey });
+    this.publish();
+  }
+
+  // Seat token first (survives reloads even if the host still thinks the old
+  // connection is alive), then a name match on a seat that is clearly free.
+  // A live player with the same name keeps their seat.
+  seatFor(name, seatKey) {
+    const wanted = String(name || '').toLowerCase();
+    if (!wanted) return null;
+    const heldBy = (p) => !p.isHost && p.name.toLowerCase() === wanted;
+    if (seatKey) {
+      const tokenSeat = this.players.find((p) => heldBy(p) && p.seatKey === seatKey);
+      if (tokenSeat) return tokenSeat;
+    }
+    // Same name, no token (or a stale one): only reclaim a seat that is free.
+    return this.players.find((p) => heldBy(p) && (!p.connected || !this.conns.get(p.id)?.open)) || null;
+  }
+
+  adoptSeat(conn, seat) {
+    this.conns.delete(seat.id);
+    this.conns.set(conn.peer, conn);
+    seat.id = conn.peer;
+    seat.connected = true;
+    seat.ready = false;
+    seat.vote = null;
+    seat.lastSeen = Date.now();
+    conn.send({ type: 'welcome', code: this.code, resumed: true, seat: seat.seatKey });
+    this.publish();
+  }
+
+  // Silence is the only reliable sign of a phone that walked out of Wi-Fi:
+  // PeerJS does not always fire 'close'. Two quiet minutes means the seat is
+  // free to reclaim and no longer blocks the round.
+  sweepSeats() {
+    if (this.destroyed) return;
+    const now = Date.now();
+    let changed = false;
+    this.players.forEach((p) => {
+      if (p.isHost || !p.connected) return;
+      if (now - (p.lastSeen || 0) < 120000) return;
+      p.connected = false;
+      p.ready = false;
+      p.vote = null;
+      changed = true;
+    });
+    if (!changed) return;
+    this.maybeStartDiscussion();
+    this.maybeResolveVotes();
     this.publish();
   }
 
@@ -654,6 +701,10 @@ export class HostRoom {
   close() {
     this.destroyed = true;
     this.clearDiscussionTimer();
+    if (this.seatSweep) {
+      clearInterval(this.seatSweep);
+      this.seatSweep = null;
+    }
     this.conns.forEach((conn) => {
       // Tell guests this was deliberate, so they do not sit in a retry loop.
       try { if (conn?.open) conn.send({ type: 'closed' }); } catch (e) { /* ignore */ }
@@ -667,13 +718,15 @@ export class HostRoom {
 // --------------------------------------------------------------- guest client
 
 export class GuestClient {
-  constructor({ code, name, onState, onYou, onStatus, onError }) {
+  constructor({ code, name, seatKey, onState, onYou, onStatus, onError, onSeat }) {
     this.code = normalizeCode(code);
     this.name = cleanName(name);
+    this.seatKey = seatKey || '';
     this.onState = onState;
     this.onYou = onYou;
     this.onStatus = onStatus;
     this.onError = onError;
+    this.onSeat = onSeat;
     this.lastState = null;
     this.lastYou = null;
     this.conn = null;
@@ -682,6 +735,7 @@ export class GuestClient {
     this.retryTimer = null;
     this.rejoinable = false;
     this.stopped = false;
+    this.pingTimer = null;
 
     this.onStatus?.('connecting');
     this.openPeer();
@@ -741,15 +795,17 @@ export class GuestClient {
       this.onStatus?.('online');
       // Always offer to resume: the host only reuses a seat that is offline,
       // so a live player with the same name still gets "name taken".
-      conn.send({ type: 'hello', name: this.name, resume: true });
+      conn.send({ type: 'hello', name: this.name, resume: true, seatKey: this.seatKey || undefined });
     });
     conn.on('data', (msg) => this.handleMessage(msg));
     conn.on('close', () => {
       if (this.destroyed) return;
+      this.stopPing();
       this.scheduleReconnect();
     });
     conn.on('error', () => {
       if (this.destroyed) return;
+      this.stopPing();
       this.scheduleReconnect();
     });
   }
@@ -821,7 +877,29 @@ export class GuestClient {
       this.attempts = 0;
       this.rejoinable = true;
       this.onStatus?.('online');
+      if (msg.seat) {
+        this.seatKey = msg.seat;
+        this.onSeat?.({ code: this.code, name: this.name, seatKey: msg.seat });
+      }
       this.onResumed?.(!!msg.resumed);
+      this.startPing();
+    }
+  }
+
+  // One tiny message every few seconds tells the host this device is still
+  // here, which also lets it notice a dead connection that never fires 'close'.
+  startPing() {
+    this.stopPing();
+    this.pingTimer = setInterval(() => {
+      if (this.destroyed || !this.conn?.open) return;
+      try { this.conn.send({ type: 'ping' }); } catch (error) { /* ignore */ }
+    }, 5000);
+  }
+
+  stopPing() {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
     }
   }
 
@@ -837,6 +915,7 @@ export class GuestClient {
 
   close() {
     this.destroyed = true;
+    this.stopPing();
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;

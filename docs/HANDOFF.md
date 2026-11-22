@@ -80,10 +80,17 @@ import the pass-and-play game class; the two sides exchange two JSON snapshots i
   client gets a guess box.
 - **Seats survive a drop.** A guest that disconnects keeps their row in the room (marked offline);
   `GuestClient` retries with backoff (8 attempts, then gives up) and re-sends
-  `hello { resume: true }`. `HostRoom.addGuest` adopts an offline seat with the same name, so the
-  player lands back on the current phase with the same role — including after a full page reload
-  and a manual rejoin with the same name. A *connected* player with that name still gets
-  `name-taken`, so a stranger cannot take a live seat.
+  `hello { resume: true, seatKey }`. Each guest seat carries a secret seat key issued in `welcome`
+  and stored on that device as `fti-seat` (`{code, name, seatKey}`), so a reload can reclaim the
+  seat immediately — even while the host still believes the old connection is alive, which is the
+  case PeerJS does not always report. `HostRoom.seatFor` requires both the typed name and either
+  the matching seat key or an offline/dead connection, then `adoptSeat` swaps the connection and
+  reissues the current phase and role. Clearing storage still rejoins by name once the old link is
+  gone, and a stranger using a live player's name without the key gets `name-taken`/`in-progress`.
+- **Liveness:** a seated guest sends `{type:'ping'}` every 5s (the host answers `pong`);
+  `HostRoom.sweepSeats` runs every 15s and marks a seat offline after two quiet minutes, since a
+  phone that walks out of Wi-Fi often never fires a PeerJS `close`. That frees the seat for a
+  rejoin and stops a missing ballot from blocking vote resolution.
 - **Moderation:** guests are shown with an Offline tag and the host can remove them
   (`kick(name)` → `data-kick` button). A deliberate leave sends `{type:'leave'}` and frees the seat.
 - **Host closes the room:** `HostRoom.close()` broadcasts `{type:'closed'}` before tearing down, so
@@ -121,6 +128,7 @@ All optional, all best-effort writes wrapped in `try`:
 | `fti-stats` | `{ games, crewWins, imposterWins, imposters: { name: count } }`, shown on the victory screen |
 | `fti-banned-pairs` | `crew::imposter` pairs flagged "too similar" (victory screen button); `getWordSelection` skips them |
 | `fti-muted` | Sound preference, owned by `audio.js` |
+| `fti-seat` | `{ code, name, seatKey }` for the last online room, used to reclaim that seat after a reload |
 
 `getWordSelection(selected, isUndercover, difficulty, usedWords, customWords, bannedPairs)` takes the
 ban list as its sixth argument; `HostRoom` receives the host device's list at construction.
