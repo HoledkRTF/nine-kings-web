@@ -172,6 +172,12 @@ export class HostRoom {
     const player = this.players.find((p) => p.id === conn.peer);
     if (!player) return;
     player.lastSeen = Date.now();
+    // A seat the sweep retired is clearly alive again as soon as it speaks,
+    // so it must not sit in the host's "not at the table" list.
+    if (!player.connected) {
+      player.connected = true;
+      this.publish();
+    }
     if (msg.type === 'ping') {
       try { if (conn.open) conn.send({ type: 'pong' }); } catch (error) { /* ignore */ }
       return;
@@ -308,12 +314,22 @@ export class HostRoom {
     this.publish();
   }
 
+  // Guests ping every 5s, so three missed pings mean the phone is gone even
+  // when PeerJS never reports the connection closing. The host can act on this
+  // straight away; the automatic two-minute sweep is the fallback.
+  isSilent(player, now = Date.now()) {
+    return !player.isHost && now - (player.lastSeen || 0) > 20000;
+  }
+
+  // The host can remove an absent player at any point in the game, so a dead
+  // phone cannot hold up the ready check or the next ballot. Live players can
+  // still only be removed from the lobby, so nobody can boot a rival mid-round.
   kick(name) {
-    if (this.screen !== 'lobby') return;
     const player = this.players.find(
       (p) => !p.isHost && p.name.toLowerCase() === String(name || '').toLowerCase()
     );
     if (!player) return;
+    if (this.screen !== 'lobby' && player.connected && !this.isSilent(player)) return;
     const conn = this.conns.get(player.id);
     if (conn?.open) {
       try { conn.send({ type: 'denied', reason: 'kicked' }); } catch (error) { /* ignore */ }
@@ -321,6 +337,10 @@ export class HostRoom {
     }
     this.conns.delete(player.id);
     this.players = this.players.filter((p) => p !== player);
+    this.turnOrder = this.turnOrder.filter((turn) => turn !== player.name);
+    // Removing the last blocker should let the current phase finish now.
+    this.maybeStartDiscussion();
+    this.maybeResolveVotes();
     this.publish();
   }
 
@@ -624,6 +644,7 @@ export class HostRoom {
   }
 
   publicState() {
+    const now = Date.now();
     const alive = this.players.filter((p) => !p.eliminated);
     const votesNeeded = alive.filter((p) => p.connected).length;
     const votesIn = alive.filter((p) => p.vote).length;
@@ -639,6 +660,7 @@ export class HostRoom {
         name: p.name,
         isHost: !!p.isHost,
         connected: p.connected,
+        silent: this.isSilent(p, now),
         ready: p.ready,
         eliminated: p.eliminated,
         hasVoted: !!p.vote,

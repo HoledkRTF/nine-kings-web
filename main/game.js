@@ -2884,6 +2884,32 @@ class ImposterGame {
     }
   }
 
+  // Hosts need to prune a phone that died mid-round: a seat that stopped
+  // pinging still shows as connected until the sweep notices, which would
+  // otherwise hold up the ready check or the ballot. Only absent seats are
+  // listed, and the same [data-kick] handler removes them.
+  renderOfflineSeats() {
+    const st = this.online.state;
+    if (this.online.role !== 'host' || !st) return '';
+    if (!['reveal', 'discussion', 'vote', 'results'].includes(st.screen)) return '';
+    const away = (st.players || []).filter(p => !p.isHost && (!p.connected || p.silent));
+    if (!away.length) return '';
+    return `
+      <div class="online-players online-away-card">
+        <div class="online-players-head"><span>NOT AT THE TABLE</span><span>${away.length}</span></div>
+        ${away.map(p => `
+          <div class="online-player is-offline">
+            ${renderAvatarSvg(p.name, 30)}
+            <span class="online-player-name">${escapeHtml(p.name)}</span>
+            <span class="online-tag muted">${p.connected ? 'No signal' : 'Offline'}</span>
+            <button class="online-kick" data-kick="${escapeHtml(p.name)}" title="Remove ${escapeHtml(p.name)}" aria-label="Remove ${escapeHtml(p.name)} from the game">✕</button>
+          </div>
+        `).join('')}
+        <p class="online-hint">Remove them so the round can move on without their vote.</p>
+      </div>
+    `;
+  }
+
   renderOnlineReveal() {
     const st = this.online.state;
     const you = this.online.you;
@@ -2950,6 +2976,8 @@ class ImposterGame {
             <p class="role-instructions">${hintDesc}</p>
           </div>
         </div>
+
+        ${this.renderOfflineSeats()}
 
         <div class="stage-actions">
           ${!isRevealed ? `
@@ -3059,6 +3087,8 @@ class ImposterGame {
           </div>
         </div>
 
+        ${this.renderOfflineSeats()}
+
         <div class="round-block">
           <h3>Give a clue</h3>
           <p>Go around the table and each say one short clue about your word. Don’t say the word itself.</p>
@@ -3137,6 +3167,8 @@ class ImposterGame {
           </div>
           <button class="btn btn-red btn-lg" id="online-vote-submit-btn" ${selected ? '' : 'disabled'}>LOCK IN VOTE</button>
         `}
+
+        ${this.renderOfflineSeats()}
 
         ${isHost ? `<button class="btn btn-ghost-quiet" id="online-force-votes-btn">End voting now</button>` : ''}
       </div>
@@ -3298,6 +3330,7 @@ class ImposterGame {
 
         ${result.eliminated?.length ? `<div class="elimination-note">${escapeHtml(result.eliminated.join(' & '))} ${result.eliminated.length > 1 ? 'were' : 'was'} eliminated.</div>` : ''}
 
+        ${this.renderOfflineSeats()}
 
         <div class="stage-actions">
           ${isHost ? `

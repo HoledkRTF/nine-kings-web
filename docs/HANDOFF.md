@@ -92,7 +92,14 @@ import the pass-and-play game class; the two sides exchange two JSON snapshots i
   phone that walks out of Wi-Fi often never fires a PeerJS `close`. That frees the seat for a
   rejoin and stops a missing ballot from blocking vote resolution.
 - **Moderation:** guests are shown with an Offline tag and the host can remove them
-  (`kick(name)` → `data-kick` button). A deliberate leave sends `{type:'leave'}` and frees the seat.
+  (`kick(name)` → `data-kick` button). In the lobby any guest can go; mid-game `kick` only accepts a
+  seat that is offline or silent, so a rival cannot be booted during a round. `publicState` marks a
+  guest `silent: true` once three 5s pings are missed (>20s), and the reveal/discussion/vote/results
+  screens show those seats in a host-only "Not at the table" card with the same remove button;
+  removal prunes `turnOrder` and re-runs `maybeStartDiscussion`/`maybeResolveVotes`, so the round
+  finishes without the missing ballot. A seat the sweep retired re-arms on its next message, so a
+  phone that comes back is not listed as removable. A deliberate leave sends `{type:'leave'}` and
+  frees the seat.
 - **Host closes the room:** `HostRoom.close()` broadcasts `{type:'closed'}` before tearing down, so
   guests land on the `online_closed` screen with the last roster/vote rather than a bare error.
   That screen offers a rejoin attempt for the same code and name.
