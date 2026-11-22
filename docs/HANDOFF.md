@@ -100,6 +100,12 @@ import the pass-and-play game class; the two sides exchange two JSON snapshots i
   finishes without the missing ballot. A seat the sweep retired re-arms on its next message, so a
   phone that comes back is not listed as removable. A deliberate leave sends `{type:'leave'}` and
   frees the seat.
+- **Leaving is always confirmed:** `leaveOnlineRoom()` (lobby, connect card, victory screen) asks
+  "Leave the room?" / "Close the room?" with `Stay` + `Leave room`/`Close room`, and the Pass &
+  Play `QUIT GAME` buttons on the reveal and both voting screens now route through
+  `confirmQuitGame()` ("Quit this game?" → `Keep playing` / `Quit game`) instead of dropping
+  straight back to setup. `showConfirmModal(title, message, onConfirm, {confirmLabel, cancelLabel})`
+  takes the labels and focuses Cancel so a held Enter or double tap cannot confirm by itself.
 - **Host closes the room:** `HostRoom.close()` broadcasts `{type:'closed'}` before tearing down, so
   guests land on the `online_closed` screen with the last roster/vote rather than a bare error.
   That screen offers a rejoin attempt for the same code and name.

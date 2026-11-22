@@ -1637,11 +1637,7 @@ class ImposterGame {
       }
     });
 
-    document.getElementById('quit-reveal-btn')?.addEventListener('click', () => {
-      this.pauseTimer();
-      this.state.screen = 'setup';
-      this.render();
-    });
+    document.getElementById('quit-reveal-btn')?.addEventListener('click', () => this.confirmQuitGame());
   }
 
   // --- Discussion Screen Template ---
@@ -1802,10 +1798,7 @@ class ImposterGame {
       this.state.screen = 'discussion';
       this.render();
     });
-    document.getElementById('quit-vote-btn')?.addEventListener('click', () => {
-      this.state.screen = 'setup';
-      this.render();
-    });
+    document.getElementById('quit-vote-btn')?.addEventListener('click', () => this.confirmQuitGame());
   }
 
   // --- Voting: Input Screen ---
@@ -1899,10 +1892,7 @@ class ImposterGame {
       this.submitVote(this.state.currentSelectedAccused);
     });
 
-    document.getElementById('quit-vote-input-btn')?.addEventListener('click', () => {
-      this.state.screen = 'setup';
-      this.render();
-    });
+    document.getElementById('quit-vote-input-btn')?.addEventListener('click', () => this.confirmQuitGame());
   }
 
   // --- Voting Results Screen ---
@@ -2591,14 +2581,32 @@ class ImposterGame {
   leaveOnlineRoom() {
     const wasHost = this.online.role === 'host';
     this.showConfirmModal(
-      wasHost ? 'Close this room?' : 'Leave this room?',
-      wasHost ? 'Everyone in the room will be disconnected.' : 'You can rejoin later with the same code.',
+      wasHost ? 'Close the room?' : 'Leave the room?',
+      wasHost
+        ? 'Everyone at the table will be disconnected and this room will be gone. Are you sure?'
+        : 'Your seat will be freed and you’ll go back to the main menu. Are you sure?',
       () => {
         this.clearSeat(this.online.code);
         this.cleanupOnline();
         this.state.screen = 'home';
         this.render();
-      }
+      },
+      { confirmLabel: wasHost ? 'Close room' : 'Leave room', cancelLabel: 'Stay' }
+    );
+  }
+
+  // Every pass-and-play exit runs through here, so a stray tap on QUIT GAME
+  // can never abandon a live round by accident.
+  confirmQuitGame() {
+    this.showConfirmModal(
+      'Quit this game?',
+      'The round will be abandoned and you’ll go back to the setup screen. Are you sure?',
+      () => {
+        this.pauseTimer();
+        this.state.screen = 'setup';
+        this.render();
+      },
+      { confirmLabel: 'Quit game', cancelLabel: 'Keep playing' }
     );
   }
 
@@ -3480,19 +3488,21 @@ class ImposterGame {
     modal.addEventListener('click', e => { if (e.target === modal) close(); });
   }
 
-  showConfirmModal(title, message, onConfirm) {
+  showConfirmModal(title, message, onConfirm, options = {}) {
+    const confirmLabel = options.confirmLabel || 'Confirm';
+    const cancelLabel = options.cancelLabel || 'Cancel';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-      <div class="modal-content modal-small">
+      <div class="modal-content modal-small" role="dialog" aria-modal="true">
         <div class="modal-head">
           <h3>${title}</h3>
           <button class="icon-btn" id="close-confirm-btn">✕</button>
         </div>
         <p class="modal-text">${message}</p>
         <div class="modal-actions">
-          <button class="btn btn-dark" id="confirm-cancel-btn">Cancel</button>
-          <button class="btn btn-red" id="confirm-ok-btn">Confirm</button>
+          <button class="btn btn-dark" id="confirm-cancel-btn">${escapeHtml(cancelLabel)}</button>
+          <button class="btn btn-red" id="confirm-ok-btn">${escapeHtml(confirmLabel)}</button>
         </div>
       </div>
     `;
@@ -3506,6 +3516,9 @@ class ImposterGame {
       onConfirm();
     });
     modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    // Land focus on the harmless choice so a held Enter or a double tap can't
+    // confirm a destructive action.
+    modal.querySelector('#confirm-cancel-btn')?.focus({ preventScroll: true });
   }
 
   showOnlineModal() {
