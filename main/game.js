@@ -181,6 +181,7 @@ class ImposterGame {
     // (see bindTellCode) and then remembers the choice on this device.
     this.tellEnabled = false;
     this._tellBuffer = '';
+    this._tellTaps = [];
     try {
       this.tellEnabled = localStorage.getItem('fti-tell') === '1';
     } catch (error) {
@@ -399,8 +400,16 @@ class ImposterGame {
   // --- Tell code ---
   // Old-school cheat code: type the word below anywhere outside a text field
   // and the tell marker switches on or off. No UI ever hints that it exists.
+  // Phones have no keyboard to type it on, so five quick taps in the bottom
+  // right corner do the same. The taps are read from document coordinates
+  // rather than an invisible layer, so nothing ever covers a real button and
+  // the same corner works on every screen.
   bindTellCode() {
     const CODE = 'pedophilerep';
+    const TAPS = 5;
+    const TAP_WINDOW = 3000;
+    const TAP_ZONE = 64;
+
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target;
@@ -413,14 +422,34 @@ class ImposterGame {
       this._tellBuffer = (this._tellBuffer + e.key.toLowerCase()).slice(-CODE.length);
       if (this._tellBuffer !== CODE) return;
       this._tellBuffer = '';
-      this.tellEnabled = !this.tellEnabled;
-      try {
-        localStorage.setItem('fti-tell', this.tellEnabled ? '1' : '0');
-      } catch (error) {
-        // Storage is optional; the marker still toggles for this visit.
-      }
-      this.render();
+      this.toggleTell();
     });
+
+    document.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch' || e.isPrimary === false) return;
+      const inCorner = window.innerWidth - e.clientX <= TAP_ZONE
+        && window.innerHeight - e.clientY <= TAP_ZONE;
+      if (!inCorner) {
+        this._tellTaps = [];
+        return;
+      }
+      const now = Date.now();
+      this._tellTaps = (this._tellTaps || []).filter(at => now - at < TAP_WINDOW);
+      this._tellTaps.push(now);
+      if (this._tellTaps.length < TAPS) return;
+      this._tellTaps = [];
+      this.toggleTell();
+    });
+  }
+
+  toggleTell() {
+    this.tellEnabled = !this.tellEnabled;
+    try {
+      localStorage.setItem(STORAGE.tell, this.tellEnabled ? '1' : '0');
+    } catch (error) {
+      // Storage is optional; the marker still toggles for this visit.
+    }
+    this.render();
   }
 
   // --- Confetti FX ---

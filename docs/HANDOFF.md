@@ -120,6 +120,11 @@ import the pass-and-play game class; the two sides exchange two JSON snapshots i
 `bindTellCode()` in `game.js` listens for the typed code `pedophilerep` anywhere outside a text field
 and toggles `tellEnabled` (remembered in `localStorage` as `fti-tell`). While it is off nothing is
 drawn at all, so the marker cannot be discovered by accident; typing the code again switches it off.
+A phone has no keyboard to type it on, so there is a touch route too: five taps with one finger
+inside the bottom-right 64px corner within three seconds fire the same `toggleTell()`. The gesture
+is matched on document `pointerdown` coordinates instead of an invisible overlay, so it never
+swallows a tap meant for a real button, and each tap outside the corner clears the count so a few
+stray taps can never accumulate into it. Both routes toggle; neither is advertised in the UI.
 Once on, `ownTellRole()`, `tellDot(name)` and `updateTellSelf()` drive a deliberately subtle 1px
 pixel fixed in the very bottom-right corner (`#tell-self`), painted to match the page background
 there — being the imposter only shifts it a couple of channel steps, so nothing appears or
